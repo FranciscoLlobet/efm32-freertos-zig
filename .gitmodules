@@ -1,0 +1,3 @@
+[submodule "deps/microzig"]
+	path = deps/microzig
+	url = git@github.com:FranciscoLlobet/microzig.git
