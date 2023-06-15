@@ -1,0 +1,25 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/zig-out/bin/XDK110.minimal",
+            "name": "Debug Microcontroller",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "jlink",
+            "serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
+            "armToolchainPath": "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\bin",
+            "device": "EFM32GG390F1024",
+            "interface": "swd",
+            "runToEntryPoint": "ResetHandler"
+            "serialNumber": "", // add J-Link serial number if having multiple attached the same time.
+            "svdFile": "${workspaceRoot}/src/chips/EFM32GG390F1024.svd",
+            "rtos": "FreeRTOS"
+
+        }
+    ]
+}
