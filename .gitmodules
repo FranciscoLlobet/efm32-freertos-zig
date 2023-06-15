@@ -1,3 +1,6 @@
 [submodule "deps/microzig"]
 	path = deps/microzig
 	url = git@github.com:FranciscoLlobet/microzig.git
+[submodule "csrc/system/FreeRTOS-Kernel"]
+	path = csrc/system/FreeRTOS-Kernel
+	url = git@github.com:FranciscoLlobet/FreeRTOS-Kernel.git
