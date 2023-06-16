@@ -60,9 +60,6 @@ void BOARD_SD_Card_Init(void)
                       true,
                       true,
                       false);
-
-    sl_led_turn_off(&led_yellow);
-
 }
 
 void BOARD_SD_Card_Enable(void)
@@ -107,8 +104,6 @@ void BOARD_SD_Card_Disable(void)
                       false,
                       false,
                       false);
-
-    sl_led_turn_off(&led_yellow);
 }
 
 

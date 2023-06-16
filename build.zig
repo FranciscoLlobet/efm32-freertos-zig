@@ -182,6 +182,8 @@ pub fn build(b: *std.build.Builder) void {
         exe.addCSourceFile("csrc/board/src/sdmm.c", &[_][]const u8{"-DEFM32GG390F1024"});
 
         exe.addIncludePath("csrc/utils/jsmn");
+        exe.addIncludePath("csrc/inc");
+        exe.addCSourceFile("csrc/src/config.c", &[_][]const u8{"-DEFM32GG390F1024"});
         exe.installArtifact(b);
     }
 
