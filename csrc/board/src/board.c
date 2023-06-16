@@ -6,6 +6,7 @@
  */
 
 #include "board.h"
+#include "board_sd_card.h"
 
 #include "timer.h"
 
@@ -138,7 +139,7 @@ void BOARD_Init(void)
 	DMADRV_Init();
 
 	/* Initialize SPI peripherals */
-	//BOARD_SD_Card_Init();
+	BOARD_SD_Card_Init();
 	//Board_CC3100_Init();
 
 	/* Initialize I2C peripheral */

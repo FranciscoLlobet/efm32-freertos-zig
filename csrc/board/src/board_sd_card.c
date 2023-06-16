@@ -4,9 +4,8 @@
  *  Created on: 9 nov 2022
  *      Author: Francisco
  */
-
-#include <sd_card.h>
 #include "board.h"
+#include "board_sd_card.h"
 
 #include "ff.h"
 #include "diskio.h"
@@ -14,8 +13,6 @@
 /* OS resources */
 #include "FreeRTOS.h"
 #include "semphr.h"
-
-#include "em_usart.h"
 
 /* SPI DRV Handle */
 SPIDRV_HandleData_t sd_card_usart;

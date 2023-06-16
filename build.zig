@@ -13,7 +13,7 @@ pub fn build(b: *std.build.Builder) void {
             continue;
 
         const exe = microzig.addEmbeddedExecutable(b, .{
-            .name = @field(boards, decl.name).name ++ ".minimal",
+            .name = @field(boards, decl.name).name ++ ".elf",
             .source_file = .{
                 .path = "src/main.zig",
             },
@@ -171,6 +171,17 @@ pub fn build(b: *std.build.Builder) void {
 
         exe.addCSourceFile("csrc/system/FreeRTOS-Kernel/portable/GCC/ARM_CM3/port.c", &[_][]const u8{"-DEFM32GG390F1024"});
         exe.addCSourceFile("csrc/system/FreeRTOS-Kernel/portable/MemMang/heap_4.c", &[_][]const u8{"-DEFM32GG390F1024"});
+
+        exe.addIncludePath("csrc/system/ff15/source");
+        //  FatFs FF15
+        exe.addCSourceFile("csrc/system/ff15/source/ff.c", &[_][]const u8{"-DEFM32GG390F1024"});
+        exe.addCSourceFile("csrc/system/ff15/source/ffunicode.c", &[_][]const u8{"-DEFM32GG390F1024"});
+        exe.addCSourceFile("csrc/system/ff15/custom/ffsystem.c", &[_][]const u8{"-DEFM32GG390F1024"});
+
+        exe.addCSourceFile("csrc/board/src/board_sd_card.c", &[_][]const u8{"-DEFM32GG390F1024"});
+        exe.addCSourceFile("csrc/board/src/sdmm.c", &[_][]const u8{"-DEFM32GG390F1024"});
+
+        exe.addIncludePath("csrc/utils/jsmn");
         exe.installArtifact(b);
     }
 

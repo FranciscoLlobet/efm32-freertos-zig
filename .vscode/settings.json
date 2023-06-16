@@ -2,6 +2,8 @@
     "files.associations": {
         "em_gpio.h": "c",
         "em_device.h": "c",
-        "sl_simple_led.h": "c"
+        "sl_simple_led.h": "c",
+        "board_sd_card.h": "c",
+        "board.h": "c"
     }
 }
