@@ -4,3 +4,6 @@
 [submodule "csrc/system/FreeRTOS-Kernel"]
 	path = csrc/system/FreeRTOS-Kernel
 	url = git@github.com:FranciscoLlobet/FreeRTOS-Kernel.git
+[submodule "csrc/utils/jsmn"]
+	path = csrc/utils/jsmn
+	url = git@github.com:FranciscoLlobet/jsmn.git
