@@ -7,3 +7,18 @@
 [submodule "csrc/utils/jsmn"]
 	path = csrc/utils/jsmn
 	url = git@github.com:FranciscoLlobet/jsmn.git
+[submodule "csrc/sensors/BMA2-Sensor-API"]
+	path = csrc/sensors/BMA2-Sensor-API
+	url = git@github.com:FranciscoLlobet/BMA2-Sensor-API.git
+[submodule "csrc/sensors/BMM150-Sensor-API"]
+	path = csrc/sensors/BMM150-Sensor-API
+	url = git@github.com:FranciscoLlobet/BMM150-Sensor-API.git
+[submodule "csrc/sensors/BMG160_driver"]
+	path = csrc/sensors/BMG160_driver
+	url = git@github.com:FranciscoLlobet/BMG160_driver.git
+[submodule "csrc/sensors/BME280_driver"]
+	path = csrc/sensors/BME280_driver
+	url = git@github.com:FranciscoLlobet/BME280_driver.git
+[submodule "csrc/sensors/BMI160_driver"]
+	path = csrc/sensors/BMI160_driver
+	url = git@github.com:FranciscoLlobet/BMI160_driver.git
