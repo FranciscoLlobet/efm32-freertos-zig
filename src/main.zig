@@ -1,5 +1,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const freertos = @import("freertos.zig");
 
 const c_board = @cImport({
     @cDefine("EFM32GG390F1024", "1");
@@ -8,15 +9,6 @@ const c_board = @cImport({
     @cInclude("board.h");
     @cInclude("sl_simple_led.h");
     @cInclude("uiso_config.h");
-});
-
-const free_rtos = @cImport({
-    @cDefine("EFM32GG390F1024", "1");
-    @cDefine("__PROGRAM_START", "__main");
-    @cInclude("FreeRTOS.h");
-    @cInclude("task.h");
-    @cInclude("timers.h");
-    @cInclude("semphr.h");
 });
 
 extern fn xPortSysTickHandler() callconv(.C) void;
@@ -71,7 +63,7 @@ pub const microzig_options = struct {
             c_board.DMA_IRQHandler();
         }
         pub fn SysTick() void {
-            if (free_rtos.taskSCHEDULER_NOT_STARTED != free_rtos.xTaskGetSchedulerState()) {
+            if (freertos.c.taskSCHEDULER_NOT_STARTED != freertos.c.xTaskGetSchedulerState()) {
                 xPortSysTickHandler();
             }
         }
@@ -104,7 +96,7 @@ pub const microzig_options = struct {
                 \\.align 4
                 \\pxCurrentTCBConst: .word pxCurrentTCB
                 :
-                : [priority] "i" (free_rtos.configMAX_SYSCALL_INTERRUPT_PRIORITY),
+                : [priority] "i" (freertos.c.configMAX_SYSCALL_INTERRUPT_PRIORITY),
             );
         }
         pub fn SVCall() callconv(.Naked) void {
@@ -162,78 +154,13 @@ pub const microzig_options = struct {
 };
 
 // Types
-pub const BaseType_t = free_rtos.BaseType_t;
-pub const TaskFunction_t = free_rtos.TaskFunction_t;
-pub const UBaseType_t = free_rtos.UBaseType_t;
-pub const TaskHandle_t = free_rtos.TaskHandle_t;
-pub const QueueHandle_t = free_rtos.QueueHandle_t;
-pub const TimerHandle_t = free_rtos.TimerHandle_t;
-pub const TickType_t = free_rtos.TickType_t;
-const TimerCallbackFunction_t = free_rtos.TimerCallbackFunction_t;
 
-pub const task = struct {
-    task_handle: TaskHandle_t,
-    pub fn xTaskCreate(self: *task, pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) BaseType_t {
-        return free_rtos.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, &self.task_handle);
-    }
-};
-
-pub const Queue = struct {
-    handle: QueueHandle_t,
-
-    pub fn init(item_size: UBaseType_t, queue_length: UBaseType_t) Queue {
-        return Queue{ .handle = free_rtos.xQueueCreate(item_size, queue_length) };
-    }
-    pub fn send(self: *Queue, item_to_queue: *const void, ticks_to_wait: UBaseType_t) BaseType_t {
-        return free_rtos.xQueueSend(self.handle, item_to_queue, ticks_to_wait);
-    }
-    pub fn receive(self: *Queue, buffer: *void, ticks_to_wait: UBaseType_t) BaseType_t {
-        return free_rtos.xQueueReceive(self.handle, buffer, ticks_to_wait);
-    }
-    pub fn delete(self: *Queue) void {
-        free_rtos.xQueueDelete(self.handle);
-    }
-};
-
-pub const Timer = struct {
-    handle: TimerHandle_t = undefined,
-
-    pub fn create(self: *Timer, pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) BaseType_t {
-        self.handle = free_rtos.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction);
-        if (self.handle == null) {
-            return free_rtos.pdFAIL;
-        } else {
-            return free_rtos.pdPASS;
-        }
-    }
-
-    //pub fn start(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-    //     return free_rtos.xTimerStart(self.handle, xTicksToWait);
-    // }
-    pub fn start(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-        var pxHigherPriorityTaskWoken: BaseType_t = undefined;
-        return free_rtos.xTimerGenericCommand(self.handle, free_rtos.tmrCOMMAND_START, free_rtos.xTaskGetTickCount(), &pxHigherPriorityTaskWoken, xTicksToWait);
-    }
-
-    pub fn stop(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-        return free_rtos.xTimerStop(self.handle, xTicksToWait);
-    }
-
-    pub fn delete(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-        return free_rtos.xTimerDelete(self.handle, xTicksToWait);
-    }
-
-    pub fn reset(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-        return free_rtos.xTimerReset(self.handle, xTicksToWait);
-    }
-};
-
-var my_user_task: task = undefined;
-var my_user_task_queue: Queue = undefined;
-const stack_Depth: u16 = 1600;
+var my_user_task: freertos.Task = undefined;
+var my_user_task_queue: freertos.Queue = undefined;
+const stack_Depth: u16 = 2000;
 const task_name: [*c]const u8 = "TestTask";
-const taskPriority: UBaseType_t = 3;
-var my_timer: Timer = undefined;
+const taskPriority: freertos.c.UBaseType_t = 3;
+var my_timer: freertos.Timer = undefined;
 const timer_name: [*c]const u8 = "TestTimer";
 
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -244,26 +171,29 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (true) {
         var test_var: u32 = 0;
 
-        if (free_rtos.pdPASS == my_user_task_queue.receive(@ptrCast(*void, &test_var), free_rtos.portMAX_DELAY)) {
+        if (my_user_task_queue.receive(@ptrCast(*void, &test_var), freertos.c.portMAX_DELAY)) {
             c_board.sl_led_toggle(&c_board.led_yellow);
         }
     }
 }
 
-fn myTimerFunction(xTimer: TimerHandle_t) callconv(.C) void {
+fn myTimerFunction(xTimer: freertos.c.TimerHandle_t) callconv(.C) void {
     _ = xTimer;
     var test_var: u32 = 0xAA55;
 
-    _ = my_user_task_queue.send(@ptrCast(*void, &test_var), free_rtos.portMAX_DELAY);
+    _ = my_user_task_queue.send(@ptrCast(*void, &test_var), freertos.c.portMAX_DELAY);
 }
 
 pub export fn main() void {
     c_board.BOARD_Init();
 
-    _ = my_user_task.xTaskCreate(myUserTaskFunction, task_name, stack_Depth, null, taskPriority);
-    my_user_task_queue = Queue.init(4, 1);
-    _ = my_timer.create(timer_name, 2000, free_rtos.pdTRUE, null, myTimerFunction);
+    my_user_task.init(myUserTaskFunction, task_name, stack_Depth, null, taskPriority) catch unreachable;
 
-    _ = my_timer.start(free_rtos.portMAX_DELAY);
-    free_rtos.vTaskStartScheduler();
+    my_user_task_queue.init(4, 1) catch unreachable;
+
+    my_timer.create(timer_name, 2000, freertos.c.pdTRUE, null, myTimerFunction) catch unreachable;
+
+    my_timer.start(null) catch unreachable;
+
+    freertos.vTaskStartScheduler();
 }
