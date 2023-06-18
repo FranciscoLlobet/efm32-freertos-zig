@@ -1,6 +1,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const freertos = @import("freertos.zig");
+//const xdk110 = @import("boards/xdk110.zig");
 
 const c_board = @cImport({
     @cDefine("EFM32GG390F1024", "1");
@@ -11,34 +12,37 @@ const c_board = @cImport({
     @cInclude("uiso_config.h");
 });
 
+const board = microzig.board;
+
 extern fn xPortSysTickHandler() callconv(.C) void;
 
 export fn vApplicationIdleHook() void {}
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    c_board.sl_led_turn_on(&c_board.led_red);
+    //microzig.board.mcu_reset()
+    //c_board.sl_led_turn_on(&c_board.led_red);
 
-    c_board.BOARD_msDelay(500);
+    board.red.on();
 
-    c_board.sl_led_turn_on(&c_board.led_orange);
+    board.msDelay(500);
 
-    c_board.BOARD_msDelay(500);
+    board.orange.on();
 
-    c_board.sl_led_turn_on(&c_board.led_yellow);
+    board.msDelay(500);
 
-    c_board.BOARD_msDelay(500);
+    board.yellow.on();
 
-    c_board.sl_led_turn_off(&c_board.led_red);
+    board.msDelay(500);
 
-    c_board.BOARD_msDelay(500);
+    board.red.off();
 
-    c_board.sl_led_turn_off(&c_board.led_orange);
+    board.msDelay(500);
 
-    c_board.BOARD_msDelay(500);
+    board.orange.off();
 
-    c_board.sl_led_turn_off(&c_board.led_yellow);
+    board.msDelay(500);
 
-    //c_board.uiso_load_config();
+    board.yellow.off();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -137,21 +141,6 @@ pub const microzig_options = struct {
         pub fn UsageFault() void {
             microzig.hang();
         }
-        //pub fn I2C1() void {
-        //    c_board.I2C1_IRQHandler();
-        //}
-        //pub fn USART0_RX() void {
-        //    c_board.USART0_RX_IRQHandler();
-        // }
-        //pub fn USART0_TX() void {
-        //    c_board.USART0_TX_IRQHandler();
-        //}
-        //pub fn USART1_RX() void {
-        //    c_board.USART1_RX_IRQHandler();
-        //}
-        //pub fn USART1_TX() void {
-        //    c_board.USART1_TX_IRQHandler();
-        //}
     };
 };
 
@@ -174,7 +163,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         var test_var: u32 = 0;
 
         if (my_user_task_queue.receive(@ptrCast(*void, &test_var), freertos.c.portMAX_DELAY)) {
-            c_board.sl_led_toggle(&c_board.led_yellow);
+            board.yellow.toggle();
         }
     }
 }
@@ -187,7 +176,7 @@ fn myTimerFunction(xTimer: freertos.c.TimerHandle_t) callconv(.C) void {
 }
 
 pub export fn main() void {
-    c_board.BOARD_Init();
+    board.init();
 
     my_user_task.init(myUserTaskFunction, task_name, stack_Depth, null, taskPriority) catch unreachable;
 
