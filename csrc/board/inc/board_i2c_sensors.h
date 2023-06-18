@@ -8,8 +8,6 @@
 #ifndef BOARD_I2C_SENSORS_H_
 #define BOARD_I2C_SENSORS_H_
 
-
-#include "uiso.h"
 #include "board.h"
 #include "sl_i2cspm.h"
 

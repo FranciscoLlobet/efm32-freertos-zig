@@ -143,7 +143,7 @@ void BOARD_Init(void)
 	//Board_CC3100_Init();
 
 	/* Initialize I2C peripheral */
-	//board_i2c_init();
+	board_i2c_init();
 
 	BOARD_Watchdog_Init();
 

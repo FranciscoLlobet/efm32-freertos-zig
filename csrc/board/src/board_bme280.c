@@ -7,7 +7,7 @@
 #include "board_i2c_sensors.h"
 
 struct bme280_dev board_bme280;
-static dummy_val = 0;
+static uint32_t dummy_val = 0;
 
 static void _bme280_delay_us(uint32_t period, void *intf_ptr)
 {

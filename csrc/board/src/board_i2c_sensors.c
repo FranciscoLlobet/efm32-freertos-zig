@@ -7,6 +7,11 @@
 
 #include "board_i2c_sensors.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "queue.h"
+
 #include "sl_i2cspm.h"
 #include "em_cmu.h"
 #include "sl_i2cspm_inst_config.h"
