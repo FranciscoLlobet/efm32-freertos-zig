@@ -13,8 +13,8 @@ const c_board = @cImport({
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
-export fn vApplicationMallocFailedHook() void {}
 export fn vApplicationIdleHook() void {}
+
 export fn vApplicationDaemonTaskStartupHook() void {
     c_board.sl_led_turn_on(&c_board.led_red);
 
@@ -41,12 +41,17 @@ export fn vApplicationDaemonTaskStartupHook() void {
     //c_board.uiso_load_config();
 }
 
-export fn vApplicationStackOverflowHook() void {}
-export fn vApplicationTickHook() void {}
-extern fn microzig_main() noreturn;
+export fn vApplicationStackOverflowHook() noreturn {
+    microzig.hang();
+}
 
-extern fn PendSV_Handler() void;
-extern fn SVC_Handler() void;
+export fn vApplicationMallocFailedHook() noreturn {
+    microzig.hang();
+}
+
+export fn vApplicationTickHook() void {
+    //
+}
 
 pub const microzig_options = struct {
     pub const interrupts = struct {
@@ -61,6 +66,9 @@ pub const microzig_options = struct {
         }
         pub fn DMA() void {
             c_board.DMA_IRQHandler();
+        }
+        pub fn I2C0() void {
+            c_board.I2C0_IRQHandler();
         }
         pub fn SysTick() void {
             if (freertos.c.taskSCHEDULER_NOT_STARTED != freertos.c.xTaskGetSchedulerState()) {
@@ -129,12 +137,6 @@ pub const microzig_options = struct {
         pub fn UsageFault() void {
             microzig.hang();
         }
-        // pub fn EMU() void {
-        //     c_board.EMU_IRQHandler();
-        // }
-        //pub fn I2C0() void {
-        //    c_board.I2C0_IRQHandler();
-        //}
         //pub fn I2C1() void {
         //    c_board.I2C1_IRQHandler();
         //}
@@ -191,7 +193,7 @@ pub export fn main() void {
 
     my_user_task_queue.init(4, 1) catch unreachable;
 
-    my_timer.create(timer_name, 2000, freertos.c.pdTRUE, null, myTimerFunction) catch unreachable;
+    my_timer.create(timer_name, 2000, freertos.pdTRUE, null, myTimerFunction) catch unreachable;
 
     my_timer.start(null) catch unreachable;
 

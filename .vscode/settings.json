@@ -5,6 +5,8 @@
         "sl_simple_led.h": "c",
         "board_sd_card.h": "c",
         "board.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "sl_i2cspm.h": "c",
+        "board_i2c_sensors.h": "c"
     }
 }
