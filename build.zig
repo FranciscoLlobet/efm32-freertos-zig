@@ -4,7 +4,7 @@ const build_ff = @import("build_ff.zig");
 const build_gecko_sdk = @import("build_gecko_sdk.zig");
 const build_freertos = @import("build_freertos.zig");
 const build_sensors = @import("build_sensors.zig");
-
+const build_cc3100_sdk = @import("build_cc3100_sdk.zig");
 pub const boards = @import("src/boards.zig");
 pub const chips = @import("src/chips.zig");
 
@@ -84,6 +84,7 @@ pub fn build(b: *std.build.Builder) void {
         build_gecko_sdk.aggregate(exe);
         build_freertos.aggregate(exe);
         build_sensors.aggregate(exe);
+        build_cc3100_sdk.aggregate(exe);
         exe.installArtifact(b);
     }
 

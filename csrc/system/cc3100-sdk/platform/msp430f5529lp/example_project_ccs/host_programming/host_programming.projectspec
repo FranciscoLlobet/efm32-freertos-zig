@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context
+                deviceFamily="MSP430"
+                deviceId="MSP430F5529"
+            />
+        </when>
+    </applicability>
+    <project
+        title="host_programming"
+        name="host_programming"
+        toolChain="TI"
+        connection="TI_MSP430_USB1.xml"
+        device="MSP430F5529"
+        ignoreDefaultDeviceSettings="true"
+        compilerBuildOptions=" -I${CCS_BASE_ROOT}/msp430/include -I${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx -I${CC3100_SDK_ROOT}/examples/common -I${CC3100_SDK_ROOT}/examples/host_programming -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/msp430f5529lp -I${CG_TOOL_ROOT}/include -g --define=__MSP430F5529__ --define=__CCS__ --define=_USE_CLI_ -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --silicon_version=mspx --data_model=restricted --use_hw_mpy=F5 --advice:power='none'"
+        linkerBuildOptions=" -i${CCS_BASE_ROOT}/msp430/include -i${CCS_BASE_ROOT}/msp430/lib -i${CCS_BASE_ROOT}/msp430/lib/5xx_6xx_FRxx -g --stack_size=512 --cinit_hold_wdt=on --reread_libs --warn_sections --rom_model"
+        postBuildStep=""
+        description="host programming application using MSP430F5529 and CC3100">
+
+        <property name="buildProfile" value="release"/>
+        <property name="products" value="com.ti.mcu.msp430ware"/>
+
+        <pathVariable name="CC3100_SDK_ROOT" path="../../../.." scope="project"/>
+
+        <file path="${CC3100_SDK_ROOT}/examples/host_programming/main.c" openOnCreation="false" excludeFromBuild="false" action="copy">
+        </file>	
+		<file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/bl_uart.h" targetDirectory="bl_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/bl_uart.c" targetDirectory="bl_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/cli_uart.h" targetDirectory="cli_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/cli_uart.c" targetDirectory="cli_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/board.h" targetDirectory="board" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/board.c" targetDirectory="board" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/spi.c" targetDirectory="spi" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/spi.h" targetDirectory="spi" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx/timer_a.c" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx/timer_a.h" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/timer_tick.c" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/timer_tick.h" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/uart.h" targetDirectory="uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/uart.c" targetDirectory="uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/user.h" targetDirectory="simplelink" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/device.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/fs.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/netapp.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/netcfg.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/simplelink.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/socket.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/trace.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/wlan.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/wlan_rx_filters.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/device.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/driver.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/driver.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/flowcont.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/flowcont.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/fs.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/netapp.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/netcfg.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/nonos.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/nonos.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/objInclusion.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/protocol.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/socket.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/spawn.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/spawn.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/wlan.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="lnk_msp430f5529.cmd" openOnCreation="false" excludeFromBuild="false" action="copy">
+        </file>
+    </project>
+</projectSpec>
+

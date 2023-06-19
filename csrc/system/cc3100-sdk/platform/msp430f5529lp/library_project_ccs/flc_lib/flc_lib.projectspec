@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context
+                deviceFamily="MSP430"
+                deviceId="MSP430F5529"
+                />
+        </when>
+    </applicability>
+    <project
+        title="flc_lib"
+        name="flc_lib"
+        toolChain="TI"
+        device="MSP430F5529"
+        ignoreDefaultDeviceSettings="true"
+        compilerBuildOptions=" -I${CCS_BASE_ROOT}/msp430/include -I${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/msp430f5529lp -I${CC3100_SDK_ROOT}/simplelink_extlib/include -I${CC3100_SDK_ROOT}/simplelink_extlib/flc -I${CG_TOOL_ROOT}/include -g --define=__MSP430F5529__ --define=__CCS__ --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --silicon_version=mspx --data_model=restricted --use_hw_mpy=F5 --advice:power='none'"
+        outputType="staticLibrary">
+
+        <property name="buildProfile" value="release"/>
+		<property name="products" value="com.ti.mcu.msp430ware"/>
+
+        <pathVariable name="CC3100_SDK_ROOT" path="../../../.." scope="project" />
+
+        <file path="${CC3100_SDK_ROOT}/simplelink_extlib/flc/flc.c" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+    </project>
+</projectSpec>

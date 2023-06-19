@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context
+                deviceFamily="MSP430"
+                deviceId="MSP430F5529"
+                />
+        </when>
+    </applicability>
+    <project
+        title="osi_lib"
+        name="osi_lib"
+        toolChain="TI"
+        device="MSP430F5529"
+        ignoreDefaultDeviceSettings="true"
+        compilerBuildOptions=" -I${CCS_BASE_ROOT}/msp430/include -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/msp430f5529lp -I${CC3100_SDK_ROOT}/platform/msp430f5529lp/freertos/ccs -I${CC3100_SDK_ROOT}/third_party/freertos/source/include -I${CC3100_SDK_ROOT}/third_party/freertos/source -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/oslib -I${CG_TOOL_ROOT}/include --define=__MSP430F5529__ --define=__CCS__ --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --silicon_version=mspx --data_model=restricted --use_hw_mpy=F5 --advice:power='none'"
+        outputType="staticLibrary">
+
+        <property name="buildProfile" value="release"/>
+
+        <pathVariable name="CC3100_SDK_ROOT" path="../../../.." scope="project" />
+
+        <file path="${CC3100_SDK_ROOT}/oslib/osi_freertos.c" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/portable/memmang/heap_3.c" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/croutine.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/event_groups.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/list.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/queue.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/tasks.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/third_party/freertos/source/timers.c" targetDirectory="freertos" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/freertos/ccs/port.c" targetDirectory="freertos/portable" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/msp430f5529lp/freertos/ccs/portext.asm" targetDirectory="freertos/portable" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+    </project>
+</projectSpec>

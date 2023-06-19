@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iarUserArgVars>
+    <group name="PATH_VARIABLES" active="true">
+        <variable>
+            <name>TI_PRODUCTS_DIR</name>
+            <value>C:\ti</value>
+        </variable>
+    </group>
+</iarUserArgVars>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context
+                deviceFamily="MSP430"
+                deviceId="MSP430F5529"
+                />
+        </when>
+    </applicability>
+    <project
+        title="mqtt_lib"
+        name="mqtt_lib"
+        toolChain="TI"
+        device="MSP430F5529"
+        ignoreDefaultDeviceSettings="true"
+		outputType="staticLibrary"
+		artifactName="mqtt"
+		artifactExtension="a">
+		
+		<configuration
+			name="client"
+			compilerBuildOptions=" -I${CCS_BASE_ROOT}/msp430/include -I${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx -I${CC3100_SDK_ROOT}/netapps/mqtt/client -I${CC3100_SDK_ROOT}/netapps/mqtt/common -I${CC3100_SDK_ROOT}/netapps/mqtt/include -I${CC3100_SDK_ROOT}/netapps/mqtt/platform -I${CC3100_SDK_ROOT}/netapps/mqtt/server -I${CC3100_SDK_ROOT}/netapps/mqtt/sl -I${CC3100_SDK_ROOT}/oslib  -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/msp430f5529lp -I${CC3100_SDK_ROOT}/platform/msp430f5529lp/freertos/ccs -I${CC3100_SDK_ROOT}/third_party/freertos/source -I${CC3100_SDK_ROOT}/third_party/freertos/source/include -I${CG_TOOL_ROOT}/include -g --define=__MSP430F5529__  --define=ccs --define=USE_FREERTOS --define=SL_PLATFORM_MULTI_THREADED --define=CFG_CL_MQTT_CTXS=2 --define=CFG_SL_CL_BUF_LEN=256 --define=CFG_SL_CL_MAX_MQP=2 --define=CFG_SL_CL_STACK=1024 --define=CFG_MQTT_CL_CTXS=2  --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --silicon_version=mspx --data_model=restricted --use_hw_mpy=F5 --advice:power='none'">
+		</configuration>
+		
+		<configuration
+			name="client-server"
+			compilerBuildOptions=" -I${CCS_BASE_ROOT}/msp430/include -I${COM_TI_MCU_MSP430WARE_INSTALL_DIR}/driverlib/driverlib/MSP430F5xx_6xx -I${CC3100_SDK_ROOT}/netapps/mqtt/client -I${CC3100_SDK_ROOT}/netapps/mqtt/common -I${CC3100_SDK_ROOT}/netapps/mqtt/include -I${CC3100_SDK_ROOT}/netapps/mqtt/platform -I${CC3100_SDK_ROOT}/netapps/mqtt/server -I${CC3100_SDK_ROOT}/netapps/mqtt/sl -I${CC3100_SDK_ROOT}/oslib  -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/msp430f5529lp -I${CC3100_SDK_ROOT}/platform/msp430f5529lp/freertos/ccs -I${CC3100_SDK_ROOT}/third_party/freertos/source -I${CC3100_SDK_ROOT}/third_party/freertos/source/include -I${CG_TOOL_ROOT}/include -g --define=__MSP430F5529__  --define=ccs --define=USE_FREERTOS --define=SL_PLATFORM_MULTI_THREADED --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --silicon_version=mspx --data_model=restricted --use_hw_mpy=F5 --advice:power='none'">
+		</configuration>		
+		
+        <property name="buildProfile" value="release"/>
+		<property name="products" value="com.ti.mcu.msp430ware"/>
+
+        <pathVariable name="CC3100_SDK_ROOT" path="../../../.." scope="project" />
+
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/client/mqtt_client.c" applicableConfigurations="client,client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/common/mqtt_common.c" applicableConfigurations="client,client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/sl/sl_mqtt_client.c" applicableConfigurations="client,client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/platform/cc31xx_sl_net.c" applicableConfigurations="client,client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/server/client_mgmt.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/server/server_core.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/server/server_pkts.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/server/server_plug.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/server/server_util.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/netapps/mqtt/sl/sl_mqtt_server.c" applicableConfigurations="client-server" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+    </project>
+</projectSpec>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+
+<!--[if lte IE 9 ]> <html class="ie"> <![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--> <html> <!--<![endif]-->
+
+<head>
+<link rel="stylesheet" type="text/css" href="simple_link.css">
+<script type="text/javascript">
+var HTTPrequest = new XMLHttpRequest();
+function UpdateStatus()
+{
+    var status = "__SL_G_ULD";
+	if(status.indexOf("LED1_ON") > -1)
+	{
+		document.getElementById("mybutton1").value="Turn Off";
+		document.getElementById("LED1").style.color="green";
+	}
+	else
+	{
+		document.getElementById("mybutton1").value="Turn On";
+		document.getElementById("LED1").style.color="red";
+	}
+	if(status.indexOf("LED2_ON") > -1)
+	{
+		document.getElementById("mybutton2").value="Turn Off";
+		document.getElementById("LED2").style.color="green";
+	}
+	else
+	{
+		document.getElementById("mybutton2").value="Turn On";
+		document.getElementById("LED2").style.color="red";
+	}
+}
+function ToggleLED(LEDnum)
+{
+	var params = "__SL_P_ULD=LED"+LEDnum;
+	if(document.getElementById("mybutton"+LEDnum).value=="Turn On")
+	{
+		params = params+"_ON";
+		document.getElementById("mybutton"+LEDnum).value="Turn Off";
+		document.getElementById("LED"+LEDnum).style.color="green";
+	}
+	else
+	{
+		params = params+"_OFF";
+		document.getElementById("mybutton"+LEDnum).value="Turn On";
+		document.getElementById("LED"+LEDnum).style.color="red";
+	}
+	HTTPrequest.open("POST","No_content", true);
+	HTTPrequest.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+	HTTPrequest.setRequestHeader("Content-length", params.length);
+	HTTPrequest.setRequestHeader("Connection", "close");
+	HTTPrequest.onreadystatechange = function()
+	{
+		if (HTTPrequest.readyState==4 && HTTPrequest.status==200)
+		{
+		}
+	}
+	HTTPrequest.send(params);
+}
+</script>
+</head>
+
+<body class="in-frame" onload="UpdateStatus()">
+
+
+<form method="POST" name="SimpleLink Configuration action" action="ip_config.html">
+<table border="0"  width="100%" cellpadding="3" cellspacing="0">
+
+<tr>  
+<td class="page-title" colspan=2 >
+	Blink LED</td>
+</tr>
+
+<tr>
+  <td class = "empty-line" colspan=2></td>
+</tr>
+ 
+ <tr>
+  <td class="frame-title" colspan=2 > 
+     LED Control </td>
+</tr>
+<tr>
+  <td class = "empty-line-in-box" colspan=2></td>
+ </tr>
+ <tr>
+  <td class = "empty-line" colspan=2></td>
+</tr>
+
+ 
+<tr>
+  <td  class="label" dir=LTR align=center><span id="LED1"> LED 1: </span></td>
+  <td  class="user-input" dir=LTR align=center><input type="button" value="Turn On" id="mybutton1" onclick="ToggleLED('1')"></input></td>
+</tr>
+<tr>
+  <td class = "empty-line-in-box" colspan=2></td>
+ </tr>
+ <tr>
+  <td  class="label" dir=LTR align=center><span id="LED2"> LED 2: </span></td>
+   <td class="user-input" dir=LTR align=center><input type="button" value="Turn On" id="mybutton2" onclick="ToggleLED('2')"></input></td>
+</tr>
+<tr>
+  <td class = "empty-line-in-box" colspan=2></td>
+ </tr>
+
+<tr>
+  <td class = "empty-line-in-box" colspan=2></td>
+ </tr>
+ 
+ <tr >
+  <td class = "border-line-top" colspan=2 >
+  </td>
+</tr>
+</table>
+</form>
+</body>
+</html>

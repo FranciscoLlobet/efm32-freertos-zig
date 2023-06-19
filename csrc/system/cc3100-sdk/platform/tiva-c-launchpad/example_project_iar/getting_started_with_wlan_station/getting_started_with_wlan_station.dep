@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <fileVersion>2</fileVersion>
+    <fileChecksum>2254853811</fileChecksum>
+    <configuration>
+        <name>Debug</name>
+        <outputs>
+            <file>$PROJ_DIR$\..\..\spi.h</file>
+            <file>$PROJ_DIR$\..\..\spi.c</file>
+            <file>$PROJ_DIR$\..\..\user.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\nonos.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\nonos.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\examples\getting_started_with_wlan_station\main.c</file>
+            <file>$PROJ_DIR$\..\..\uart.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\netcfg.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\netapp.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\fs.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\flowcont.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\flowcont.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\driver.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\driver.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\device.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\wlan_rx_filters.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\wlan.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\trace.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\socket.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\simplelink.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\netcfg.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\netapp.h</file>
+            <file>$PROJ_DIR$\..\..\board.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\fs.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\include\device.h</file>
+            <file>$PROJ_DIR$\..\..\cli_uart.h</file>
+            <file>$PROJ_DIR$\..\..\cli_uart.c</file>
+            <file>$PROJ_DIR$\..\..\board.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\objInclusion.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\spawn.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\socket.c</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\protocol.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\simplelink\source\wlan.c</file>
+            <file>$PROJ_DIR$\startup_ewarm.c</file>
+            <file>$TOOLKIT_DIR$\lib\rt7M_tl.a</file>
+            <file>$TOOLKIT_DIR$\lib\shb_l.a</file>
+            <file>$PROJ_DIR$\Debug\List\wlan.lst</file>
+            <file>$PROJ_DIR$\TM4C123GH6.icf</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\ewarm\Exe\driverlib.a</file>
+            <file>$TOOLKIT_DIR$\lib\dl7M_tln.a</file>
+            <file>$TOOLKIT_DIR$\lib\m7M_tls.a</file>
+            <file>$PROJ_DIR$\Debug\List\getting_started_with_wlan_station.map</file>
+            <file>$PROJ_DIR$\Debug\Obj\spi.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\wlan.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\spawn.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\socket.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\board.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\startup_ewarm.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\uart.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\wlan.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\socket.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\netcfg.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\device.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\board.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\flowcont.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\main.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\spi.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\spawn.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\nonos.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\netapp.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\cli_uart.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\driver.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\cli_uart.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\fs.o</file>
+            <file>$PROJ_DIR$\Debug\Obj\uart.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\nonos.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\netcfg.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\netapp.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\fs.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\driver.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\device.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\flowcont.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\timer_tick.o</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\systick.h</file>
+            <file>$PROJ_DIR$\Debug\Obj\timer_tick.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\List\timer_tick.lst</file>
+            <file>$PROJ_DIR$\..\..\timer_tick.c</file>
+            <file>$PROJ_DIR$\Debug\Obj\timer_tick.pbi</file>
+            <file>$PROJ_DIR$\Debug\Obj\startup_ewarm.pbi</file>
+            <file>$PROJ_DIR$\Debug\Exe\getting_started_with_wlan_station.out</file>
+            <file>$PROJ_DIR$\Debug\Obj\device.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\cli_uart.__cstat.et</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_ints.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\stdbool.h</file>
+            <file>$PROJ_DIR$\Debug\Obj\getting_started_with_wlan_station.pbd</file>
+            <file>$PROJ_DIR$\Debug\Obj\board.__cstat.et</file>
+            <file>$TOOLKIT_DIR$\inc\c\stdint.h</file>
+            <file>$PROJ_DIR$\Debug\List\flowcont.lst</file>
+            <file>$PROJ_DIR$\Debug\List\board.lst</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\uart.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\fpu.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\sysctl.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\gpio.h</file>
+            <file>$PROJ_DIR$\Debug\Obj\fs.__cstat.et</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\rom.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\ssi.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_types.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_ssi.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_memmap.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\tm4c123gh6pm.h</file>
+            <file>$PROJ_DIR$\..\..\timer_tick.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\DLib_Product_string.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\ysizet.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\DLib_Product.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\DLib_Config_Normal.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\DLib_Defaults.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\yvals.h</file>
+            <file>$TOOLKIT_DIR$\inc\c\ycheck.h</file>
+            <file>$PROJ_DIR$\Debug\List\device.lst</file>
+            <file>$TOOLKIT_DIR$\inc\c\string.h</file>
+            <file>$PROJ_DIR$\Debug\Obj\startup_ewarm.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\main.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\uart.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\spi.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\wlan.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\spawn.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\socket.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\nonos.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\netcfg.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\netapp.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\flowcont.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\driver.__cstat.et</file>
+            <file>$PROJ_DIR$\Debug\Obj\main.pbi</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\pin_map.h</file>
+            <file>$PROJ_DIR$\Debug\List\cli_uart.lst</file>
+            <file>$PROJ_DIR$\Debug\List\driver.lst</file>
+            <file>$PROJ_DIR$\Debug\List\fs.lst</file>
+            <file>$PROJ_DIR$\..\..\..\..\examples\common\sl_common.h</file>
+            <file>$PROJ_DIR$\Debug\List\netapp.lst</file>
+            <file>$PROJ_DIR$\Debug\List\main.lst</file>
+            <file>$PROJ_DIR$\Debug\List\netcfg.lst</file>
+            <file>$PROJ_DIR$\Debug\List\nonos.lst</file>
+            <file>$PROJ_DIR$\Debug\List\socket.lst</file>
+            <file>$PROJ_DIR$\Debug\List\spawn.lst</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_gpio.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\inc\hw_nvic.h</file>
+            <file>$PROJ_DIR$\..\..\..\..\..\..\..\..\..\ti\TivaWare_C_Series-2.1.4.178\driverlib\interrupt.h</file>
+            <file>$PROJ_DIR$\Debug\List\spi.lst</file>
+            <file>$PROJ_DIR$\Debug\List\uart.lst</file>
+            <file>$PROJ_DIR$\Debug\List\startup_ewarm.lst</file>
+        </outputs>
+        <file>
+            <name>$PROJ_DIR$\..\..\spi.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 42</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 137 56</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 113</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 98 97 134 96 123 82 95 94 92 91 136</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\nonos.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 65</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 131 58</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 117</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\examples\getting_started_with_wlan_station\main.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 122</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 129 55</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 111</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 127</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\uart.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 64</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 138 48</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 112</file>
+                </tool>
+            </outputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\netcfg.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 66</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 130 51</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 118</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\netapp.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 67</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 128 59</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 119</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\fs.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 68</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 126 63</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 93</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\flowcont.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 71</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 87 54</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 120</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12 10</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\driver.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 69</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 125 61</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 121</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12 10</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\device.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 70</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 108 52</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 80</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 10 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\board.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 46</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 88 53</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 85</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 99 98 97 96 95 94 92 91 90 89</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\cli_uart.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 62</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 124 60</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 81</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 109 107 106 105 104 103 102 101 86 83 82 98 92 123 94 91 89 25</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\spawn.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 44</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 133 57</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 115</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\socket.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 45</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 132 50</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 116</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\..\simplelink\source\wlan.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 43</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 36 49</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 114</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 19 2 109 107 106 105 104 103 102 101 27 25 100 0 28 17 23 18 21 16 24 20 15 3 31 12</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\startup_ewarm.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 78</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 139 47</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 110</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 86 107 106 105 104 103 135 96 27</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>[ROOT_NODE]</name>
+            <outputs>
+                <tool>
+                    <name>ILINK</name>
+                    <file> 79 41</file>
+                </tool>
+            </outputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\timer_tick.c</name>
+            <outputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 77</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 75 72</file>
+                </tool>
+                <tool>
+                    <name>__cstat</name>
+                    <file> 74</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>BICOMP</name>
+                    <file> 107 103 135 104 96 106 105 86 73 100</file>
+                </tool>
+                <tool>
+                    <name>ICCARM</name>
+                    <file> 86 107 106 105 104 103 96 135 73 100</file>
+                </tool>
+            </inputs>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\Debug\Exe\getting_started_with_wlan_station.out</name>
+            <outputs>
+                <tool>
+                    <name>ILINK</name>
+                    <file> 41</file>
+                </tool>
+            </outputs>
+            <inputs>
+                <tool>
+                    <name>ILINK</name>
+                    <file> 37 53 60 52 61 54 63 55 59 51 58 50 57 56 47 72 48 49 38 35 34 40 39</file>
+                </tool>
+            </inputs>
+        </file>
+    </configuration>
+    <configuration>
+        <name>Release</name>
+        <outputs />
+        <forcedrebuild>
+            <name>[MULTI_TOOL]</name>
+            <tool>ILINK</tool>
+        </forcedrebuild>
+        <forcedrebuild>
+            <name>[REBUILD_ALL]</name>
+        </forcedrebuild>
+    </configuration>
+</project>

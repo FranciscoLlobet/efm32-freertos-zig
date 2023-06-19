@@ -1,0 +1,90 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="css/style.css" >
+<script src="js/jquery-1.8.3.min.js"></script>
+<script src="js/com.TI.tokenPoller.js"></script>
+<script src="js/page-actions.js"></script>
+<script src="js/jquery.rwdImageMaps.min.js"></script>
+<script type="text/javascript">
+function swapClass (whichBubble, classString) {
+  //document.getElementsByClassName('bubble').style.display = "none";
+  document.getElementById(whichBubble).setAttribute("class", classString);  
+}
+$(document).ready(function(e) {
+    $('img[usemap]').rwdImageMaps();
+});
+</script>
+<title>Overview</title>
+</head>
+<body class="sbd3200">
+<a name="top"></a>
+<div class="header">
+  <div class="ti-logo"></div>
+  <div class="page-title"></div>
+  <div class="red-bar">SimpleLink&trade; Wi-Fi&reg; Family</div>
+  <!-- toggle class "online" to change status - use js to change status message (later) --> 
+</div>
+<div class="tabs">
+  <ul>
+    <li class="" id="welcome"><a href="index.html"><span>Welcome</span></a></li>
+    <li class="" id="overview"><a href="overview.html"><span>Overview</span></a></li>
+    <li class="" id="about"><a href="about.html"><span>About</span></a></li>
+    <li class="" id="setup"><a href="setup.html"><span>Setup</span></a></li>
+    <li class="" id="portal"><a href="portal.html"><span>Developer's Portal</span></a></li>
+  </ul>
+</div>
+<div class="content"> 
+  <ul>
+    <li><a href="#SWArchitecture">SW Architecture</a></li>
+    <li><a href="#HWArchitecture">HW Architecture</a></li>
+    <li><a href="#OtherResources">Other Resources</a></li>
+  </ul>
+  <a name="SWArchitecture"></a> <span class="hilight-text">SW Architecture</span><br />
+  <div class="instructions">Rollover the image below to see more information</div>
+  <div class="sbdImage"> <img src="images/sw-sbd.gif" usemap="#SWMap" border="0" />
+    <map name="SWMap" id="SWMap">
+      <area shape="rect" coords="17,18,363,80" href="#a1" onmouseover="swapClass('desc1', 'bubble active');" onmouseout="swapClass('desc1', 'bubble off');" />
+      <area shape="rect" coords="17,118,361,156" href="#a2" onmouseover="swapClass('desc2', 'bubble active');" onmouseout="swapClass('desc2', 'bubble off');" />
+      <area shape="rect" coords="17,169,359,210" href="#a3" onmouseover="swapClass('desc3', 'bubble active');" onmouseout="swapClass('desc3', 'bubble off');" />
+      <area shape="rect" coords="19,243,364,284" href="#a4" onmouseover="swapClass('desc4', 'bubble active');" onmouseout="swapClass('desc4', 'bubble off');" />
+      <area shape="rect" coords="17,302,145,345" href="#a5" onmouseover="swapClass('desc5', 'bubble active');" onmouseout="swapClass('desc5', 'bubble off');" />
+      <area shape="rect" coords="201,322,364,413" href="#a7" onmouseover="swapClass('desc7', 'bubble active');" onmouseout="swapClass('desc7', 'bubble off');" />
+      <area shape="rect" coords="16,370,190,412" href="#a6" onmouseover="swapClass('desc6', 'bubble active');" onmouseout="swapClass('desc6', 'bubble off');" />
+      <area shape="rect" coords="16,435,364,480" href="#a8" onmouseover="swapClass('desc8', 'bubble active');" onmouseout="swapClass('desc8', 'bubble off');" />
+    </map>
+    <div id="desc1" class="bubble off"><a name="a1" id="a1"></a> <span><strong>Customer Application</strong> - easy development for applications such as: home automation and security, connected home, smart energy, industrial automation, and many more </span> </div>
+    <div id="desc2" class="bubble off"><a name="a2" id="a2"></a> <span><strong>Simplelink driver</strong> – Common between CC3100 and CC3200 </span> </div>
+    <div id="desc3" class="bubble off"><a name="a3" id="a3"></a> <span><strong>Bus driver</strong> – 2 sets of SPI and UART interfaces are available </span> </div>
+    <div id="desc4" class="bubble off"><a name="a4" id="a4"></a> <span><strong>Host Interface</strong> – Wide range of VIO (1.8-3.6V), SPI, UART driver </span> </div>
+    <div id="desc5" class="bubble off"><a name="a5" id="a5"></a> <span><strong>Network apps</strong> – ARP, ICMP, DHCP, DNS mDNS, http server</span> </div>
+    <div id="desc6" class="bubble off"><a name="a6" id="a6"></a> <span><strong>TCP/IP stack</strong> – IPv4 </span> </div>
+    <div id="desc7" class="bubble off"><a name="a7" id="a7"></a> <span><strong>SimpleLink connection manager</strong> – WLAN profiles and security management </span> </div>
+    <div id="desc8" class="bubble off"><a name="a8" id="a8"></a> <span><strong>WLAN MAC &amp; PHY</strong> – 2.4GHz radio + physical layer</span> </div>
+  </div>
+  <div class="backToTop"><a href="#top">Back to top</a></div>
+  <br />
+  <br />
+  <a name="HWArchitecture"></a>
+  <span class="hilight-text">HW Architecture</span><br />
+  <img src="images/hw-sbd.gif" class="hwdiagram" /><br />
+  <div class="backToTop"><a href="#top">Back to top</a></div>
+  <br />
+  <a name="OtherResources"></a>
+  <span class="hilight-text">Other Resources</span>
+  <ul>
+    <li><a href="http://www.ti.com/cc3200wiki-oob">CC3100/3200 wiki page</a></li>
+    <li><a href="http://www.ti.com/cc3200tools-oob">Developer's Tools download</a></li>
+    <li><a href="http://www.ti.com/wirelesshelp">TI online E2E support</a></li>
+  </ul>
+  <div class="backToTop"><a href="#top">Back to top</a></div>
+  <div class="footer"><a href="http://www.ti.com/privacy">Privacy  Policy</a> | <a href="http://www.ti.com/termsofuse">Terms of Use</a></div>
+</div>
+<!-- <!-- <div class="footer">
+	<div class="red-bar">TI Wireless - CC3100</div>
+</div>
+-->
+</body>
+</html>

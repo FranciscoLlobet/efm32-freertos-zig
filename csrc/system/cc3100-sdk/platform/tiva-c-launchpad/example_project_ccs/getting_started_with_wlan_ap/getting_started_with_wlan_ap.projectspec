@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context
+                deviceFamily="ARM"
+                deviceId="TM4C123GH6PM"
+            />
+        </when>
+    </applicability>
+    <project
+        title="getting_started_with_wlan_ap"
+        name="getting_started_with_wlan_ap"
+        toolChain="TI"
+        connection="Stellaris_ICDI_Connection.xml"
+        device="tm4c123gh6pm"
+        ignoreDefaultDeviceSettings="true"
+        compilerBuildOptions="-mv7M4 -me -I${TIVAWARE_ROOT} -I${CC3100_SDK_ROOT}/examples/common -I${CC3100_SDK_ROOT}/simplelink/include -I${CC3100_SDK_ROOT}/simplelink/source -I${CC3100_SDK_ROOT}/platform/tiva-c-launchpad --define=PART_TM4C123GH6PM --define=TARGET_IS_BLIZZARD_RA1=1 --define=_USE_CLI_ --define=ccs -g --diag_warning=225 --diag_wrap=off --display_error_number"
+        linkerBuildOptions="-mv7M4 -me --define=PART_TM4C123GH6PM --define=TARGET_IS_BLIZZARD_RA1=1 --define=_USE_CLI_ --define=ccs -g --diag_warning=225 --diag_wrap=off --display_error_number -m$getting_started_with_wlan_ap.map --heap_size=0 --stack_size=704 --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info=getting_started_with_wlan_ap_linkInfo.xml --rom_model -l${TIVAWARE_ROOT}\driverlib\ccs\Debug\driverlib.lib"
+        postBuildStep="${CCS_INSTALL_ROOT}/utils/tiobj2bin/tiobj2bin ${BuildArtifactFileName} ${BuildArtifactFileBaseName}.bin ${CG_TOOL_ROOT}/bin/armofd ${CG_TOOL_ROOT}/bin/armhex ${CCS_INSTALL_ROOT}/utils/tiobj2bin/mkhex4bin"
+        description="getting_started_with_wlan_ap application using tm4c123gh6pm and CC3100">
+
+        <property name="buildProfile" value="debug"/>
+
+        <pathVariable name="CC3100_SDK_ROOT" path="../../../.." scope="project"/>
+        <pathVariable name="TIVAWARE_ROOT" path="${TI_PRODUCTS_DIR}\TivaWare_C_Series-2.1.4.178" scope="project"/>
+
+        <file path="${CC3100_SDK_ROOT}/examples/getting_started_with_wlan_ap/main.c" openOnCreation="false" excludeFromBuild="false" action="copy">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/cli_uart.c" targetDirectory="cli_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/cli_uart.h" targetDirectory="cli_uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>		
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/board.c" targetDirectory="board" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/board.h" targetDirectory="board" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/spi.c" targetDirectory="spi" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/spi.h" targetDirectory="spi" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/timer_tick.c" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/timer_tick.h" targetDirectory="timer" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/uart.c" targetDirectory="uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/uart.h" targetDirectory="uart" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/user.h" targetDirectory="simplelink" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/device.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/fs.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/netapp.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/netcfg.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/simplelink.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/socket.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/trace.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/wlan.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/include/wlan_rx_filters.h" targetDirectory="simplelink/include" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/device.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/driver.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/driver.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/flowcont.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/flowcont.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/fs.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/netapp.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/netcfg.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/nonos.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/nonos.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/objInclusion.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/protocol.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/socket.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/spawn.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/spawn.h" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+		<file path="${CC3100_SDK_ROOT}/simplelink/source/wlan.c" targetDirectory="simplelink/source" openOnCreation="false" excludeFromBuild="false" action="link">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/example_project_ccs/getting_started_with_wlan_ap/tm4c123gh6pm.cmd" openOnCreation="false" excludeFromBuild="false" action="copy">
+        </file>
+        <file path="${CC3100_SDK_ROOT}/platform/tiva-c-launchpad/example_project_ccs/getting_started_with_wlan_ap/tm4c123gh6pm_startup_ccs.c" openOnCreation="false" excludeFromBuild="false" action="copy">
+        </file>
+    </project>
+</projectSpec>
+

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CC3xxx>
+   <Version>
+      <Platform>CC31xx Simple Link device</Platform>
+      <SoftwareMajor>1</SoftwareMajor>
+      <SoftwareMinor>0</SoftwareMinor>
+      <Software_sub_Minor>0</Software_sub_Minor>
+   </Version>
+   <Filename name="www/safe/about.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/overview.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/portal.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/setup.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/index.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/param_about.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/param_config.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/param_online.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/js/com.TI.tokenPoller.js">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/js/jquery-1.8.3.min.js">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/js/jquery.rwdImageMaps.min.js">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/js/page-actions.js">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/ti-logo.png">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/icon_l_html_a.png">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/tab-line.gif">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/ticom3-tab-left.gif">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/ticom3-tab-right.gif">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/hw-sbd.gif">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/images/sw-sbd.gif">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/safe/css/style.css">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+   <Filename name="www/index.html">
+      <MAX>0x0</MAX>
+      <RW>0x0</RW>
+      <RO>0x0</RO>
+   </Filename>
+</CC3xxx>

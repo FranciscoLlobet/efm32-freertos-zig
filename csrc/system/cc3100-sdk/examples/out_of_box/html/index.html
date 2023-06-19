@@ -1,0 +1,66 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="css/style.css" >
+<script src="js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+$(function() {
+	var deviceType = "__SL_G_V.D",
+		len = deviceType.length,
+		deviceTypeEnd = deviceType.substring(len-2,len),
+		cc3101Vals = ['10','11','13'];
+	if ($.inArray(deviceTypeEnd, cc3101Vals) > -1) {
+		$('span.deviceName').html('CC3200');
+	} else {
+		$('span.deviceName').html('CC3100');
+	}
+});
+</script>
+<script src="js/com.TI.tokenPoller.js"></script>
+<script src="js/page-actions.js"></script>
+<title>Overview</title>
+</head>
+<body>
+<div class="header">
+	<div class="ti-logo"></div>
+    <div class="page-title"></div>
+    <div class="red-bar">SimpleLink&trade; Wi-Fi&reg; Family</div>
+</div>
+<div class="tabs">
+<ul>
+	<li class="active" id="welcome"><a href="index.html"><span>Welcome</span></a></li>
+	<li class="" id="overview"><a href="overview.html"><span>Overview</span></a></li>
+    <li class="" id="about"><a href="about.html"><span>About</span></a></li>
+    <li class="" id="setup"><a href="setup.html"><span>Setup</span></a></li>
+    <li class="" id="portal"><a href="portal.html"><span>Developer's Portal</span></a></li>
+</ul>
+
+</div>
+<div class="content">
+<p class="hilight-text">Congratulations! You are now connected to the SimpleLink <span id="deviceName">CC3100</span></p>
+<p>The CC3100/3200  products are packed with  new features that allow you to easily create Internet applications, establish a  secure Wi-Fi and Internet connection and enable battery-operated  devices.  TI provides various kits and software  tools, reference designs, sample applications, development documentation and E2E  community  support.<br />
+  <br />
+  
+</p>
+<a href="overview.html">CC3100</a><br />
+It is a perfect Wi-Fi companion to  TI&rsquo;s MCUs with on-chip power management to boost power efficiency. The  development kit is a SimpleLink BoosterPack. <br />
+<br />
+<br />
+<b>Key Features of CC3100</b>
+<ul><li>802.11 b/g/n, Station, Access Point, and Wi-Fi Direct roles with fully integrated radio, baseband, and MAC</li>
+<li>Integrated TCP/IP stacks and industry standard API</li>
+<li>Small MCU driver footprint</li>
+<li>Embedded crypto engine with 256-bit encryption, personal and enterprise security</li>
+<li>Low power radio with advanced low power modes enabling battery-operated Wi-Fi</li>
+<li>Simple Wi-Fi connection with TI’s SmartConfig™ technology</li>
+</ul>
+
+<br />
+<br />
+<strong><a href="setup.html">Let's get started.</a></strong>
+<div class="footer"><a href="http://www.ti.com/privacy">Privacy  Policy</a> | <a href="http://www.ti.com/termsofuse">Terms of Use</a></div>
+</div>
+</body>
+</html>
