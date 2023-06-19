@@ -178,9 +178,9 @@ fn myTimerFunction(xTimer: freertos.c.TimerHandle_t) callconv(.C) void {
 pub export fn main() void {
     board.init();
 
-    my_user_task.init(myUserTaskFunction, task_name, stack_Depth, null, taskPriority) catch unreachable;
+    my_user_task.create(myUserTaskFunction, task_name, stack_Depth, null, taskPriority) catch unreachable;
 
-    my_user_task_queue.init(4, 1) catch unreachable;
+    my_user_task_queue.create(4, 1) catch unreachable;
 
     my_timer.create(timer_name, 2000, freertos.pdTRUE, null, myTimerFunction) catch unreachable;
 

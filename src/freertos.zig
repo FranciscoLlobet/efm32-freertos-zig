@@ -54,7 +54,7 @@ pub fn vPortFree(pv: ?*anyopaque) void {
 pub const Task = struct {
     task_handle: TaskHandle_t = undefined,
 
-    pub fn init(self: *Task, pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
+    pub fn create(self: *Task, pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
         if (c.pdPASS != c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, &self.task_handle)) {
             return FreeRtosError.TaskCreationFailed;
         }
@@ -68,7 +68,7 @@ pub const Task = struct {
 pub const Queue = struct {
     handle: QueueHandle_t = undefined,
 
-    pub fn init(self: *Queue, item_size: UBaseType_t, queue_length: UBaseType_t) !void {
+    pub fn create(self: *Queue, item_size: UBaseType_t, queue_length: UBaseType_t) !void {
         self.handle = c.xQueueCreate(item_size, queue_length);
         if (self.handle == null) {
             return FreeRtosError.QueueCreationFailed;
