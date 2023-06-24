@@ -39,7 +39,7 @@ _sbrk(int incr);
 
 // The definitions used here should be kept in sync with the
 // stack definitions in the linker script.
-char heap_array[10*1024];
+char heap_array[1024];
 
 
 caddr_t
@@ -75,7 +75,7 @@ _sbrk(int incr)
       abort ();
 #else
       // Heap has overflowed
-      errno = ENOMEM;
+      //errno = ENOMEM;
       return (caddr_t) - 1;
 #endif
     }
