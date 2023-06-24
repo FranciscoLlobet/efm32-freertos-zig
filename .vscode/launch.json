@@ -18,8 +18,8 @@
             "runToEntryPoint": "ResetHandler"
             "serialNumber": "", // add J-Link serial number if having multiple attached the same time.
             "svdFile": "${workspaceRoot}/src/chips/EFM32GG390F1024.svd",
-            "rtos": "FreeRTOS"
-
+            "rtos": "FreeRTOS",
+            "swoConfig": { "cpuFrequency": 48000000, "swoFrequency": 875000, "enabled": true, "source": "socket", "decoders": [{"port": 0, "type": "console", "encoding": "ascii", "label": "Output"}]},
         }
     ]
 }

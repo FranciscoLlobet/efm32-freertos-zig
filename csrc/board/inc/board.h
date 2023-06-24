@@ -25,6 +25,9 @@
 /* Include us delay */
 #include "sl_udelay.h"
 
+/* include usbexpress */
+#include "em_usbxpress.h"
+
 #define BOARD_SYSTICK_FREQUENCY    (1000)
 
 /* LEDs */
@@ -286,5 +289,7 @@ extern sl_led_t led_yellow;
 extern SPIDRV_HandleData_t sd_card_usart;
 extern SPIDRV_HandleData_t cc3100_usart;
 
+extern uint8_t usb_rx_buf[64];
+extern uint8_t usb_tx_buf[64];
 
 #endif /* BOARD_H_ */

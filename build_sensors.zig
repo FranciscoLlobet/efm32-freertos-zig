@@ -17,7 +17,7 @@ const source_path = [_][]const u8{
     "csrc/sensors/BMM150-Sensor-API/bmm150.c",
 };
 
-const c_flags = [_][]const u8{"-DEFM32GG390F1024"};
+const c_flags = [_][]const u8{"-DEFM32GG390F1024 -fdata-sections -ffunction-sections"};
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {

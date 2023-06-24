@@ -18,7 +18,7 @@ static SemaphoreHandle_t rx_semaphore = NULL;
 
 SPIDRV_HandleData_t cc3100_usart;
 
-SPIDRV_Init_t cc3100_usart_init_data =
+const SPIDRV_Init_t cc3100_usart_init_data =
 { .port = WIFI_SERIAL_PORT, .portLocation = _USART_ROUTE_LOCATION_LOC0,
 		.bitRate = WIFI_SPI_BAUDRATE, .frameLength = 8, .dummyTxValue = 0xFF, .type = spidrvMaster,
 		.bitOrder = spidrvBitOrderMsbFirst, .clockMode = spidrvClockMode0, .csControl =
@@ -307,15 +307,17 @@ void CC3100_IfRegIntHdlr(P_EVENT_HANDLER interruptHdl, void *pValue)
 	interrupt_handler_pValue = pValue;
 }
 
-CC3100_MaskIntHdlr(void)
+void CC3100_MaskIntHdlr(void)
 {
 	;
 }
 
-CC3100_UnmaskIntHdlr(void)
+void CC3100_UnmaskIntHdlr(void)
 {
 	;
 }
+
+extern void system_reset(void);
 
 /* General Event Handler */
 void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
@@ -332,13 +334,13 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
 			 printf("General Error: Status=%d, Sender=%d\n",
 			               slGeneralEvent->EventData.deviceEvent.status,
 			               slGeneralEvent->EventData.deviceEvent.sender);
-			uiso_reboot();
+			BOARD_MCU_Reset();
 			break;
 		case SL_DEVICE_ABORT_ERROR_EVENT:
-	        printf("Abort Error: AbortType=%d, AbortData=%d\n",
+	        printf("Abort Error: AbortType=%u, AbortData=%u\n",
 	               slGeneralEvent->EventData.deviceReport.AbortType,
 	               slGeneralEvent->EventData.deviceReport.AbortData);
-			uiso_reboot();
+			BOARD_MCU_Reset();
 	        break;
 		case SL_DEVICE_DRIVER_ASSERT_ERROR_EVENT:
 			 printf("Driver Assert Error Occurred.\n");
@@ -351,6 +353,7 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
 			break;
 		case SL_DEVICE_DRIVER_TIMEOUT_ASYNC_EVENT:
 			printf("Driver Timeout: Async event not received.\n");
+			BOARD_MCU_Reset();
 			break;
 		default:
 			break;

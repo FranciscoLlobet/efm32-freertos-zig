@@ -5,8 +5,11 @@ const build_gecko_sdk = @import("build_gecko_sdk.zig");
 const build_freertos = @import("build_freertos.zig");
 const build_sensors = @import("build_sensors.zig");
 const build_cc3100_sdk = @import("build_cc3100_sdk.zig");
+const build_mbedts = @import("build_mbedtls.zig");
 pub const boards = @import("src/boards.zig");
 pub const chips = @import("src/chips.zig");
+const builtin = @import("builtin");
+const compile = std.Build.Step.Compile;
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -17,6 +20,8 @@ pub fn build(b: *std.build.Builder) void {
     //const c_base_path = "csrc/":
     //const c_system_path = "csrc/system/";
     //const gecko_sdk_path = c_system_path ++ "gecko-sdk/";
+
+    //@field(compile, "link_gc_sections") = true;
 
     const include_path_array = [_][]const u8{
         // Configuration Files for miso
@@ -38,9 +43,9 @@ pub fn build(b: *std.build.Builder) void {
 
         "csrc/src/config.c",
 
+        // Board (support) package
         "csrc/board/src/board.c",
         "csrc/board/src/system_efm32gg.c",
-
         "csrc/board/src/board_leds.c",
         "csrc/board/src/board_buttons.c",
         "csrc/board/src/board_watchdog.c",
@@ -52,9 +57,14 @@ pub fn build(b: *std.build.Builder) void {
         "csrc/board/src/board_bmg160.c",
         "csrc/board/src/board_bmi160.c",
         "csrc/board/src/board_bmm150.c",
+        "csrc/board/src/board_CC3100.c",
+        "csrc/src/uiso_ntp.c",
+        "csrc/src/sntp_packet.c",
+        "csrc/src/network.c",
+        "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\""};
+    const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections -ffunction-sections"};
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
         if (!decl.is_pub)
@@ -67,12 +77,10 @@ pub fn build(b: *std.build.Builder) void {
             },
             .backing = .{ .board = @field(boards, decl.name) },
             .optimize = optimize,
-            // .linkerscript_source_file = .{ .path = "csrc/efm32gg.ld" },
         });
         exe.addSystemIncludePath("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include");
         exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libc_nano.a");
         exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libgcc.a");
-
         for (include_path_array) |path| {
             exe.addIncludePath(path);
         }
@@ -85,6 +93,8 @@ pub fn build(b: *std.build.Builder) void {
         build_freertos.aggregate(exe);
         build_sensors.aggregate(exe);
         build_cc3100_sdk.aggregate(exe);
+        build_mbedts.aggregate(exe);
+        //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
         exe.installArtifact(b);
     }
 

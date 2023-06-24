@@ -103,79 +103,79 @@ pub const devices = struct {
 
         pub const peripherals = struct {
             ///  VCMP
-            pub const VCMP = @intToPtr(*volatile types.peripherals.VCMP, 0x40000000);
+            pub const VCMP = @ptrFromInt(*volatile types.peripherals.VCMP, 0x40000000);
             ///  ACMP0
-            pub const ACMP0 = @intToPtr(*volatile types.peripherals.ACMP0, 0x40001000);
+            pub const ACMP0 = @ptrFromInt(*volatile types.peripherals.ACMP0, 0x40001000);
             ///  ACMP1
-            pub const ACMP1 = @intToPtr(*volatile types.peripherals.ACMP1, 0x40001400);
+            pub const ACMP1 = @ptrFromInt(*volatile types.peripherals.ACMP1, 0x40001400);
             ///  ADC0
-            pub const ADC0 = @intToPtr(*volatile types.peripherals.ADC0, 0x40002000);
+            pub const ADC0 = @ptrFromInt(*volatile types.peripherals.ADC0, 0x40002000);
             ///  DAC0
-            pub const DAC0 = @intToPtr(*volatile types.peripherals.DAC0, 0x40004000);
+            pub const DAC0 = @ptrFromInt(*volatile types.peripherals.DAC0, 0x40004000);
             ///  GPIO
-            pub const GPIO = @intToPtr(*volatile types.peripherals.GPIO, 0x40006000);
+            pub const GPIO = @ptrFromInt(*volatile types.peripherals.GPIO, 0x40006000);
             ///  EBI
-            pub const EBI = @intToPtr(*volatile types.peripherals.EBI, 0x40008000);
+            pub const EBI = @ptrFromInt(*volatile types.peripherals.EBI, 0x40008000);
             ///  I2C0
-            pub const I2C0 = @intToPtr(*volatile types.peripherals.I2C0, 0x4000a000);
+            pub const I2C0 = @ptrFromInt(*volatile types.peripherals.I2C0, 0x4000a000);
             ///  I2C1
-            pub const I2C1 = @intToPtr(*volatile types.peripherals.I2C1, 0x4000a400);
+            pub const I2C1 = @ptrFromInt(*volatile types.peripherals.I2C1, 0x4000a400);
             ///  USART0
-            pub const USART0 = @intToPtr(*volatile types.peripherals.USART0, 0x4000c000);
+            pub const USART0 = @ptrFromInt(*volatile types.peripherals.USART0, 0x4000c000);
             ///  USART1
-            pub const USART1 = @intToPtr(*volatile types.peripherals.USART1, 0x4000c400);
+            pub const USART1 = @ptrFromInt(*volatile types.peripherals.USART1, 0x4000c400);
             ///  USART2
-            pub const USART2 = @intToPtr(*volatile types.peripherals.USART2, 0x4000c800);
+            pub const USART2 = @ptrFromInt(*volatile types.peripherals.USART2, 0x4000c800);
             ///  UART0
-            pub const UART0 = @intToPtr(*volatile types.peripherals.UART0, 0x4000e000);
+            pub const UART0 = @ptrFromInt(*volatile types.peripherals.UART0, 0x4000e000);
             ///  UART1
-            pub const UART1 = @intToPtr(*volatile types.peripherals.UART1, 0x4000e400);
+            pub const UART1 = @ptrFromInt(*volatile types.peripherals.UART1, 0x4000e400);
             ///  TIMER0
-            pub const TIMER0 = @intToPtr(*volatile types.peripherals.TIMER0, 0x40010000);
+            pub const TIMER0 = @ptrFromInt(*volatile types.peripherals.TIMER0, 0x40010000);
             ///  TIMER1
-            pub const TIMER1 = @intToPtr(*volatile types.peripherals.TIMER1, 0x40010400);
+            pub const TIMER1 = @ptrFromInt(*volatile types.peripherals.TIMER1, 0x40010400);
             ///  TIMER2
-            pub const TIMER2 = @intToPtr(*volatile types.peripherals.TIMER2, 0x40010800);
+            pub const TIMER2 = @ptrFromInt(*volatile types.peripherals.TIMER2, 0x40010800);
             ///  TIMER3
-            pub const TIMER3 = @intToPtr(*volatile types.peripherals.TIMER3, 0x40010c00);
+            pub const TIMER3 = @ptrFromInt(*volatile types.peripherals.TIMER3, 0x40010c00);
             ///  RTC
-            pub const RTC = @intToPtr(*volatile types.peripherals.RTC, 0x40080000);
+            pub const RTC = @ptrFromInt(*volatile types.peripherals.RTC, 0x40080000);
             ///  BURTC
-            pub const BURTC = @intToPtr(*volatile types.peripherals.BURTC, 0x40081000);
+            pub const BURTC = @ptrFromInt(*volatile types.peripherals.BURTC, 0x40081000);
             ///  LETIMER0
-            pub const LETIMER0 = @intToPtr(*volatile types.peripherals.LETIMER0, 0x40082000);
+            pub const LETIMER0 = @ptrFromInt(*volatile types.peripherals.LETIMER0, 0x40082000);
             ///  LEUART0
-            pub const LEUART0 = @intToPtr(*volatile types.peripherals.LEUART0, 0x40084000);
+            pub const LEUART0 = @ptrFromInt(*volatile types.peripherals.LEUART0, 0x40084000);
             ///  LEUART1
-            pub const LEUART1 = @intToPtr(*volatile types.peripherals.LEUART1, 0x40084400);
+            pub const LEUART1 = @ptrFromInt(*volatile types.peripherals.LEUART1, 0x40084400);
             ///  PCNT0
-            pub const PCNT0 = @intToPtr(*volatile types.peripherals.PCNT0, 0x40086000);
+            pub const PCNT0 = @ptrFromInt(*volatile types.peripherals.PCNT0, 0x40086000);
             ///  PCNT1
-            pub const PCNT1 = @intToPtr(*volatile types.peripherals.PCNT1, 0x40086400);
+            pub const PCNT1 = @ptrFromInt(*volatile types.peripherals.PCNT1, 0x40086400);
             ///  PCNT2
-            pub const PCNT2 = @intToPtr(*volatile types.peripherals.PCNT2, 0x40086800);
+            pub const PCNT2 = @ptrFromInt(*volatile types.peripherals.PCNT2, 0x40086800);
             ///  WDOG
-            pub const WDOG = @intToPtr(*volatile types.peripherals.WDOG, 0x40088000);
+            pub const WDOG = @ptrFromInt(*volatile types.peripherals.WDOG, 0x40088000);
             ///  LESENSE
-            pub const LESENSE = @intToPtr(*volatile types.peripherals.LESENSE, 0x4008c000);
+            pub const LESENSE = @ptrFromInt(*volatile types.peripherals.LESENSE, 0x4008c000);
             ///  MSC
-            pub const MSC = @intToPtr(*volatile types.peripherals.MSC, 0x400c0000);
+            pub const MSC = @ptrFromInt(*volatile types.peripherals.MSC, 0x400c0000);
             ///  DMA
-            pub const DMA = @intToPtr(*volatile types.peripherals.DMA, 0x400c2000);
+            pub const DMA = @ptrFromInt(*volatile types.peripherals.DMA, 0x400c2000);
             ///  USB
-            pub const USB = @intToPtr(*volatile types.peripherals.USB, 0x400c4000);
+            pub const USB = @ptrFromInt(*volatile types.peripherals.USB, 0x400c4000);
             ///  EMU
-            pub const EMU = @intToPtr(*volatile types.peripherals.EMU, 0x400c6000);
+            pub const EMU = @ptrFromInt(*volatile types.peripherals.EMU, 0x400c6000);
             ///  CMU
-            pub const CMU = @intToPtr(*volatile types.peripherals.CMU, 0x400c8000);
+            pub const CMU = @ptrFromInt(*volatile types.peripherals.CMU, 0x400c8000);
             ///  RMU
-            pub const RMU = @intToPtr(*volatile types.peripherals.RMU, 0x400ca000);
+            pub const RMU = @ptrFromInt(*volatile types.peripherals.RMU, 0x400ca000);
             ///  PRS
-            pub const PRS = @intToPtr(*volatile types.peripherals.PRS, 0x400cc000);
+            pub const PRS = @ptrFromInt(*volatile types.peripherals.PRS, 0x400cc000);
             ///  AES
-            pub const AES = @intToPtr(*volatile types.peripherals.AES, 0x400e0000);
+            pub const AES = @ptrFromInt(*volatile types.peripherals.AES, 0x400e0000);
             ///  ETM
-            pub const ETM = @intToPtr(*volatile types.peripherals.ETM, 0xe0041000);
+            pub const ETM = @ptrFromInt(*volatile types.peripherals.ETM, 0xe0041000);
         };
     };
 };

@@ -1,7 +1,7 @@
 const std = @import("std");
 const microzig = @import("deps/microzig/build.zig");
 
-const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1"};
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-DEFM_DEBUG", "-fdata-sections", "-ffunction-sections" };
 
 const include_path = [_][]const u8{
     // Gecko-SDK Defines
@@ -25,13 +25,15 @@ const include_path = [_][]const u8{
     "csrc/system/gecko_sdk/service/sleeptimer/inc",
     "csrc/system/gecko_sdk/service/iostream/inc",
     "csrc/system/gecko_sdk/service/power_manager/inc",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/inc",
+    "csrc/system/gecko_sdk/middleware/usbxpress/inc/",
 };
 
 const source_paths = [_][]const u8{
     // Adding EMLIB essentials
     "csrc/system/gecko_sdk/common/src/sl_assert.c",
     "csrc/system/gecko_sdk/common/src/sl_slist.c",
-    "csrc/system/gecko_sdk/common/errno/src/sl_errno.c",
+    //"csrc/system/gecko_sdk/common/errno/src/sl_errno.c",
     "csrc/system/gecko_sdk/emlib/src/em_acmp.c",
     "csrc/system/gecko_sdk/emlib/src/em_adc.c",
     "csrc/system/gecko_sdk/emlib/src/em_aes.c",
@@ -113,6 +115,22 @@ const source_paths = [_][]const u8{
     "csrc/system/gecko_sdk/service/iostream/src/sl_iostream_swo_itm_8.c",
     "csrc/system/gecko_sdk/service/iostream/src/sl_iostream_swo.c",
     "csrc/system/gecko_sdk/service/iostream/src/sl_iostream.c",
+
+    // Adding USB device
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbhint.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbtimer.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbd.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbdch9.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbdep.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbdint.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbh.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbhal.c",
+    "csrc/system/gecko_sdk/middleware/usb_gecko/src/em_usbhep.c",
+
+    // Adding USB express
+    "csrc/system/gecko_sdk/middleware/usbxpress/src/em_usbxpress_descriptors.c",
+    "csrc/system/gecko_sdk/middleware/usbxpress/src/em_usbxpress.c",
+    "csrc/system/gecko_sdk/middleware/usbxpress/src/em_usbxpress_callback.c",
 };
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {

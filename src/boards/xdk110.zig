@@ -24,23 +24,31 @@ pub fn usDelay(us: u32) void {
     c.BOARD_usDelay(us);
 }
 
+pub fn watchdogEnable() void {
+    c.BOARD_Watchdog_Enable();
+}
+
+pub fn watchdogFeed() void {
+    c.BOARD_Watchdog_Feed();
+}
+
 // LED stuff
-pub const led = struct {
+const led = struct {
     led_handle: *c.sl_led_t = undefined,
-    pub fn init(self: *led) void {
+    pub fn init(self: *const led) void {
         c.led_init(self.led_handle);
     }
-    pub fn on(self: *led) void {
+    pub fn on(self: *const led) void {
         c.sl_led_turn_on(self.led_handle);
     }
-    pub fn off(self: *led) void {
+    pub fn off(self: *const led) void {
         c.sl_led_turn_off(self.led_handle);
     }
-    pub fn toggle(self: *led) void {
+    pub fn toggle(self: *const led) void {
         c.sl_led_toggle(self.led_handle);
     }
 };
 
-pub var red = led{ .led_handle = &c.led_red };
-pub var yellow = led{ .led_handle = &c.led_yellow };
-pub var orange = led{ .led_handle = &c.led_orange };
+pub const red = led{ .led_handle = &c.led_red };
+pub const yellow = led{ .led_handle = &c.led_yellow };
+pub const orange = led{ .led_handle = &c.led_orange };

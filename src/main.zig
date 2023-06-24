@@ -1,6 +1,9 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const freertos = @import("freertos.zig");
+const system = @import("system.zig");
+const sensors = @import("sensors.zig");
+const network = @import("network.zig");
 //const xdk110 = @import("boards/xdk110.zig");
 
 const c_board = @cImport({
@@ -16,11 +19,12 @@ const board = microzig.board;
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
-export fn vApplicationIdleHook() void {}
+export fn vApplicationIdleHook() void {
+    board.watchdogFeed();
+}
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    //microzig.board.mcu_reset()
-    //c_board.sl_led_turn_on(&c_board.led_red);
+    _ = c_board.printf("--- FreeRTOS Scheduler Started ---\n\r");
 
     board.red.on();
 
@@ -43,6 +47,8 @@ export fn vApplicationDaemonTaskStartupHook() void {
     board.msDelay(500);
 
     board.yellow.off();
+
+    board.watchdogEnable();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -73,6 +79,12 @@ pub const microzig_options = struct {
         }
         pub fn I2C0() void {
             c_board.I2C0_IRQHandler();
+        }
+        pub fn USB() void {
+            c_board.USB_IRQHandler();
+        }
+        pub fn TIMER0() void {
+            c_board.TIMER0_IRQHandler();
         }
         pub fn SysTick() void {
             if (freertos.c.taskSCHEDULER_NOT_STARTED != freertos.c.xTaskGetSchedulerState()) {
@@ -156,13 +168,12 @@ const timer_name: [*c]const u8 = "TestTimer";
 
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     _ = pvParameters;
-
     c_board.uiso_load_config();
 
     while (true) {
         var test_var: u32 = 0;
 
-        if (my_user_task_queue.receive(@ptrCast(*void, &test_var), freertos.c.portMAX_DELAY)) {
+        if (my_user_task_queue.receive(@ptrCast(*void, &test_var), null)) {
             board.yellow.toggle();
         }
     }
@@ -172,7 +183,7 @@ fn myTimerFunction(xTimer: freertos.c.TimerHandle_t) callconv(.C) void {
     _ = xTimer;
     var test_var: u32 = 0xAA55;
 
-    _ = my_user_task_queue.send(@ptrCast(*void, &test_var), freertos.c.portMAX_DELAY);
+    _ = my_user_task_queue.send(@ptrCast(*void, &test_var), null);
 }
 
 pub export fn main() void {
@@ -186,5 +197,13 @@ pub export fn main() void {
 
     my_timer.start(null) catch unreachable;
 
+    sensors.init_sensor_service() catch unreachable;
+
+    network.start();
+
+    _ = c_board.printf("--- MISO starting FreeRTOS ---\n\r");
+
     freertos.vTaskStartScheduler();
+
+    unreachable;
 }

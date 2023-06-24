@@ -22,3 +22,6 @@
 [submodule "csrc/sensors/BMI160_driver"]
 	path = csrc/sensors/BMI160_driver
 	url = git@github.com:FranciscoLlobet/BMI160_driver.git
+[submodule "csrc/crypto/mbedtls"]
+	path = csrc/crypto/mbedtls
+	url = git@github.com:FranciscoLlobet/mbedtls.git

@@ -11,7 +11,7 @@ const source_path = [_][]const u8{
     "csrc/system/ff15/custom/ffsystem.c",
 };
 
-const c_flags = [_][]const u8{"-DEFM32GG390F1024"};
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-fdata-sections", "-ffunction-sections" };
 
 pub fn build_ff(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
