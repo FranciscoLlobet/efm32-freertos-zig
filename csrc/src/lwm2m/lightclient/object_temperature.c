@@ -127,7 +127,7 @@ void* get_temperature_object(void)
 
 	temperature_instance[0].id = 0;
 
-	temperature_object.instanceList = lwm2m_list_add(&temperature_instance[0], NULL);
+	temperature_object.instanceList = &temperature_instance[0];
 
 	temperature_object.objID = LWM2M_TEMPERATURE_OBJECT_ID;
 

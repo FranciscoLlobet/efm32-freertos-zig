@@ -234,7 +234,10 @@ void wifi_task(void *param)
 				// Suspend LWM2M Task
 				//vTaskSuspend(user_task_handle);
 				vTaskSuspend(network_monitor_task_handle);
-				//vTaskSuspend(get_mqtt_client_task_handle());
+
+				vTaskSuspend(get_lwm2m_task_handle());
+				vTaskSuspend(get_mqtt_task_handle());
+		
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Disconnected %x\n\r",
 						ulNotifiedValue);
 
@@ -299,8 +302,8 @@ void wifi_task(void *param)
 			if (ulNotifiedValue & (uint32_t) wifi_ntp_synced_event)
 			{
 				// Resume LWM2M Task
-				//vTaskResume(user_task_handle);
-				//vTaskResume(get_mqtt_client_task_handle());
+				vTaskResume(get_lwm2m_task_handle());
+				vTaskResume(get_mqtt_task_handle());
 			}
 		} else
 		{

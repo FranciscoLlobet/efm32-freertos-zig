@@ -25,7 +25,7 @@ pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
 
 // Common FreeRTOS constants
 pub const pdPASS = c.pdPASS;
-pub const pdFAIL = c.pdPASS;
+pub const pdFAIL = c.pdFAIL;
 pub const pdTRUE = c.pdTRUE;
 pub const pdFALSE = c.pdFALSE;
 
@@ -58,8 +58,8 @@ pub fn vTaskDelay(xTicksToDelay: TickType_t) void {
     c.vTaskDelay(xTicksToDelay);
 }
 
-pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?anyopaque, ulParameter2: u32, xTicksToWait: TickType_t) bool {
-    return (pdTRUE == xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait));
+pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: TickType_t) bool {
+    return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait));
 }
 
 pub const eNotifyAction = enum(u32) {
@@ -73,8 +73,8 @@ pub const eNotifyAction = enum(u32) {
 pub const Task = struct {
     task_handle: TaskHandle_t = undefined,
 
-    pub fn initFromHandle(task_handle: ?TaskHandle_t) Task {
-        return Task{
+    pub fn initFromHandle(task_handle: ?TaskHandle_t) @This() {
+        return @This(){
             .task_handle = task_handle orelse c.xTaskGetCurrentTaskHandle(),
         };
     }
@@ -111,6 +111,9 @@ pub const Task = struct {
     pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, pulNotificationValue: *u32, xTicksToWait: TickType_t) bool {
         _ = self;
         return (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, pulNotificationValue, xTicksToWait));
+    }
+    pub fn getStackHighWaterMark(self: *Task) u32 {
+        return @as(u32, c.uxTaskGetStackHighWaterMark(self.task_handle));
     }
 };
 
@@ -162,4 +165,59 @@ pub const Timer = struct {
     pub fn reset(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerReset(self.handle, xTicksToWait);
     }
+    pub fn getId(self: *Timer) ?*anyopaque {
+        return c.pvTimerGetTimerID(self.handle);
+    }
+    pub fn initFromHandle(handle: TimerHandle_t) @This() {
+        return @This(){ .handle = handle };
+    }
 };
+
+pub const allocator = std.mem.Allocator{ .ptr = undefined, .vtable = &allocator_vtable };
+
+pub const allocator_vtable = std.mem.Allocator.VTable{
+    .alloc = freertos_alloc,
+    .resize = freertos_resize,
+    .free = freertos_free,
+};
+
+pub fn freertos_alloc(
+    _: *anyopaque,
+    len: usize,
+    log2_ptr_align: u8,
+    ret_addr: usize,
+) ?[*]u8 {
+    _ = ret_addr;
+    _ = log2_ptr_align;
+    //std.debug.assert(log2_ptr_align <= comptime std.math.log2_int(usize, @alignOf(std.c.max_align_t)));
+    // Note that this pointer cannot be aligncasted to max_align_t because if
+    // len is < max_align_t then the alignment can be smaller. For example, if
+    // max_align_t is 16, but the user requests 8 bytes, there is no built-in
+    // type in C that is size 8 and has 16 byte alignment, so the alignment may
+    // be 8 bytes rather than 16. Similarly if only 1 byte is requested, malloc
+    // is allowed to return a 1-byte aligned pointer.
+    return @ptrCast(?[*]u8, vPortMalloc(len));
+}
+
+fn freertos_resize(
+    _: *anyopaque,
+    buf: []u8,
+    log2_old_align: u8,
+    new_len: usize,
+    ret_addr: usize,
+) bool {
+    _ = log2_old_align;
+    _ = ret_addr;
+    return new_len <= buf.len;
+}
+
+fn freertos_free(
+    _: *anyopaque,
+    buf: []u8,
+    log2_old_align: u8,
+    ret_addr: usize,
+) void {
+    _ = log2_old_align;
+    _ = ret_addr;
+    vPortFree(buf.ptr);
+}

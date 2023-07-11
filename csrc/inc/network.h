@@ -17,10 +17,6 @@
 #include "netapp.h"
 #include "socket.h"
 
-/* Include mbedTLS as TLS provider */
-#include "mbedtls/ssl.h"
-
-
 #define UISO_PROTOCOL_BIT		             (0)
 #define UISO_PROTOCOL_BIT_MASK			     (1 << UISO_PROTOCOL_BIT)
 #define UISO_UDP_SELECTION_BIT				 (1)
@@ -129,7 +125,10 @@ int uiso_close_network_connection(uiso_network_ctx_t ctx);
 int uiso_network_register_ssl_context(uiso_network_ctx_t ctx, mbedtls_ssl_context * ssl_ctx);
 
 int uiso_network_read(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-int uiso_network_send(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+int uiso_network_send(uiso_network_ctx_t ctx, const uint8_t *buffer, size_t length);
+
+int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s);
+int wait_tx(uiso_network_ctx_t ctx, uint32_t timeout_s);
 
 mbedtls_ssl_context * uiso_network_get_ssl_ctx(uiso_network_ctx_t ctx);
 #endif /* NETWORK_H_ */

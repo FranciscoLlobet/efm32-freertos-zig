@@ -25,3 +25,9 @@
 [submodule "csrc/crypto/mbedtls"]
 	path = csrc/crypto/mbedtls
 	url = git@github.com:FranciscoLlobet/mbedtls.git
+[submodule "csrc/connectivity/wakaama"]
+	path = csrc/connectivity/wakaama
+	url = git@github.com:FranciscoLlobet/wakaama.git
+[submodule "csrc/connectivity/MQTT-C"]
+	path = csrc/connectivity/MQTT-C
+	url = git@github.com:FranciscoLlobet/MQTT-C.git

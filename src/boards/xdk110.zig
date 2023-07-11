@@ -10,6 +10,7 @@ pub const cpu_frequency = 48_000_000; // 48MHz
 
 pub fn mcuReset() noreturn {
     c.BOARD_MCU_Reset();
+    unreachable;
 }
 
 pub fn init() void {

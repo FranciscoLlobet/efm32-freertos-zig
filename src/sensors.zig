@@ -2,11 +2,14 @@ const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
+const network = @import("network.zig");
 
 const c = @cImport({
     @cDefine("EFM32GG390F1024", "1");
     @cDefine("__PROGRAM_START", "__main");
     @cInclude("board_i2c_sensors.h");
+    @cInclude("FreeRTOS.h");
+    @cInclude("task.h");
 });
 
 pub const sensor_errors = error{
@@ -21,7 +24,6 @@ pub const bme280 = bme280_ctx{ .handle = &c.board_bme280 };
 
 pub var task: freertos.Task = undefined;
 pub var timer: freertos.Timer = undefined;
-
 
 pub const bma2x = struct {
     handle: *c.bma2_dev,
@@ -93,8 +95,9 @@ pub const bme280_ctx = struct {
 };
 
 fn _tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    _ = xTimer;
-    _ = task.notify(1, freertos.eNotifyAction.eSetBits);
+    var task_handle = freertos.Task.initFromHandle(@ptrCast(freertos.TaskHandle_t, freertos.c.pvTimerGetTimerID(xTimer)));
+
+    _ = task_handle.notify(1, .eSetBits);
 }
 
 fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -110,21 +113,16 @@ fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
             if (notification_value == 1) {
                 bme280.readInForcedMode(&temp_data) catch unreachable;
                 // Notify to event system
-                _ = c.printf("Temp: %d\n\r", @intFromFloat(u32, 100.0 * temp_data.temperature));
+                _ = c.printf("Temp: %d, Stack: %d\n\r", @intFromFloat(i32, 100.0 * temp_data.temperature), task.getStackHighWaterMark());
 
-                //var test_string = "Test String";
-                var sent: u32 = undefined;
-
-                _ = c.strncpy(&c.usb_rx_buf[0], "Test String", c.strlen("Test String"));
-                _ = c.USBX_blockWrite(&c.usb_rx_buf[0], c.strlen("Test String"), &sent);
+                network.lwm2m_service.updateTemperature(@as(f32, @floatCast(f32, temp_data.temperature)));
             }
         }
-        board.orange.toggle();
     }
 }
 
 pub fn init_sensor_service() !void {
-    timer.create("tempTimer", 1000, freertos.pdTRUE, null, _tempTimerCallback) catch unreachable;
     task.create(_sensorSampingTask, "tempTask", config.rtos_stack_depth_sensor, null, config.rtos_prio_sensor) catch unreachable;
+    timer.create("tempTimer", 1000, freertos.pdTRUE, task.getHandle(), _tempTimerCallback) catch unreachable;
     timer.start(null) catch unreachable;
 }

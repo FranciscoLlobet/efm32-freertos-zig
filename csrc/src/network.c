@@ -25,38 +25,39 @@ typedef int (*_network_close_fn)(uiso_network_ctx_t ctx);
 struct uiso_sockets_s
 {
 	int32_t sd; /* Socket Descriptor */
-	int32_t protocol;
+	int32_t protocol; /* protocol id */
 
-	_network_send_fn send_fn;
-	_network_read_fn read_fn;
-	_network_close_fn close_fn;
+	_network_send_fn send_fn; /* Send function for the protocol */
+	_network_read_fn read_fn; /* Read function for the protocol */
+	_network_close_fn close_fn; /* Close function for the protocol */
 
 	/* Wait deadlines */
-	uint32_t rx_wait_deadline_s;
-	uint32_t tx_wait_deadline_s;
+	uint32_t rx_wait_deadline_s; /* Deadline for rx (in s) */
+	uint32_t tx_wait_deadline_s; /* Deadline for tx (in s) */
 
 	/* RX-TX Wait */
-	SemaphoreHandle_t rx_signal;
-	SemaphoreHandle_t tx_signal;
+	SemaphoreHandle_t rx_signal; /* RX available signal */
+	SemaphoreHandle_t tx_signal; /* TX available signal */
 
 	/* local address */
-	SlSockAddrIn_t local;
+	SlSockAddrIn_t local; 
 	SlSocklen_t local_len;
 
 	/* Peer address */
 	SlSockAddrIn_t peer;
 	SlSocklen_t peer_len;
 
-	mbedtls_ssl_context *ssl_context;
+	mbedtls_ssl_context *ssl_context; /* Optional SSL context */
+	int (*ssl_cleanup)(mbedtls_ssl_context *ssl); // optional SSL cleanup function
 
-	uint32_t last_send_time;
-	uint32_t last_recv_time;
+	uint32_t last_send_time;	// Last time we sent a packet
+	uint32_t last_recv_time;	// Last time we received a packet
 
-	void *app_ctx;
-	uint32_t app_param;
+	void *app_ctx;	// Optional application context
+	uint32_t app_param;	// Optional application parameter
 };
 
-static struct uiso_sockets_s system_sockets[wifi_service_max]; /* new system sockets */
+static struct uiso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
 static SemaphoreHandle_t network_monitor_mutex = NULL;
 
 static SemaphoreHandle_t rx_tx_mutex = NULL;
@@ -64,7 +65,7 @@ static SemaphoreHandle_t rx_tx_mutex = NULL;
 static void select_task(void *param);
 static void initialize_socket_management(void);
 //static int register_deadline(struct socket_management_s * ctx, int sd, uint32_t timeout_s);
-static void wifi_service_register_rx_socket(enum wifi_socket_id_e id, uint32_t timeout_s);
+static void wifi_service_register_rx_socket(uiso_network_ctx_t ctx, uint32_t timeout_s);
 static void wifi_service_register_tx_socket(enum wifi_socket_id_e id, uint32_t timeout_s);
 
 TaskHandle_t network_monitor_task_handle = NULL;
@@ -99,11 +100,11 @@ static void initialize_socket_management(void)
 	}
 }
 
-void wifi_service_register_rx_socket(enum wifi_socket_id_e id, uint32_t timeout_s)
+void wifi_service_register_rx_socket(uiso_network_ctx_t ctx, uint32_t timeout_s)
 {
 	(void) xSemaphoreTake(network_monitor_mutex, portMAX_DELAY);
 
-	_get_network_ctx(id)->rx_wait_deadline_s = (uint32_t) sl_sleeptimer_get_time() + timeout_s;
+	ctx->rx_wait_deadline_s = (uint32_t) sl_sleeptimer_get_time() + timeout_s;
 
 	(void) xSemaphoreGive(network_monitor_mutex);
 }
@@ -121,8 +122,7 @@ int create_network_mediator(void)
 {
 	int ret = 0;
 
-	if (pdFALSE == xTaskCreate(select_task, "SelectTask", configMINIMAL_STACK_SIZE + 4096, NULL,
-	NETWORK_MONITOR_TASK, &network_monitor_task_handle))
+	if (pdFALSE == xTaskCreate(select_task, "SelectTask", 1144, NULL,NETWORK_MONITOR_TASK, &network_monitor_task_handle))
 	{
 		ret = -1;
 	}
@@ -148,18 +148,25 @@ int create_network_mediator(void)
 
 int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s)
 {
-	int ret_value = -1;
-	wifi_service_register_rx_socket(id, timeout_s);
+	return wait_rx(_get_network_ctx(id), timeout_s);;
+}
 
-	(void) xSemaphoreTake(_get_network_ctx(id)->rx_signal, 0);
+int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s)
+{
+	int ret_value = -1;
+
+	wifi_service_register_rx_socket(ctx, timeout_s);
+
+	(void) xSemaphoreTake(ctx->rx_signal, 0);
 	(void) xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);
 
-	if (pdTRUE == xSemaphoreTake(_get_network_ctx(id)->rx_signal, 1000 * (timeout_s + 2)))
+	if (pdTRUE == xSemaphoreTake(ctx->rx_signal, 1000 * (timeout_s + 2)))
 	{
 		ret_value = 0;
 	}
 
 	return ret_value;
+
 }
 
 int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s)
@@ -304,7 +311,7 @@ static void select_task(void *param)
 							if (FD_ISSET(ctx->sd, write_fd_set_ptr))
 							{
 								ctx->tx_wait_deadline_s = 0;
-								(void) xSemaphoreGive(ctx->tx_wait_deadline_s);
+								(void) xSemaphoreGive(ctx->tx_signal);
 							}
 						}
 					}
@@ -319,6 +326,7 @@ static void select_task(void *param)
 		} else
 		{
 			// Return mutex
+			printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
 			(void) xTaskGenericNotifyWait(0, 0, UINT32_MAX, &notification_counter, portMAX_DELAY);
 		}
 
@@ -466,13 +474,7 @@ static int _recv_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 
 static int _read_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
-	int ret = 0;
-	do
-	{
-		ret = (int) sl_Recv((_i16) ctx->sd, (char*) buf, (_i16) len, (_i16) 0);
-
-	}while(ret == (int)SL_EAGAIN);
-	return ret;
+	return (int) sl_Recv((_i16) ctx->sd, (char*) buf, (_i16) len, (_i16) 0);
 }
 
 static int _recv_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
@@ -718,7 +720,7 @@ int uiso_network_read(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return ret;
 }
 
-int uiso_network_send(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int uiso_network_send(uiso_network_ctx_t ctx, const uint8_t *buffer, size_t length)
 {
 	(void) xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
     int ret = ctx->send_fn(ctx, buffer, length);

@@ -13,4 +13,10 @@ const task_priorities = enum(freertos.BaseType_t) {
 };
 
 pub const rtos_prio_sensor = @intFromEnum(task_priorities.rtos_prio_low);
-pub const rtos_stack_depth_sensor: u16 = 2000;
+pub const rtos_stack_depth_sensor: u16 = 440;
+
+pub const rtos_prio_lwm2m = @intFromEnum(task_priorities.rtos_prio_normal);
+pub const rtos_stack_depth_lwm2m: u16 = 2000;
+
+pub const rtos_prio_mqtt = @intFromEnum(task_priorities.rtos_prio_normal);
+pub const rtos_stack_depth_mqtt: u16 = 2000;

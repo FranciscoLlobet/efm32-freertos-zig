@@ -8,6 +8,23 @@
         "stdio.h": "c",
         "sl_i2cspm.h": "c",
         "board_i2c_sensors.h": "c",
-        "sl_simple_button.h": "c"
+        "sl_simple_button.h": "c",
+        "bme280_defs.h": "c",
+        "stdint.h": "c",
+        "em_usbxpress.h": "c",
+        "em_usbxpress_descriptors.h": "c",
+        "build_info.h": "c",
+        "platform_util.h": "c",
+        "time.h": "c",
+        "timing_alt.h": "c",
+        "board_cc3100.h": "c",
+        "connection.h": "c",
+        "net_sockets.h": "c",
+        "wifi_service.h": "c",
+        "uiso.h": "c",
+        "lwm2m_temperature.h": "c",
+        "stdlib.h": "c",
+        "network.h": "c",
+        "mqtt.h": "c"
     }
 }

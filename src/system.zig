@@ -1,8 +1,8 @@
 const std = @import("std");
 const board = @import("microzig").board;
-const freertos = @import("freertos");
+const freertos = @import("freertos.zig");
 
-fn _performReset(param1: ?anyopaque, param2: u32) callconv(.C) noreturn {
+fn _performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = param2;
     _ = param1;
 
@@ -27,6 +27,6 @@ pub fn shutdown() void {
     reset();
 }
 
-pub export fn system_reset() void {
+pub export fn system_reset() callconv(.C) void {
     reset();
 }

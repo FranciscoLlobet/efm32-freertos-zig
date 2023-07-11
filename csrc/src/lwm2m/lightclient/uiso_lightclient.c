@@ -54,11 +54,11 @@
  Bosch Software Innovations GmbH - Please refer to git log
 
  */
+#include "lwm2m_client.h"
 
 #include "liblwm2m.h"
 #include "../connection.h"
 
-#include "uiso_net_sockets.h"
 //#include "simplelink.h"
 #include <ctype.h>
 #include <errno.h>
@@ -70,7 +70,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../../wifi_service.h"
+#include "wifi_service.h"
 #include "lwm2m_temperature.h"
 
 extern TaskHandle_t user_task_handle;
@@ -104,15 +104,6 @@ int g_reboot = 0;
 enum dtls_authentication_mode
 {
 	DTLS_AUTHENTICATION_MODE_PK = 0, DTLS_AUTHENTICATION_MODE_PSK = 1
-};
-
-enum
-{
-	lwm2m_notify_registration = (1 << 0),
-	lwm2m_notify_timestamp = (1 << 1),
-	lwm2m_notify_temperature = (1 << 2),
-	lwm2m_notify_accelerometer = (1 << 3),
-	lwm2m_notify_message_reception = (1 << 4)
 };
 
 typedef struct
@@ -526,13 +517,15 @@ int lwm2m_client_task_runner(void *param1)
 		}
 		else
 		{
-			if(timeout_val > 10)
+			if(timeout_val > 1)
 			{
 				timeout_val = 1;
 			}
 
 			wait_for_rx(timeout_val);
 		}
+
+		printf("LWM2M: %d\n\r", uxTaskGetStackHighWaterMark(NULL));
 	} while (1);
 
 	/*
@@ -552,14 +545,6 @@ int lwm2m_client_task_runner(void *param1)
 	fprintf(stdout, "\r\n\n");
 
 	return 0;
-}
-
-void lwm2m_client_update_temperature(float temperature)
-{
-	write_temperature(temperature);
-
-	xTaskNotify(user_task_handle, (uint32_t )lwm2m_notify_temperature,
-			eSetBits);
 }
 
 extern void update_accelerometer_values(float x, float y, float z);

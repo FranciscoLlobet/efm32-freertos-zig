@@ -21,58 +21,18 @@
 #include <ctype.h>
 #include "connection.h"
 #include "commandline.h"
-#include "uiso_net_sockets.h"
 #include "mbedtls/net_sockets.h"
 #include <sys/types.h>
 
 #define SIMPLE_LINK_MAX_SEND_MTU 	1472
 
 extern mbedtls_ssl_context ssl_context;
-extern uiso_mbedtls_context_t net_context;
-
-#if 0
-connection_t connection_find(connection_t connList, struct sockaddr_in *addr,
-		size_t addrLen)
-{
-	connection_t connP;
-
-	connP = connList;
-	while (connP != NULL)
-	{
-		/* Modified this for IPv4 */
-		if (uiso_net_compare_addresses_ipv4((SlSockAddrIn_t*) addr,
-				&(connP->host_addr)))
-		{
-			return connP;
-		}
-
-		connP = connP->next;
-	}
-
-	return connP;
-}
-
-connection_t connection_new_incoming(connection_t connList,
-		struct uiso_mbedtls_context_s *connection)
-{
-	connection_t connP;
-
-	connP = (connection_t) lwm2m_malloc(sizeof(connection_t));
-	if (connP != NULL)
-	{
-		/* Prepend to list */
-		memmove(connP, connection, sizeof(struct uiso_mbedtls_context_s));
-		connP->next = connList;
-	}
-
-	return connP;
-}
-#endif
+//extern uiso_mbedtls_context_t net_context;
 
 connection_t connection_create(connection_t connList, char *host, char *port,
 		int protocol)
 {
-	int ret = UISO_NET_GENERIC_ERROR;
+	int ret = UISO_NETWORK_GENERIC_ERROR;
 	connection_t newConn = lwm2m_malloc(sizeof(struct connection_s));
 	if(NULL != newConn)
 	{

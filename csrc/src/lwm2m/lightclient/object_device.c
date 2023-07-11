@@ -96,6 +96,7 @@
 #define RES_O_MEMORY_TOTAL          21
 
 extern size_t xPortGetFreeHeapSize(void);
+extern void system_reboot(void);
 
 static uint8_t prv_set_value(lwm2m_data_t * dataP)
 {
@@ -312,7 +313,7 @@ static uint8_t prv_device_execute(lwm2m_context_t * contextP,
 
     if (resourceId == RES_M_REBOOT)
     {
-        uiso_reboot(); // Enqueue Reset in x seconds
+        //system_reboot(); // Enqueue Reset in x seconds
         return COAP_204_CHANGED;
     }
 

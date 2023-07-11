@@ -5,6 +5,7 @@ const system = @import("system.zig");
 const sensors = @import("sensors.zig");
 const network = @import("network.zig");
 //const xdk110 = @import("boards/xdk110.zig");
+const mqtt = @import("mqtt.zig");
 
 const c_board = @cImport({
     @cDefine("EFM32GG390F1024", "1");

@@ -22,6 +22,8 @@
 int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s);
 int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s);
 
+
+
 void create_wifi_service_task(void);
 
 
@@ -31,6 +33,7 @@ extern TaskHandle_t wifi_task_handle;
 extern TaskHandle_t network_monitor_task_handle;
 int create_network_mediator(void);
 
-
+extern TaskHandle_t get_lwm2m_task_handle(void);
+extern TaskHandle_t get_mqtt_task_handle(void);
 
 #endif /* WIFI_SERVICE_H_ */

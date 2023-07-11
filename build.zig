@@ -6,6 +6,8 @@ const build_freertos = @import("build_freertos.zig");
 const build_sensors = @import("build_sensors.zig");
 const build_cc3100_sdk = @import("build_cc3100_sdk.zig");
 const build_mbedts = @import("build_mbedtls.zig");
+const build_wakaama = @import("build_wakaama.zig");
+const build_mqtt = @import("build_mqtt.zig");
 pub const boards = @import("src/boards.zig");
 pub const chips = @import("src/chips.zig");
 const builtin = @import("builtin");
@@ -64,7 +66,7 @@ pub fn build(b: *std.build.Builder) void {
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections -ffunction-sections"};
+    const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections", "-ffunction-sections"};
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
         if (!decl.is_pub)
@@ -94,9 +96,12 @@ pub fn build(b: *std.build.Builder) void {
         build_sensors.aggregate(exe);
         build_cc3100_sdk.aggregate(exe);
         build_mbedts.aggregate(exe);
+        build_wakaama.aggregate(exe);
+        build_mqtt.aggregate(exe);
         //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
         exe.installArtifact(b);
     }
+
 
     inline for (@typeInfo(chips).Struct.decls) |decl| {
         if (!decl.is_pub)
