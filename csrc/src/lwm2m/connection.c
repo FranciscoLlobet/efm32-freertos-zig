@@ -27,7 +27,7 @@
 #define SIMPLE_LINK_MAX_SEND_MTU 	1472
 
 extern mbedtls_ssl_context ssl_context;
-//extern uiso_mbedtls_context_t net_context;
+//extern miso_mbedtls_context_t net_context;
 
 connection_t connection_create(connection_t connList, char *host, char *port,
 		int protocol)
@@ -36,11 +36,11 @@ connection_t connection_create(connection_t connList, char *host, char *port,
 	connection_t newConn = lwm2m_malloc(sizeof(struct connection_s));
 	if(NULL != newConn)
 	{
-		ret = uiso_create_network_connection(uiso_get_network_ctx(wifi_service_lwm2m_socket), host, port, NULL, (enum uiso_protocol)protocol);
+		ret = miso_create_network_connection(miso_get_network_ctx(wifi_service_lwm2m_socket), host, port, NULL, (enum miso_protocol)protocol);
 		if(ret >= 0)
 		{
 			/* Prepare */
-			newConn->ctx = uiso_get_network_ctx(wifi_service_lwm2m_socket);
+			newConn->ctx = miso_get_network_ctx(wifi_service_lwm2m_socket);
 			newConn->next = NULL;
 
 			if(NULL != connList)
@@ -70,7 +70,7 @@ void connection_free(connection_t connList)
 	{
 		do{
 			// connection free
-			ret = uiso_close_network_connection(connList->ctx);
+			ret = miso_close_network_connection(connList->ctx);
 			if(ret != UISO_NETWORK_OK)
 			{
 				printf("Error: %d\n\r");
@@ -89,7 +89,7 @@ int connection_send(connection_t connP, uint8_t *buffer, size_t length)
 {
 	(void)connP;
 
-	int nbSent = uiso_network_send(uiso_get_network_ctx(wifi_service_lwm2m_socket), buffer, length);
+	int nbSent = miso_network_send(miso_get_network_ctx(wifi_service_lwm2m_socket), buffer, length);
 	if(0 > nbSent)
 	{
 		return -1;

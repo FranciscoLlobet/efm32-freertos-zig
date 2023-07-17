@@ -1,13 +1,13 @@
 /*
- * uiso_ntp.c
+ * miso_ntp.c
  *
  *  Created on: 14 nov 2022
  *      Author: Francisco
  */
 
-#include "uiso.h"
+#include "miso.h"
 
-#include "uiso_ntp.h"
+#include "miso_ntp.h"
 
 //#include "simplelink.h"
 #include "wifi_service.h"
@@ -67,7 +67,7 @@ static uint32_t get_local_ntp_time(void)
 	return local_time;
 }
 
-enum sntp_return_codes_e uiso_sntp_request(sntp_server_t *server,
+enum sntp_return_codes_e miso_sntp_request(sntp_server_t *server,
 		uint32_t *time_to_next_sync)
 {
 	sl_sleeptimer_date_t date =
@@ -91,7 +91,7 @@ enum sntp_return_codes_e uiso_sntp_request(sntp_server_t *server,
 	uint32_t local_origin_timestamp = 0;
 	uint32_t local_origin_timestamp_fraction = 0;
 
-	res = uiso_create_network_connection(uiso_get_network_ctx(wifi_service_ntp_socket), server->server_name, "123", "123",uiso_protocol_udp_ip4);
+	res = miso_create_network_connection(miso_get_network_ctx(wifi_service_ntp_socket), server->server_name, "123", "123",miso_protocol_udp_ip4);
 
 	if (sntp_success == sntp_rcode)
 	{
@@ -102,7 +102,7 @@ enum sntp_return_codes_e uiso_sntp_request(sntp_server_t *server,
 					local_origin_timestamp, local_origin_timestamp_fraction,
 					sntp_version_4);
 
-			res =  uiso_network_send(uiso_get_network_ctx(wifi_service_ntp_socket), (uint8_t *)&ntp_packet, sizeof(ntp_packet));
+			res =  miso_network_send(miso_get_network_ctx(wifi_service_ntp_socket), (uint8_t *)&ntp_packet, sizeof(ntp_packet));
 		}
 
 		// select?
@@ -114,16 +114,16 @@ enum sntp_return_codes_e uiso_sntp_request(sntp_server_t *server,
 		/* Wait for response */
 		if (res >= 0)
 		{
-			res = uiso_network_read(uiso_get_network_ctx(wifi_service_ntp_socket), (uint8_t *)&ntp_packet, sizeof(ntp_packet));
+			res = miso_network_read(miso_get_network_ctx(wifi_service_ntp_socket), (uint8_t *)&ntp_packet, sizeof(ntp_packet));
 		}
 
 		if(res >= 0)
 		{
-			res = uiso_close_network_connection(uiso_get_network_ctx(wifi_service_ntp_socket));
+			res = miso_close_network_connection(miso_get_network_ctx(wifi_service_ntp_socket));
 		}
 		else
 		{
-			(void) uiso_close_network_connection(uiso_get_network_ctx(wifi_service_ntp_socket));
+			(void) miso_close_network_connection(miso_get_network_ctx(wifi_service_ntp_socket));
 		}
 
 		if (res < 0)

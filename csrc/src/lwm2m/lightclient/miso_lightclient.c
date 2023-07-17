@@ -173,7 +173,7 @@ void* lwm2m_connect_server(uint16_t secObjInstID, void *userData)
 	if (0 == ret)
 	{
 		newConnP = connection_create(dataP->connList, host, port,
-				(int) uiso_protocol_dtls_ip4);
+				(int) miso_protocol_dtls_ip4);
 	}
 
 	if (newConnP == NULL)
@@ -480,7 +480,7 @@ int lwm2m_client_task_runner(void *param1)
 			if (notification_value & (uint32_t) lwm2m_notify_message_reception)
 			{
 				/* Handle reception */
-				ssize_t numBytes = uiso_network_read(data.connList->ctx, get_rx_buffer(),
+				ssize_t numBytes = miso_network_read(data.connList->ctx, get_rx_buffer(),
 						MAX_PACKET_SIZE);
 
 				if (numBytes >= MAX_PACKET_SIZE)

@@ -1,7 +1,7 @@
 const std = @import("std");
 const microzig = @import("deps/microzig/build.zig");
 
-const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2","-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-DEFM_DEBUG", "-fdata-sections", "-ffunction-sections" };
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-DEFM_DEBUG", "-fdata-sections", "-ffunction-sections" };
 
 const include_path = [_][]const u8{
     // Gecko-SDK Defines
@@ -15,6 +15,7 @@ const include_path = [_][]const u8{
     "csrc/system/gecko_sdk/emdrv/emcode/inc",
     "csrc/system/gecko_sdk/emdrv/gpiointerrupt/inc",
     "csrc/system/gecko_sdk/emdrv/spidrv/inc",
+    "csrc/system/gecko_sdk/emdrv/uartdrv/inc",
     "csrc/system/gecko_sdk/emdrv/nvm3/inc",
     "csrc/system/gecko_sdk/driver/button/inc",
     "csrc/system/gecko_sdk/driver/debug/inc",
@@ -82,6 +83,7 @@ const source_paths = [_][]const u8{
     "csrc/system/gecko_sdk/emdrv/dmadrv/src/dmadrv.c",
     "csrc/system/gecko_sdk/emdrv/gpiointerrupt/src/gpiointerrupt.c",
     "csrc/system/gecko_sdk/emdrv/spidrv/src/spidrv.c",
+    "csrc/system/gecko_sdk/emdrv/uartdrv/src/uartdrv.c",
 
     "csrc/system/gecko_sdk/driver/button/src/sl_button.c",
     "csrc/system/gecko_sdk/driver/button/src/sl_simple_button.c",

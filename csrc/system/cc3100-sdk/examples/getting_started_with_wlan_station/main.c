@@ -46,7 +46,7 @@
  */
 
 /**/
-#include "uiso.h"
+#include "miso.h"
 
 #include "simplelink.h"
 #include "sl_common.h"

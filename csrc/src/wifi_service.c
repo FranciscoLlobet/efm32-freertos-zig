@@ -4,18 +4,18 @@
  *  Created on: 12 nov 2022
  *      Author: Francisco
  */
-#include "uiso_config.h"
+#include "miso_config.h"
 #include "wifi_service.h"
 
 #include "board_cc3100.h"
 
 #include "simplelink.h"
-#include "uiso_ntp.h"
+#include "miso_ntp.h"
 #include "sl_sleeptimer.h"
 
 //#include "mqtt/mqtt_client.h"
 
-#define WIFI_TASK_PRIORITY      (UBaseType_t)( uiso_rtos_prio_above_normal )
+#define WIFI_TASK_PRIORITY      (UBaseType_t)( miso_rtos_prio_above_normal )
 
 
 extern int lwm2m_client_task_runner(void *param1);
@@ -276,7 +276,7 @@ void wifi_task(void *param)
 
 				sntp_server_t *server = select_server_from_list();
 
-				sntp_rcode = uiso_sntp_request(server, &time_to_next_sync);
+				sntp_rcode = miso_sntp_request(server, &time_to_next_sync);
 
 				if (time_to_next_sync < WIFI_NTP_SYNC_PERIOD)
 				{

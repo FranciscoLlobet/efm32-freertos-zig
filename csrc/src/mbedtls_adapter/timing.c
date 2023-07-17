@@ -1,5 +1,5 @@
 /*
- * uiso_timing.c
+ * miso_timing.c
  *
  *  Created on: 18 nov 2022
  *      Author: Francisco
@@ -19,7 +19,7 @@ enum{
 
 static void timer_callback( TimerHandle_t xTimer )
 {
-	uiso_mbedtls_timing_delay_t * data = pvTimerGetTimerID( xTimer );
+	miso_mbedtls_timing_delay_t * data = pvTimerGetTimerID( xTimer );
 
 
 	if( xTimer == data->int_timer)
@@ -38,21 +38,21 @@ static void timer_callback( TimerHandle_t xTimer )
 }
 
 
-void uiso_mbedtls_init_timer(uiso_mbedtls_timing_delay_t * data)
+void miso_mbedtls_init_timer(miso_mbedtls_timing_delay_t * data)
 {
 	data->int_timer = xTimerCreate("inttimer", 1000, false, data, timer_callback );
 	data->fin_timer = xTimerCreate("fintimer", 1000, false, data, timer_callback );
 }
 
-void uiso_mbedtls_deinit_timer(uiso_mbedtls_timing_delay_t * data)
+void miso_mbedtls_deinit_timer(miso_mbedtls_timing_delay_t * data)
 {
 	xTimerDelete(data->int_timer, portMAX_DELAY);
 	xTimerDelete(data->fin_timer, portMAX_DELAY);
 }
 
-void uiso_mbedtls_timing_set_delay( void *data, uint32_t int_ms, uint32_t fin_ms )
+void miso_mbedtls_timing_set_delay( void *data, uint32_t int_ms, uint32_t fin_ms )
 {
-	uiso_mbedtls_timing_delay_t * timer = (uiso_mbedtls_timing_delay_t *)data;
+	miso_mbedtls_timing_delay_t * timer = (miso_mbedtls_timing_delay_t *)data;
 
 	if(pdTRUE == xTimerIsTimerActive(timer->int_timer))
 	{
@@ -83,9 +83,9 @@ void uiso_mbedtls_timing_set_delay( void *data, uint32_t int_ms, uint32_t fin_ms
 	}
 }
 
-int uiso_mbedtls_timing_get_delay( void *data )
+int miso_mbedtls_timing_get_delay( void *data )
 {
-	uiso_mbedtls_timing_delay_t * timer = (mbedtls_timing_delay_context *)data;
+	miso_mbedtls_timing_delay_t * timer = (mbedtls_timing_delay_context *)data;
 
 	return timer->state;
 }

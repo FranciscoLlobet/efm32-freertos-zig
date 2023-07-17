@@ -5,7 +5,7 @@
  *      Author: Francisco
  */
 
-#include "uiso_config.h"
+#include "miso_config.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "ff.h"
@@ -54,7 +54,7 @@ FATFS fs;
 //extern int calculate_sha256_of_file(const char *filename, uint8_t *hash);
 //extern int verify_signature_of_file(const char *file, const char *sig_file, const char * pub_key_file);
 
-void uiso_load_config(void)
+void miso_load_config(void)
 {
 	FSIZE_t fSize = 0;
 	FRESULT fRes = FR_OK;

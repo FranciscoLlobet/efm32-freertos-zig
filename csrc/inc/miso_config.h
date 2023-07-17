@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void uiso_load_config(void);
+void miso_load_config(void);
 
 char* config_get_wifi_ssid(void);
 char* config_get_wifi_key(void);

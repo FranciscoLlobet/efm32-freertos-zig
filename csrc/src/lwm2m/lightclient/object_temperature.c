@@ -4,7 +4,7 @@
  *  Created on: 10 dic 2022
  *      Author: Francisco
  */
-#include "uiso.h"
+#include "miso.h"
 #include "liblwm2m.h"
 
 #define LWM2M_TEMPERATURE_OBJECT_ID		(3303)

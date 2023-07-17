@@ -161,7 +161,7 @@ extern "C" {
 #include "FreeRTOS.h"
 #include "semphr.h"
 
-//typedef uiso_network_ctx_t mqtt_pal_socket_handle; // Will think about this.
+//typedef miso_network_ctx_t mqtt_pal_socket_handle; // Will think about this.
 typedef void * mqtt_pal_socket_handle; // Make this generic
 
 #define MQTT_PAL_HTONS(s) htons(s)

@@ -10,6 +10,20 @@
 #ifndef BOARD_H_
 #define BOARD_H_
 
+#ifndef EFM32GG390F1024
+#define EFM32GG390F1024  (1)
+#endif
+
+#ifndef __PROGRAM_START
+#define __PROGRAM_START __main
+#endif
+
+#ifndef SL_CATALOG_POWER_MANAGER_PRESENT
+#define SL_CATALOG_POWER_MANAGER_PRESENT    (1)
+#endif
+
+#include <stdint.h>
+
 #include "em_device.h"
 #include "em_chip.h"
 #include "em_msc.h"
@@ -17,6 +31,8 @@
 #include "em_gpio.h"
 #include "gpiointerrupt.h"
 #include "spidrv.h"
+#include "uartdrv.h"
+#include "em_usbxpress.h"
 
 /* Adding LEDs and Buttons */
 #include "sl_button.h"
@@ -61,45 +77,45 @@
 
 #define BOARD_SD_CARD_USART      		USART1
 #define BOARD_SD_CARD_BITRATE     		UINT32_C(10000000)
-#define BOARD_SD_CARD_WAKEUP_BITRATE       UINT32_C(100000)
+#define BOARD_SD_CARD_WAKEUP_BITRATE    UINT32_C(100000)
 
-#define SD_CARD_CS_PIN         (15)
-#define SD_CARD_CS_PORT        (gpioPortB)
-#define SD_CARD_CS_MODE        (gpioModeWiredAnd)
+#define SD_CARD_CS_PIN                  (15)
+#define SD_CARD_CS_PORT                 (gpioPortB)
+#define SD_CARD_CS_MODE                 (gpioModeWiredAnd)
 
-#define SD_CARD_LS_PIN         (7)
-#define SD_CARD_LS_PORT        (gpioPortC)
-#define SD_CARD_LS_MODE        (gpioModeWiredAnd)
+#define SD_CARD_LS_PIN                  (7)
+#define SD_CARD_LS_PORT                 (gpioPortC)
+#define SD_CARD_LS_MODE                 (gpioModeWiredAnd)
 
-#define SD_DETECT_PIN            (12)
-#define SD_DETECT_PORT           (gpioPortF)
-#define SD_DETECT_MODE           (gpioModeInputPullFilter)
-#define SD_DETECT_EDGE_RISING    true
-#define SD_DETECT_EDGE_FALLING   true
+#define SD_DETECT_PIN                   (12)
+#define SD_DETECT_PORT                  (gpioPortF)
+#define SD_DETECT_MODE                  (gpioModeInputPullFilter)
+#define SD_DETECT_EDGE_RISING           true
+#define SD_DETECT_EDGE_FALLING          true
 
-#define SD_CARD_SPI1_MISO_PIN       (1)
-#define SD_CARD_SPI1_MISO_PORT      (gpioPortD)
-#define SD_CARD_SPI1_MISO_MODE      (gpioModeInput)
+#define SD_CARD_SPI1_MISO_PIN           (1)
+#define SD_CARD_SPI1_MISO_PORT          (gpioPortD)
+#define SD_CARD_SPI1_MISO_MODE          (gpioModeInput)
 
-#define SD_CARD_SPI1_MOSI_PIN      (0)
-#define SD_CARD_SPI1_MOSI_PORT     (gpioPortD)
-#define SD_CARD_SPI1_MOSI_MODE     (gpioModePushPull)
+#define SD_CARD_SPI1_MOSI_PIN           (0)
+#define SD_CARD_SPI1_MOSI_PORT          (gpioPortD)
+#define SD_CARD_SPI1_MOSI_MODE          (gpioModePushPull)
 
-#define SD_CARD_SPI1_SCK_PIN       (2)
-#define SD_CARD_SPI1_SCK_PORT      (gpioPortD)
-#define SD_CARD_SPI1_SCK_MODE      (gpioModePushPull)
+#define SD_CARD_SPI1_SCK_PIN            (2)
+#define SD_CARD_SPI1_SCK_PORT           (gpioPortD)
+#define SD_CARD_SPI1_SCK_MODE           (gpioModePushPull)
 
-#define PWR_2V5_SNOOZE_PIN       (5)
-#define PWR_2V5_SNOOZE_PORT         (gpioPortF)
-#define PWR_2V5_SNOOZE_MODE          (gpioModeWiredOr)
+#define PWR_2V5_SNOOZE_PIN              (5)
+#define PWR_2V5_SNOOZE_PORT             (gpioPortF)
+#define PWR_2V5_SNOOZE_MODE             (gpioModeWiredOr)
 
-#define PWR_3V3_EN_PIN                                                          (11)
-#define PWR_3V3_EN_PORT                                                         (gpioPortC)
-#define PWR_3V3_EN_MODE                                                         (gpioModePushPull)
+#define PWR_3V3_EN_PIN                  (11)
+#define PWR_3V3_EN_PORT                 (gpioPortC)
+#define PWR_3V3_EN_MODE                 (gpioModePushPull)
 
 /* CC3100 */
-#define WIFI_SERIAL_PORT         USART0
-#define WIFI_SPI_BAUDRATE	     UINT32_C(10000000)
+#define WIFI_SERIAL_PORT                USART0
+#define WIFI_SPI_BAUDRATE	            UINT32_C(10000000)
 
 #define WIFI_SUPPLY_SETTING_DELAY_MS                                            UINT32_C(3)
 #define WIFI_PWRON_HW_WAKEUP_DELAY_MS                                           UINT32_C(25)
@@ -223,6 +239,32 @@
 #define MAX44009_INTN_EDGE_RISING                                               false
 #define MAX44009_INTN_EDGE_FALLING                                              true
 
+/* EM9303 */
+#define EM9303_BAUD_RATE                                                        (115200)
+#define EM9303_ROUTE_LOCATION
+#define EM9303_SERIAL_PORT                                                      UART0
+
+#define EM9303_IRQ_PIN                                                          (11)
+#define EM9303_IRQ_PORT                                                         (gpioPortD)
+#define EM9303_IRQ_MODE                                                         (gpioModeDisabled)
+
+#define EM9303_RST_PIN                                                          (9)
+#define EM9303_RST_PORT                                                         (gpioPortA)
+#define EM9303_RST_MODE                                                         (gpioModeWiredOr)
+
+#define EM9303_UART0_RX_PIN                                                     (1)
+#define EM9303_UART0_RX_PORT                                                    (gpioPortE)
+#define EM9303_UART0_RX_MODE                                                    (gpioModeInput)
+#define EM9303_UART0_RX_DMA_CHANNEL                                             (3)
+
+#define EM9303_UART0_TX_PIN                                                     (0)
+#define EM9303_UART0_TX_PORT                                                    (gpioPortE)
+#define EM9303_UART0_TX_MODE                                                    (gpioModePushPull)
+#define EM9303_UART0_TX_DMA_CHAN                                                (2)
+
+#define EM9303_WAKEUP_PIN                                                       (10)
+#define EM9303_WAKEUP_PORT                                                      (gpioPortD)
+#define EM9303_WAKEUP_MODE                                                      (gpioModeWiredOr)
 
 /* MASKS */
 #define BOARD_2V5_MCU_MASK		  UINT32_C(1 << 0)
@@ -275,6 +317,13 @@ void BOARD_Watchdog_Feed(void);
 void BOARD_Watchdog_Enable(void);
 
 
+void BOARD_EM9301_Init(void);
+void BOARD_EM9301_Enable(void);
+void BOARD_EM9301_Reset(void);
+void BOARD_EM9301_Disable(void);
+void BOARD_EM9301_Wakeup(bool wakeup);
+
+void BOARD_USB_Init(void);
 
 /* Button group */
 extern sl_button_t button1;
@@ -288,6 +337,8 @@ extern sl_led_t led_yellow;
 /* SPI DRV Handles */
 extern SPIDRV_HandleData_t sd_card_usart;
 extern SPIDRV_HandleData_t cc3100_usart;
+
+extern UARTDRV_HandleData_t em9301_uart;
 
 extern uint8_t usb_rx_buf[64];
 extern uint8_t usb_tx_buf[64];

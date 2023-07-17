@@ -25,6 +25,16 @@
         "lwm2m_temperature.h": "c",
         "stdlib.h": "c",
         "network.h": "c",
-        "mqtt.h": "c"
+        "mqtt.h": "c",
+        "uartdrv.h": "c",
+        "sl_button.h": "c",
+        "sl_device_init_hfxo.h": "c",
+        "sl_iostream_debug.h": "c",
+        "timing.h": "c",
+        "common.h": "c",
+        "httpcli.h": "c",
+        "simplelink.h": "c",
+        "user.h": "c",
+        "ssock.h": "c"
     }
 }

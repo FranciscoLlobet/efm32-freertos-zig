@@ -5,7 +5,7 @@
  *      Author: Francisco
  */
 
-#include "uiso.h"
+#include "miso.h"
 
 #include "mbedtls/error.h"
 
@@ -14,15 +14,15 @@
 //#include "simplelink.h"
 #include "sl_sleeptimer.h"
 
-#define NETWORK_MONITOR_TASK    (UBaseType_t)( uiso_task_runtime_services )
+#define NETWORK_MONITOR_TASK    (UBaseType_t)( miso_task_runtime_services )
 
 #define SIMPLELINK_MAX_SEND_MTU 	1472
 
-typedef int (*_network_send_fn)(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-typedef int (*_network_read_fn)(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-typedef int (*_network_close_fn)(uiso_network_ctx_t ctx);
+typedef int (*_network_send_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+typedef int (*_network_read_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+typedef int (*_network_close_fn)(miso_network_ctx_t ctx);
 
-struct uiso_sockets_s
+struct miso_sockets_s
 {
 	int32_t sd; /* Socket Descriptor */
 	int32_t protocol; /* protocol id */
@@ -48,6 +48,7 @@ struct uiso_sockets_s
 	SlSocklen_t peer_len;
 
 	mbedtls_ssl_context *ssl_context; /* Optional SSL context */
+	// ssl connect callback 
 	int (*ssl_cleanup)(mbedtls_ssl_context *ssl); // optional SSL cleanup function
 
 	uint32_t last_send_time;	// Last time we sent a packet
@@ -57,40 +58,48 @@ struct uiso_sockets_s
 	uint32_t app_param;	// Optional application parameter
 };
 
-static struct uiso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
-static SemaphoreHandle_t network_monitor_mutex = NULL;
+struct timeout_msg_s {
+	uint32_t deadline;
+	miso_network_ctx_t ctx;
+};
 
+static struct miso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
+
+//static SemaphoreHandle_t network_monitor_mutex = NULL;
 static SemaphoreHandle_t rx_tx_mutex = NULL;
+
+static QueueHandle_t rx_queue = NULL;
+static QueueHandle_t tx_queue = NULL;
 
 static void select_task(void *param);
 static void initialize_socket_management(void);
-//static int register_deadline(struct socket_management_s * ctx, int sd, uint32_t timeout_s);
-static void wifi_service_register_rx_socket(uiso_network_ctx_t ctx, uint32_t timeout_s);
-static void wifi_service_register_tx_socket(enum wifi_socket_id_e id, uint32_t timeout_s);
+static void wifi_service_register_rx_socket(miso_network_ctx_t ctx, uint32_t timeout_s);
+static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s);
 
 TaskHandle_t network_monitor_task_handle = NULL;
 
 /* mbedTLS Support */
-static int _network_send(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _network_recv(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _network_close(uiso_network_ctx_t ctx);
+static int _network_send(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _network_recv(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _network_close(miso_network_ctx_t ctx);
 
-static int _send_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _send_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 
-static int _read_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-static int _send_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+static int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
 
 /* mbedTLS BIO */
-static int _send_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _send_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _recv_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _recv_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _recv_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _recv_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 
-static int _set_mbedtls_bio(uiso_network_ctx_t ctx);
+static int _set_mbedtls_bio(miso_network_ctx_t ctx);
 
-static inline uiso_network_ctx_t _get_network_ctx(enum wifi_socket_id_e id);
-static int _initialize_network_ctx(uiso_network_ctx_t ctx);
+static inline miso_network_ctx_t _get_network_ctx(enum wifi_socket_id_e id);
+static int _initialize_network_ctx(miso_network_ctx_t ctx);
+
 
 static void initialize_socket_management(void)
 {
@@ -100,22 +109,24 @@ static void initialize_socket_management(void)
 	}
 }
 
-void wifi_service_register_rx_socket(uiso_network_ctx_t ctx, uint32_t timeout_s)
+static void wifi_service_register_rx_socket(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
-	(void) xSemaphoreTake(network_monitor_mutex, portMAX_DELAY);
+	struct timeout_msg_s msg;
 
-	ctx->rx_wait_deadline_s = (uint32_t) sl_sleeptimer_get_time() + timeout_s;
+	msg.deadline = timeout_s + sl_sleeptimer_get_time();
+	msg.ctx = ctx;
 
-	(void) xSemaphoreGive(network_monitor_mutex);
+	(void)xQueueSend(rx_queue, &msg, portMAX_DELAY);
 }
 
-void wifi_service_register_tx_socket(enum wifi_socket_id_e id, uint32_t timeout_s)
+static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
-	(void) xSemaphoreTake(network_monitor_mutex, portMAX_DELAY);
+	struct timeout_msg_s msg; 
+	
+	msg.deadline = timeout_s + sl_sleeptimer_get_time();
+	msg.ctx = ctx;
 
-	_get_network_ctx(id)->tx_wait_deadline_s = (uint32_t) sl_sleeptimer_get_time() + timeout_s;
-
-	(void) xSemaphoreGive(network_monitor_mutex);
+	(void)xQueueSend(tx_queue, &msg, portMAX_DELAY);
 }
 
 int create_network_mediator(void)
@@ -131,11 +142,6 @@ int create_network_mediator(void)
 	{
 		initialize_socket_management();
 	}
-	if (0 == ret)
-	{
-		network_monitor_mutex = xSemaphoreCreateMutex();
-		if (NULL == network_monitor_mutex)	ret = -1;
-	}
 
 	if (0 == ret)
 	{
@@ -143,15 +149,27 @@ int create_network_mediator(void)
 		if(NULL == rx_tx_mutex) ret = -1;
 	}
 
+	if(0 == ret)
+	{
+		rx_queue = xQueueCreate((UBaseType_t)wifi_service_max, sizeof(struct timeout_msg_s));
+		if(NULL == rx_queue) ret = -1;
+	}
+	
+	if(0 == ret)
+	{
+		tx_queue = xQueueCreate((UBaseType_t)wifi_service_max, sizeof(struct timeout_msg_s));
+		if(NULL == tx_queue) ret = -1;
+	}
+
 	return ret;
 }
 
 int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s)
 {
-	return wait_rx(_get_network_ctx(id), timeout_s);;
+	return wait_rx(_get_network_ctx(id), timeout_s);
 }
 
-int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s)
+int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
 	int ret_value = -1;
 
@@ -160,7 +178,7 @@ int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s)
 	(void) xSemaphoreTake(ctx->rx_signal, 0);
 	(void) xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);
 
-	if (pdTRUE == xSemaphoreTake(ctx->rx_signal, 1000 * (timeout_s + 2)))
+	if (pdTRUE == xSemaphoreTake(ctx->rx_signal, 1000 * (timeout_s) + 500))
 	{
 		ret_value = 0;
 	}
@@ -172,12 +190,12 @@ int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s)
 int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s)
 {
 	int ret_value = -1;
-	wifi_service_register_tx_socket(id, timeout_s);
+	wifi_service_register_tx_socket(_get_network_ctx(id), timeout_s);
 
 	(void) xSemaphoreTake(_get_network_ctx(id)->tx_signal, 0);
 	(void) xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);
 
-	if (pdTRUE == xSemaphoreTake(_get_network_ctx(id)->tx_signal, 1000 * (timeout_s + 2)))
+	if (pdTRUE == xSemaphoreTake(_get_network_ctx(id)->tx_signal, (1000 * timeout_s) + 500))
 	{
 		ret_value = 0;
 	}
@@ -197,6 +215,9 @@ static void select_task(void *param)
 	fd_set write_fd_set;
 	uint32_t notification_counter = 0;
 
+	struct timeout_msg_s timeout_msg;
+	BaseType_t ret = pdFALSE;
+
 	do
 	{
 		// Reset the pointers
@@ -206,18 +227,27 @@ static void select_task(void *param)
 		FD_ZERO(&read_fd_set);
 		FD_ZERO(&write_fd_set);
 
-		uint32_t timeout_min = MONITOR_MAX_RESPONSE_S;
 		uint32_t current_time = sl_sleeptimer_get_time();
 
-		// Start Cycle
-
-		(void) xSemaphoreTake(network_monitor_mutex, portMAX_DELAY);
+		/* Process RX and TX queues */
+		while(pdTRUE == xQueueReceive(rx_queue, &timeout_msg, 0))
+		{
+			if(timeout_msg.ctx != NULL)
+			{
+				timeout_msg.ctx->rx_wait_deadline_s = timeout_msg.deadline;
+			}
+		}
+		while(pdTRUE == xQueueReceive(tx_queue, &timeout_msg, 0))
+		{
+			if(timeout_msg.ctx != NULL)
+			{
+				timeout_msg.ctx->tx_wait_deadline_s = timeout_msg.deadline;
+			}
+		}
 
 		for (size_t i = 0; i < (size_t) wifi_service_max; i++)
 		{
-			uint32_t current_timeout = 0;
-
-			uiso_network_ctx_t ctx = &system_sockets[(size_t) i];
+			miso_network_ctx_t ctx = &system_sockets[(size_t) i];
 
 			if (ctx->sd >= 0)
 			{
@@ -225,17 +255,6 @@ static void select_task(void *param)
 				{
 					if (ctx->rx_wait_deadline_s >= current_time)
 					{
-						current_timeout = (ctx->rx_wait_deadline_s - current_time);
-						if (timeout_min > current_timeout)
-						{
-							timeout_min = current_timeout;
-						}
-
-						FD_SET((_i16) ctx->sd, &read_fd_set);
-						read_set_ptr = &read_fd_set;
-					} else if ((ctx->rx_wait_deadline_s + 1) == current_time)
-					{
-						timeout_min = 0;
 						FD_SET((_i16) ctx->sd, &read_fd_set);
 						read_set_ptr = &read_fd_set;
 					} else
@@ -247,17 +266,6 @@ static void select_task(void *param)
 				{
 					if (ctx->tx_wait_deadline_s >= current_time)
 					{
-						current_timeout = (ctx->tx_wait_deadline_s - current_time);
-						if (timeout_min > current_timeout)
-						{
-							timeout_min = current_timeout;
-						}
-
-						FD_SET((_i16) ctx->sd, &write_fd_set);
-						write_fd_set_ptr = &write_fd_set;
-					} else if ((ctx->tx_wait_deadline_s + 1) == current_time)
-					{
-						timeout_min = 0;
 						FD_SET((_i16) ctx->sd, &write_fd_set);
 						write_fd_set_ptr = &write_fd_set;
 					} else
@@ -267,28 +275,27 @@ static void select_task(void *param)
 				}
 
 			} // tx deadlines
-		} // End for
-		(void) xSemaphoreGive(network_monitor_mutex);
-
+		} // End processing deadlines
 
 		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL))
 		{
-			(void) xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
-
 			// Start second cycle
-			struct timeval tv =
-			{ .tv_sec = timeout_min, .tv_usec = 0 };
+			const struct timeval tv =
+			{ .tv_sec = 0, .tv_usec = 10000 }; // Here we have the select cycle time
+
+			(void) xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
 			int result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, &tv);
 
+			(void) xSemaphoreGive(rx_tx_mutex);
+			
 			if (result > 0)
 			{
-				(void) xSemaphoreTake(network_monitor_mutex, portMAX_DELAY);
 				if (NULL != read_set_ptr)
 				{
 					for (size_t i = 0; i < (size_t) wifi_service_max; i++)
 					{
-						uiso_network_ctx_t ctx = &system_sockets[(size_t) i];
+						miso_network_ctx_t ctx = &system_sockets[(size_t) i];
 
 						if (ctx->sd >= 0)
 						{
@@ -304,7 +311,7 @@ static void select_task(void *param)
 				{
 					for (size_t i = 0; i < (size_t) wifi_service_max; i++)
 					{
-						uiso_network_ctx_t ctx = &system_sockets[(size_t) i];
+						miso_network_ctx_t ctx = &system_sockets[(size_t) i];
 
 						if (ctx->sd >= 0)
 						{
@@ -316,17 +323,13 @@ static void select_task(void *param)
 						}
 					}
 				}
-				(void) xSemaphoreGive(network_monitor_mutex);
-			} else
-			{
-				//
-			}
-			(void) xSemaphoreGive(rx_tx_mutex);
-			// End second cycle // Return mutex
+			} 
+			
 		} else
 		{
-			// Return mutex
-			printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
+			//printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
+			
+			// Wait for notifications
 			(void) xTaskGenericNotifyWait(0, 0, UINT32_MAX, &notification_counter, portMAX_DELAY);
 		}
 
@@ -334,8 +337,8 @@ static void select_task(void *param)
 }
 
 /* Basic network operations */
-static int _network_connect(uiso_network_ctx_t ctx, const char *host, const char *port, const char * local_port,
-		enum uiso_protocol proto)
+static int _network_connect(miso_network_ctx_t ctx, const char *host, const char *port, const char * local_port,
+		enum miso_protocol proto)
 {
 	int ret = (int) UISO_NETWORK_GENERIC_ERROR;
 	_i16 dns_status = -1;
@@ -364,19 +367,19 @@ static int _network_connect(uiso_network_ctx_t ctx, const char *host, const char
 
 	switch (proto)
 	{
-		case uiso_protocol_dtls_ip4:
+		case miso_protocol_dtls_ip4:
 			type = SL_SOCK_DGRAM;
 			protocol = SL_IPPROTO_UDP;
 			break;
-		case uiso_protocol_tls_ip4:
+		case miso_protocol_tls_ip4:
 			type = SL_SOCK_STREAM;
 			protocol = SL_IPPROTO_TCP;
 			break;
-		case uiso_protocol_udp_ip4:
+		case miso_protocol_udp_ip4:
 			type = SL_SOCK_DGRAM;
 			protocol = SL_IPPROTO_UDP;
 			break;
-		case uiso_protocol_tcp_ip4:
+		case miso_protocol_tcp_ip4:
 			type = SL_SOCK_STREAM;
 			protocol = SL_IPPROTO_TCP;
 			break;
@@ -449,18 +452,18 @@ static int _network_connect(uiso_network_ctx_t ctx, const char *host, const char
 	return ret;
 }
 
-static int _send_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	return (int) sl_SendTo((_i16) ctx->sd, (void*) buf, (_i16) len, (_i16) 0,
 			(SlSockAddr_t*) &(ctx->peer), sizeof(SlSockAddrIn_t));
 }
 
-static int _send_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	return (int) sl_Send((_i16) ctx->sd, (void*) buf, (_i16) len, (_i16) 0);
 }
 
-static int _recv_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _recv_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	ctx->peer_len = sizeof(SlSockAddrIn_t);
 	int ret = (int) sl_RecvFrom((_i16) ctx->sd, (void*) buf, (_i16) len, (_i16) 0,
@@ -472,12 +475,12 @@ static int _recv_bio_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return ret;
 }
 
-static int _read_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _read_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	return (int) sl_Recv((_i16) ctx->sd, (char*) buf, (_i16) len, (_i16) 0);
 }
 
-static int _recv_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _recv_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	int ret = (int) sl_Recv((_i16) ctx->sd, (char*) buf, (_i16) len, (_i16) 0);
 	if (ret == (int) SL_EAGAIN)
@@ -487,7 +490,7 @@ static int _recv_bio_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return ret;
 }
 
-static int _send_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	size_t offset = 0;
 	int n_bytes_sent = 0;
@@ -505,7 +508,7 @@ static int _send_udp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return offset;
 }
 
-static int _send_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	size_t offset = 0;
 	int n_bytes_sent = 0;
@@ -523,7 +526,7 @@ static int _send_tcp(uiso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return offset;
 }
 
-static int _set_mbedtls_bio(uiso_network_ctx_t ctx)
+static int _set_mbedtls_bio(miso_network_ctx_t ctx)
 {
 	if (NULL == ctx)
 	{
@@ -533,11 +536,11 @@ static int _set_mbedtls_bio(uiso_network_ctx_t ctx)
 		return (int) UISO_NETWORK_NULL_CTX;
 	}
 
-	if (ctx->protocol == (int32_t) uiso_protocol_dtls_ip4)
+	if (ctx->protocol == (int32_t) miso_protocol_dtls_ip4)
 	{
 		mbedtls_ssl_set_bio(ctx->ssl_context, (void*) ctx, (mbedtls_ssl_send_t*) _send_bio_udp,
 				(mbedtls_ssl_recv_t*) _recv_bio_udp, (mbedtls_ssl_recv_timeout_t*) NULL);
-	} else if (ctx->protocol == (int32_t) uiso_protocol_tls_ip4)
+	} else if (ctx->protocol == (int32_t) miso_protocol_tls_ip4)
 	{
 		mbedtls_ssl_set_bio(ctx->ssl_context, (void*) ctx, (mbedtls_ssl_send_t*) _send_bio_tcp,
 				(mbedtls_ssl_recv_t*) _recv_bio_tcp, (mbedtls_ssl_recv_timeout_t*) NULL);
@@ -551,7 +554,7 @@ static int _set_mbedtls_bio(uiso_network_ctx_t ctx)
 /*
  * Close the connection
  */
-static int _network_close(uiso_network_ctx_t ctx)
+static int _network_close(miso_network_ctx_t ctx)
 {
 	if (NULL == ctx)
 	{
@@ -568,7 +571,7 @@ static int _network_close(uiso_network_ctx_t ctx)
 	return ret;
 }
 
-int uiso_network_register_ssl_context(uiso_network_ctx_t ctx, mbedtls_ssl_context *ssl_ctx)
+int miso_network_register_ssl_context(miso_network_ctx_t ctx, mbedtls_ssl_context *ssl_ctx)
 {
 	if (NULL == ctx)
 	{
@@ -582,8 +585,8 @@ int uiso_network_register_ssl_context(uiso_network_ctx_t ctx, mbedtls_ssl_contex
 	return UISO_NETWORK_OK;
 }
 
-int uiso_create_network_connection(uiso_network_ctx_t ctx, const char *host, const char *port, const char * local_port,
-		enum uiso_protocol proto)
+int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, const char *port, const char * local_port,
+		enum miso_protocol proto)
 {
 	int ret = (int) UISO_NETWORK_OK;
 
@@ -597,22 +600,22 @@ int uiso_create_network_connection(uiso_network_ctx_t ctx, const char *host, con
 
 	switch (proto)
 	{
-		case uiso_protocol_udp_ip4:
+		case miso_protocol_udp_ip4:
 			ctx->read_fn = _recv_bio_udp;
 			ctx->send_fn = _send_udp;
 			ctx->close_fn = _network_close;
 			break;
-		case uiso_protocol_tcp_ip4:
+		case miso_protocol_tcp_ip4:
 			ctx->read_fn = _read_tcp;
 			ctx->send_fn = _send_tcp;
 			ctx->close_fn = _network_close;
 			break;
-		case uiso_protocol_dtls_ip4:
+		case miso_protocol_dtls_ip4:
 			ctx->read_fn = _read_dtls;
 			ctx->send_fn = _send_dtls;
 			ctx->close_fn = NULL;
 			break;
-		case uiso_protocol_tls_ip4:
+		case miso_protocol_tls_ip4:
 			ctx->read_fn = _read_dtls;
 			ctx->send_fn = _send_dtls;
 			ctx->close_fn = NULL;
@@ -648,7 +651,7 @@ int uiso_create_network_connection(uiso_network_ctx_t ctx, const char *host, con
 	return ret;
 }
 
-int uiso_close_network_connection(uiso_network_ctx_t ctx)
+int miso_close_network_connection(miso_network_ctx_t ctx)
 {
 	int ret = UISO_NETWORK_OK;
 
@@ -675,7 +678,7 @@ int uiso_close_network_connection(uiso_network_ctx_t ctx)
 	return ret;
 }
 
-static int _read_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 {
 	int numBytes = -1;
 	int result = 0;
@@ -711,7 +714,7 @@ static int _read_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 }
 
 
-int uiso_network_read(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int miso_network_read(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 {
 	(void) xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 	int ret = ctx->read_fn(ctx, buffer, length);
@@ -720,7 +723,7 @@ int uiso_network_read(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return ret;
 }
 
-int uiso_network_send(uiso_network_ctx_t ctx, const uint8_t *buffer, size_t length)
+int miso_network_send(miso_network_ctx_t ctx, const uint8_t *buffer, size_t length)
 {
 	(void) xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
     int ret = ctx->send_fn(ctx, buffer, length);
@@ -729,7 +732,17 @@ int uiso_network_send(uiso_network_ctx_t ctx, const uint8_t *buffer, size_t leng
     return ret;
 }
 
-int _send_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int miso_network_get_socket(miso_network_ctx_t ctx)
+{
+	int ret = (int) UISO_NETWORK_INVALID_SOCKET;
+	if(NULL != ctx)
+	{
+		ret = ctx->sd;
+	}
+	return ret;
+}
+
+int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 {
 	int n_bytes_sent = 0;
 	int ret = (int) UISO_NETWORK_OK;
@@ -837,28 +850,29 @@ int _send_dtls(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return ret;
 }
 
-uiso_network_ctx_t uiso_get_network_ctx(enum wifi_socket_id_e id)
+miso_network_ctx_t miso_get_network_ctx(enum wifi_socket_id_e id)
 {
 	return &system_sockets[(size_t) id];
 }
 
-static inline uiso_network_ctx_t _get_network_ctx(enum wifi_socket_id_e id)
+static inline miso_network_ctx_t _get_network_ctx(enum wifi_socket_id_e id)
 {
 	return &system_sockets[(size_t) id];
 }
 
-static int _initialize_network_ctx(uiso_network_ctx_t ctx)
+static int _initialize_network_ctx(miso_network_ctx_t ctx)
 {
-	memset(ctx, 0, sizeof(struct uiso_sockets_s));
+	memset(ctx, 0, sizeof(struct miso_sockets_s));
 
 	ctx->sd = UISO_NETWORK_INVALID_SOCKET;
 	ctx->ssl_context = NULL;
 
 	ctx->app_ctx = NULL;
 	ctx->app_param = 0;
+
 	ctx->last_recv_time = 0;
 	ctx->last_send_time = 0;
-	ctx->protocol = (int32_t) uiso_protocol_no_protocol;
+	ctx->protocol = (int32_t) miso_protocol_no_protocol;
 	ctx->rx_wait_deadline_s = 0;
 	ctx->tx_wait_deadline_s = 0;
 	ctx->rx_signal = xSemaphoreCreateBinary();
@@ -867,7 +881,7 @@ static int _initialize_network_ctx(uiso_network_ctx_t ctx)
 	return 0;
 }
 
-mbedtls_ssl_context* uiso_network_get_ssl_ctx(uiso_network_ctx_t ctx)
+mbedtls_ssl_context* miso_network_get_ssl_ctx(miso_network_ctx_t ctx)
 {
 	return ctx->ssl_context;
 }

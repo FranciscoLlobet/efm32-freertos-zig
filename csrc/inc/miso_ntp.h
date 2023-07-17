@@ -1,5 +1,5 @@
 /*
- * uiso_ntp.h
+ * miso_ntp.h
  *
  * Embedded implementation for sNTP client
  *
@@ -16,7 +16,7 @@
 #ifndef UISO_NTP_H_
 #define UISO_NTP_H_
 
-#include "uiso.h"
+#include "miso.h"
 
 
 #define NTP_MIN_POLL_INTERVAL_MS	UINT32_C(16000) /**< Minimum poll interval */
@@ -215,7 +215,7 @@ struct ntp_parsed_response_s
 
 
 
-enum sntp_return_codes_e uiso_sntp_request(sntp_server_t* server, uint32_t * time_to_next_sync);
+enum sntp_return_codes_e miso_sntp_request(sntp_server_t* server, uint32_t * time_to_next_sync);
 
 sntp_server_t* select_server_from_list(void);
 

@@ -1,14 +1,15 @@
 const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
+const leds = @import("leds.zig");
 
 fn _performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = param2;
     _ = param1;
 
-    board.red.on();
-    board.yellow.on();
-    board.orange.on();
+    leds.red.on();
+    leds.yellow.on();
+    leds.orange.on();
 
     board.msDelay(1000);
 

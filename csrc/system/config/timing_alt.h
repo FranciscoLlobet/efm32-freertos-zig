@@ -8,25 +8,25 @@
 #ifndef INCLUDE_CONFIG_TIMING_ALT_H_
 #define INCLUDE_CONFIG_TIMING_ALT_H_
 
-#include "uiso.h"
+#include "miso.h"
 
-struct uiso_mbedtls_timing_delay_s
+struct miso_mbedtls_timing_delay_s
 {
 		int32_t state;
 		TimerHandle_t fin_timer;
 		TimerHandle_t int_timer;
 };
 
-typedef struct uiso_mbedtls_timing_delay_s uiso_mbedtls_timing_delay_t;
+typedef struct miso_mbedtls_timing_delay_s miso_mbedtls_timing_delay_t;
 
 typedef struct mbedtls_timing_delay_context
 {
 	uint32_t val;
 } mbedtls_timing_delay_context;
 
-void uiso_mbedtls_init_timer(uiso_mbedtls_timing_delay_t * data);
-void uiso_mbedtls_deinit_timer(uiso_mbedtls_timing_delay_t * data);
-void uiso_mbedtls_timing_set_delay( void *data, uint32_t int_ms, uint32_t fin_ms );
-int uiso_mbedtls_timing_get_delay(void * data);
+void miso_mbedtls_init_timer(miso_mbedtls_timing_delay_t * data);
+void miso_mbedtls_deinit_timer(miso_mbedtls_timing_delay_t * data);
+void miso_mbedtls_timing_set_delay( void *data, uint32_t int_ms, uint32_t fin_ms );
+int miso_mbedtls_timing_get_delay(void * data);
 
 #endif /* INCLUDE_CONFIG_TIMING_ALT_H_ */

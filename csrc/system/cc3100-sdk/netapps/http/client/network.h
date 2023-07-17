@@ -46,8 +46,8 @@
 #elif defined(__SL__) /* __linux__ */
 #include <simplelink.h>
 
-#ifndef  __ssize_t_defined
-#define __ssize_t_defined
+#ifndef  _SSIZE_T_DECLARED
+#define _SSIZE_T_DECLARED
 typedef long int ssize_t;
 
 #endif /* __ssize_t_defined */

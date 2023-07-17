@@ -8,7 +8,7 @@
 #ifndef LWM2M_LIGHTCLIENT_LWM2M_CLIENT_H_
 #define LWM2M_LIGHTCLIENT_LWM2M_CLIENT_H_
 
-#include "uiso.h"
+#include "miso.h"
 #include "liblwm2m.h"
 
 enum

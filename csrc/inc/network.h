@@ -8,7 +8,7 @@
 #ifndef NETWORK_H_
 #define NETWORK_H_
 
-#include "uiso.h"
+#include "miso.h"
 
 
 #include "mbedtls/ssl.h"
@@ -32,33 +32,33 @@
 
 enum
 {
-	uiso_protocol_udp = (UISO_UDP_SELECTION_BIT_MASK | UISO_PROTOCOL_BIT_MASK),
-	uiso_protocol_tcp = (UISO_TCP_SELECTION_BIT_MASK | UISO_PROTOCOL_BIT_MASK),
+	miso_protocol_udp = (UISO_UDP_SELECTION_BIT_MASK | UISO_PROTOCOL_BIT_MASK),
+	miso_protocol_tcp = (UISO_TCP_SELECTION_BIT_MASK | UISO_PROTOCOL_BIT_MASK),
 
-	uiso_protocol_ip4 = (0 << UISO_IPV4_IPV6_SELECTION_BIT)| UISO_PROTOCOL_BIT_MASK,
-	uiso_protocol_ip6 = (1 << UISO_IPV4_IPV6_SELECTION_BIT)| UISO_PROTOCOL_BIT_MASK,
+	miso_protocol_ip4 = (0 << UISO_IPV4_IPV6_SELECTION_BIT)| UISO_PROTOCOL_BIT_MASK,
+	miso_protocol_ip6 = (1 << UISO_IPV4_IPV6_SELECTION_BIT)| UISO_PROTOCOL_BIT_MASK,
 };
 
-enum uiso_protocol
+enum miso_protocol
 {
-	uiso_protocol_no_protocol = 0,
+	miso_protocol_no_protocol = 0,
 
-	uiso_protocol_udp_ip4 = (uiso_protocol_udp | uiso_protocol_ip4),
-	uiso_protocol_tcp_ip4 = (uiso_protocol_tcp | uiso_protocol_ip4),
+	miso_protocol_udp_ip4 = (miso_protocol_udp | miso_protocol_ip4),
+	miso_protocol_tcp_ip4 = (miso_protocol_tcp | miso_protocol_ip4),
 
 	/* IPv6 - NOT SUPPORTED */
-	uiso_protocol_udp_ip6 = (uiso_protocol_udp | uiso_protocol_ip6),
-	uiso_protocol_tcp_ip6 = (uiso_protocol_tcp | uiso_protocol_ip6),
+	miso_protocol_udp_ip6 = (miso_protocol_udp | miso_protocol_ip6),
+	miso_protocol_tcp_ip6 = (miso_protocol_tcp | miso_protocol_ip6),
 
 	/* IPv4 TLS */
-	uiso_protocol_dtls_ip4 = (uiso_protocol_udp_ip4 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
-	uiso_protocol_tls_ip4 =  (uiso_protocol_tcp_ip4 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
+	miso_protocol_dtls_ip4 = (miso_protocol_udp_ip4 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
+	miso_protocol_tls_ip4 =  (miso_protocol_tcp_ip4 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
 
 	/* IPv6 TLS - NOT SUPPORTED */
-	uiso_protocol_dtls_ip6 = (uiso_protocol_udp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
-	uiso_protocol_tls_ip6 =  (uiso_protocol_tcp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
+	miso_protocol_dtls_ip6 = (miso_protocol_udp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
+	miso_protocol_tls_ip6 =  (miso_protocol_tcp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
 
-	uiso_protocol_max = UISO_PROTOCOL_MASK,
+	miso_protocol_max = UISO_PROTOCOL_MASK,
 };
 
 enum wifi_socket_id_e
@@ -70,11 +70,11 @@ enum wifi_socket_id_e
 	wifi_service_max
 };
 
-typedef struct uiso_sockets_s * uiso_network_ctx_t;
+typedef struct miso_sockets_s * miso_network_ctx_t;
 
 // socket id?
 
-enum uiso_network_ret
+enum miso_network_ret
 {
 	UISO_NETWORK_OK = 0,
 	UISO_NETWORK_GENERIC_ERROR = INT32_MIN,
@@ -101,7 +101,7 @@ enum uiso_network_ret
  * @param id
  * @return
  */
-uiso_network_ctx_t uiso_get_network_ctx(enum wifi_socket_id_e id);
+miso_network_ctx_t miso_get_network_ctx(enum wifi_socket_id_e id);
 
 /**
  * Create Connection and Handshake with peer
@@ -111,10 +111,10 @@ uiso_network_ctx_t uiso_get_network_ctx(enum wifi_socket_id_e id);
  * @param proto
  * @return
  */
-int uiso_create_network_connection(uiso_network_ctx_t ctx, const char *host,
-		const char *port, const char * local_port, enum uiso_protocol proto);
+int miso_create_network_connection(miso_network_ctx_t ctx, const char *host,
+		const char *port, const char * local_port, enum miso_protocol proto);
 
-int uiso_close_network_connection(uiso_network_ctx_t ctx);
+int miso_close_network_connection(miso_network_ctx_t ctx);
 
 /**
  * Register SSL context with network context
@@ -122,13 +122,15 @@ int uiso_close_network_connection(uiso_network_ctx_t ctx);
  * @param ssl_ctx
  * @return
  */
-int uiso_network_register_ssl_context(uiso_network_ctx_t ctx, mbedtls_ssl_context * ssl_ctx);
+int miso_network_register_ssl_context(miso_network_ctx_t ctx, mbedtls_ssl_context * ssl_ctx);
 
-int uiso_network_read(uiso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-int uiso_network_send(uiso_network_ctx_t ctx, const uint8_t *buffer, size_t length);
+int miso_network_read(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+int miso_network_send(miso_network_ctx_t ctx, const uint8_t *buffer, size_t length);
 
-int wait_rx(uiso_network_ctx_t ctx, uint32_t timeout_s);
-int wait_tx(uiso_network_ctx_t ctx, uint32_t timeout_s);
+int miso_network_get_socket(miso_network_ctx_t ctx);
 
-mbedtls_ssl_context * uiso_network_get_ssl_ctx(uiso_network_ctx_t ctx);
+int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s);
+int wait_tx(miso_network_ctx_t ctx, uint32_t timeout_s);
+
+mbedtls_ssl_context * miso_network_get_ssl_ctx(miso_network_ctx_t ctx);
 #endif /* NETWORK_H_ */

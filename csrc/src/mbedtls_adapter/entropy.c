@@ -1,15 +1,15 @@
 /*
- * uiso_entropy.c
+ * miso_entropy.c
  *
  *  Created on: 19 nov 2022
  *      Author: Francisco
  */
-#include "uiso.h"
+#include "miso.h"
 
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
 
-static int uiso_mbedtls_entropy_callback( void * ssl_context, unsigned char * output_buffer, size_t output_buffer_len )
+static int miso_mbedtls_entropy_callback( void * ssl_context, unsigned char * output_buffer, size_t output_buffer_len )
 {
     int ret = MBEDTLS_ERR_ENTROPY_SOURCE_FAILED;
 

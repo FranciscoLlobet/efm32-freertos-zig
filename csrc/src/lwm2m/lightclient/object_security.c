@@ -43,7 +43,7 @@
 
 #include "lwm2m_security.h"
 
-#include "uiso_config.h"
+#include "miso_config.h"
 #include "mbedtls/base64.h"
 
 

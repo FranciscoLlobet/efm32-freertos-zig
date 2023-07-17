@@ -4,16 +4,16 @@ const freertos = @import("freertos.zig");
 const system = @import("system.zig");
 const sensors = @import("sensors.zig");
 const network = @import("network.zig");
-//const xdk110 = @import("boards/xdk110.zig");
+const config = @import("config.zig");
+const leds = @import("leds.zig");
 const mqtt = @import("mqtt.zig");
+const buttons = @import("buttons.zig");
+const usb = @import("usb.zig");
 
 const c_board = @cImport({
-    @cDefine("EFM32GG390F1024", "1");
-    @cDefine("__PROGRAM_START", "__main");
-    @cDefine("SL_CATALOG_POWER_MANAGER_PRESENT", "1");
     @cInclude("board.h");
     @cInclude("sl_simple_led.h");
-    @cInclude("uiso_config.h");
+    @cInclude("miso_config.h");
 });
 
 const board = microzig.board;
@@ -27,27 +27,27 @@ export fn vApplicationIdleHook() void {
 export fn vApplicationDaemonTaskStartupHook() void {
     _ = c_board.printf("--- FreeRTOS Scheduler Started ---\n\r");
 
-    board.red.on();
+    leds.red.on();
 
     board.msDelay(500);
 
-    board.orange.on();
+    leds.orange.on();
 
     board.msDelay(500);
 
-    board.yellow.on();
+    leds.yellow.on();
 
     board.msDelay(500);
 
-    board.red.off();
+    leds.red.off();
 
     board.msDelay(500);
 
-    board.orange.off();
+    leds.orange.off();
 
     board.msDelay(500);
 
-    board.yellow.off();
+    leds.yellow.off();
 
     board.watchdogEnable();
 }
@@ -159,46 +159,75 @@ pub const microzig_options = struct {
 
 // Types
 
-var my_user_task: freertos.Task = undefined;
-var my_user_task_queue: freertos.Queue = undefined;
-const stack_Depth: u16 = 2000;
-const task_name: [*c]const u8 = "TestTask";
-const taskPriority: freertos.c.UBaseType_t = 3;
-var my_timer: freertos.Timer = undefined;
-const timer_name: [*c]const u8 = "TestTimer";
+pub var sensor_service: sensors.service = undefined;
 
-fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    _ = pvParameters;
-    c_board.uiso_load_config();
+const user = struct {
+    task: freertos.Task,
+    timer: freertos.Timer,
+    queue: freertos.Queue,
 
-    while (true) {
-        var test_var: u32 = 0;
+    fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
+        var self = freertos.getAndCastTimerID(@This(), xTimer);
+        var test_var: u32 = 0xAA55;
 
-        if (my_user_task_queue.receive(@ptrCast(*void, &test_var), null)) {
-            board.yellow.toggle();
+        _ = self.queue.send(@as(*void, @ptrCast(&test_var)), null);
+    }
+
+    fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
+        var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+
+        c_board.miso_load_config();
+
+        self.timer.start(null) catch unreachable;
+
+        //const test_string: []u8 = ;
+
+        while (true) {
+            var test_var: u32 = 0;
+
+            if (self.queue.receive(@as(*void, @ptrCast(&test_var)), null)) {
+                leds.yellow.toggle();
+                //_ = usb.usb.write("test String", 9);
+            }
         }
     }
-}
 
-fn myTimerFunction(xTimer: freertos.c.TimerHandle_t) callconv(.C) void {
-    _ = xTimer;
-    var test_var: u32 = 0xAA55;
+    pub fn create(self: *@This()) void {
+        self.task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, self, config.rtos_prio_user_task) catch unreachable;
+        self.queue.create(4, 1) catch unreachable;
+        self.timer.create("user_timer", 2000, freertos.pdTRUE, self, myTimerFunction) catch unreachable;
+    }
+};
 
-    _ = my_user_task_queue.send(@ptrCast(*void, &test_var), null);
+pub var user_task: user = undefined;
+
+// Button On-Change Callback
+pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
+    var instance = buttons.getInstance(handle);
+
+    if (instance == &buttons.button1) {
+        if (.pressed == instance.getState()) {
+            leds.red.on();
+        } else {
+            leds.red.off();
+        }
+    } else if (instance == &buttons.button2) {
+        if (.pressed == instance.getState()) {
+            leds.orange.on();
+        } else {
+            leds.orange.off();
+        }
+    }
 }
 
 pub export fn main() void {
     board.init();
 
-    my_user_task.create(myUserTaskFunction, task_name, stack_Depth, null, taskPriority) catch unreachable;
+    usb.usb.init();
 
-    my_user_task_queue.create(4, 1) catch unreachable;
+    user_task.create();
 
-    my_timer.create(timer_name, 2000, freertos.pdTRUE, null, myTimerFunction) catch unreachable;
-
-    my_timer.start(null) catch unreachable;
-
-    sensors.init_sensor_service() catch unreachable;
+    sensor_service.init() catch unreachable;
 
     network.start();
 

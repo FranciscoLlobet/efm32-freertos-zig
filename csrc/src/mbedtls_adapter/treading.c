@@ -1,13 +1,13 @@
 /*
- * uiso_treading.c
+ * miso_treading.c
  *
  *  Created on: 19 nov 2022
  *      Author: Francisco
  */
-#include "uiso.h"
+#include "miso.h"
 #include "mbedtls/threading.h"
 
-void uiso_mbedtls_mutex_init( mbedtls_threading_mutex_t * mutex )
+void miso_mbedtls_mutex_init( mbedtls_threading_mutex_t * mutex )
 {
 	if(NULL == mutex)
 	{
@@ -28,7 +28,7 @@ void uiso_mbedtls_mutex_init( mbedtls_threading_mutex_t * mutex )
 	}
 }
 
-void uiso_mbedtls_mutex_free( mbedtls_threading_mutex_t * mutex )
+void miso_mbedtls_mutex_free( mbedtls_threading_mutex_t * mutex )
 {
 	if(NULL != mutex)
 	{
@@ -40,7 +40,7 @@ void uiso_mbedtls_mutex_free( mbedtls_threading_mutex_t * mutex )
 	}
 }
 
-int uiso_mbedtls_mutex_lock( mbedtls_threading_mutex_t * mutex )
+int miso_mbedtls_mutex_lock( mbedtls_threading_mutex_t * mutex )
 {
     int ret = MBEDTLS_ERR_THREADING_BAD_INPUT_DATA;
 
@@ -63,7 +63,7 @@ int uiso_mbedtls_mutex_lock( mbedtls_threading_mutex_t * mutex )
 }
 
 
-int uiso_mbedtls_mutex_unlock( mbedtls_threading_mutex_t * mutex )
+int miso_mbedtls_mutex_unlock( mbedtls_threading_mutex_t * mutex )
 {
     int ret = MBEDTLS_ERR_THREADING_BAD_INPUT_DATA;
 

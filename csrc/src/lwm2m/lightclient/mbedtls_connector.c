@@ -5,7 +5,7 @@
  *      Author: Francisco
  */
 
-#include "uiso.h"
+#include "miso.h"
 #include "lwm2m_security.h"
 #include "../connection.h"
 
@@ -41,7 +41,7 @@ static const uint16_t groups[] =
 { MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, MBEDTLS_SSL_IANA_TLS_GROUP_NONE };
 
 /* SSL Timer for the LWM2M connection */
-uiso_mbedtls_timing_delay_t ssl_timer;
+miso_mbedtls_timing_delay_t ssl_timer;
 
 /* SSL Context */
 mbedtls_ssl_context ssl_context;
@@ -125,7 +125,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	/* Start with mbedtls init */
 	enum lwm2m_security_mode_e security_mode = get_security_mode(securityObjP, secObjInstID);
 
-	uiso_mbedtls_init_timer(&ssl_timer);
+	miso_mbedtls_init_timer(&ssl_timer);
 	UISO_MBED_TLS_THREADING_SET_ALT();
 
 	mbedtls_ssl_init(&ssl_context);
@@ -247,12 +247,12 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	if (0 == ret)
 	{
 		mbedtls_ssl_set_timer_cb(&ssl_context, &ssl_timer,
-				uiso_mbedtls_timing_set_delay, uiso_mbedtls_timing_get_delay);
+				miso_mbedtls_timing_set_delay, miso_mbedtls_timing_get_delay);
 	}
 
 	if(0 == ret)
 	{
-		ret = uiso_network_register_ssl_context(uiso_get_network_ctx(wifi_service_lwm2m_socket), &ssl_context);
+		ret = miso_network_register_ssl_context(miso_get_network_ctx(wifi_service_lwm2m_socket), &ssl_context);
 	}
 
 	return ret;
@@ -270,7 +270,7 @@ void mbedtls_cleanup(void)
 	/* Free own PK */
 	mbedtls_pk_free(&own_pk);
 
-	uiso_mbedtls_deinit_timer(&ssl_timer);
+	miso_mbedtls_deinit_timer(&ssl_timer);
 	mbedtls_threading_free_alt();
 
 	mbedtls_ctr_drbg_free(&drbg_context);

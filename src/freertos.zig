@@ -1,5 +1,5 @@
 const std = @import("std");
-
+const cpu = @import("microzig").cpu;
 pub const c = @cImport({
     @cDefine("EFM32GG390F1024", "1");
     @cDefine("__PROGRAM_START", "__main");
@@ -14,11 +14,11 @@ pub const TaskFunction_t = c.TaskFunction_t;
 pub const UBaseType_t = c.UBaseType_t;
 pub const TaskHandle_t = c.TaskHandle_t;
 pub const QueueHandle_t = c.QueueHandle_t;
+pub const SemaphoreHandle_t = c.SemaphoreHandle_t;
 pub const TimerHandle_t = c.TimerHandle_t;
 pub const TickType_t = c.TickType_t;
 pub const PendedFunction_t = c.PendedFunction_t;
-
-const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
+pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
 
 pub const portMAX_DELAY = c.portMAX_DELAY;
 pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
@@ -58,8 +58,25 @@ pub fn vTaskDelay(xTicksToDelay: TickType_t) void {
     c.vTaskDelay(xTicksToDelay);
 }
 
+pub fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
+    if (xSwitchRequired != pdFALSE) {
+        cpu.regs.ICSR.modify(.{ .PENDSVSET = 1 });
+
+        cpu.dsb();
+        cpu.isb();
+    }
+}
+
 pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: TickType_t) bool {
     return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait));
+}
+
+pub fn getAndCastTimerID(comptime T: type, xTimer: TimerHandle_t) *T {
+    return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
+}
+
+pub fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
+    return @as(*T, @ptrCast(@alignCast(pvParameters)));
 }
 
 pub const eNotifyAction = enum(u32) {
@@ -140,6 +157,43 @@ pub const Queue = struct {
     }
 };
 
+pub const Semaphore = struct {
+    handle: SemaphoreHandle_t = undefined,
+
+    pub fn createBinary(self: *@This()) !void {
+        self.handle = c.xSemaphoreCreateBinary();
+        if (self.handle == null) {
+            return FreeRtosError.SemaphoreCreationFailed;
+        }
+    }
+    pub fn createMutex(self: *@This()) !void {
+        self.handle = c.xSemaphoreCreateMutex();
+        if (self.handle == null) {
+            return FreeRtosError.SemaphoreCreationFailed;
+        }
+    }
+    pub fn createCountingSemaphore(self: *@This(), uxMaxCount: u32, uxInitialCount: u32) !void {
+        self.handle = c.xSemaphoreCreateCounting(uxMaxCount, uxInitialCount);
+        if (self.handle == null) {
+            return FreeRtosError.SemaphoreCreationFailed;
+        }
+    }
+    pub fn take(self: *@This(), xTicksToWait: ?TickType_t) bool {
+        var ticks = xTicksToWait orelse portMAX_DELAY;
+        return (pdTRUE == c.xSemaphoreTake(self.handle, ticks));
+    }
+    pub fn give(self: *@This()) bool {
+        return (pdTRUE == c.xSemaphoreGive(self.handle));
+    }
+    pub fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) bool {
+        return (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken));
+    }
+
+    pub fn initFromHandle(handle: SemaphoreHandle_t) @This() {
+        return @This(){ .handle = handle };
+    }
+};
+
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
@@ -196,7 +250,7 @@ pub fn freertos_alloc(
     // type in C that is size 8 and has 16 byte alignment, so the alignment may
     // be 8 bytes rather than 16. Similarly if only 1 byte is requested, malloc
     // is allowed to return a 1-byte aligned pointer.
-    return @ptrCast(?[*]u8, vPortMalloc(len));
+    return @as(?[*]u8, @ptrCast(vPortMalloc(len)));
 }
 
 fn freertos_resize(

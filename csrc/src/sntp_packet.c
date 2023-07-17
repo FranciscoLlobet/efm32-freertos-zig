@@ -5,7 +5,7 @@
  *      Author: Francisco
  */
 
-#include "uiso_ntp.h"
+#include "miso_ntp.h"
 
 enum sntp_return_codes_e sntp_packet_create_request(struct ntp_packet_s *packet,
 		uint32_t originate, uint32_t originate_frac, enum sntp_vn_e version)

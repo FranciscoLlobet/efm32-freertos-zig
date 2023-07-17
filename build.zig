@@ -60,13 +60,16 @@ pub fn build(b: *std.build.Builder) void {
         "csrc/board/src/board_bmi160.c",
         "csrc/board/src/board_bmm150.c",
         "csrc/board/src/board_CC3100.c",
-        "csrc/src/uiso_ntp.c",
+        "csrc/board/src/board_em9301.c",
+        "csrc/board/src/board_usb.c",
+
+        "csrc/src/miso_ntp.c",
         "csrc/src/sntp_packet.c",
         "csrc/src/network.c",
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{"-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections", "-ffunction-sections"};
+    const c_flags = [_][]const u8{ "-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections", "-ffunction-sections" };
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
         if (!decl.is_pub)

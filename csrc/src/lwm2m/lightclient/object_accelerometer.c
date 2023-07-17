@@ -5,7 +5,7 @@
  *      Author: Francisco
  */
 
-#include "uiso.h"
+#include "miso.h"
 #include "liblwm2m.h"
 
 #define LWM2M_ACCELEROMETER_OBJECT_ID	(3313)

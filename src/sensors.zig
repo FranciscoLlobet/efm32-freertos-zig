@@ -3,126 +3,47 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const network = @import("network.zig");
+const bme280 = @import("bme280.zig");
+const bma280 = @import("bma280.zig");
 
 const c = @cImport({
-    @cDefine("EFM32GG390F1024", "1");
-    @cDefine("__PROGRAM_START", "__main");
     @cInclude("board_i2c_sensors.h");
     @cInclude("FreeRTOS.h");
     @cInclude("task.h");
 });
 
-pub const sensor_errors = error{
-    bme280_init_error,
-    bme280_forced_read_error,
-};
+pub const service = struct {
+    task: freertos.Task = undefined,
+    timer: freertos.Timer = undefined,
 
-pub const bme280_data = c.struct_bme280_data;
-
-pub const bma280 = bma2x{ .handle = &c.bma2_dev };
-pub const bme280 = bme280_ctx{ .handle = &c.board_bme280 };
-
-pub var task: freertos.Task = undefined;
-pub var timer: freertos.Timer = undefined;
-
-pub const bma2x = struct {
-    handle: *c.bma2_dev,
-    pub fn init(self: *const bma2x) void {
-        var ret: i8 = -1;
-        var self_test_result: i8 = -1;
-
-        c.board_bma280_enable();
-
-        ret = c.bma2_init(self.handle);
-        if (c.BMA2_OK == ret) {
-            ret = c.bma2_soft_reset(self.handle);
-        }
-
-        if (c.BMA2_OK == ret) {
-            ret = c.bma2_perform_accel_selftest(&self_test_result, self.handle);
-        }
-
-        if (c.BMA2_OK == ret) {
-            ret = c.bma2_set_power_mode(c.BMA2_STANDBY_MODE, self.handle);
-        }
+    fn _tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
+        _ = freertos.getAndCastTimerID(freertos.Task, xTimer).notify(1, .eSetBits);
     }
-};
 
-pub const bme280_ctx = struct {
-    handle: *c.bme280_dev,
+    fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
+        var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
-    pub fn init(self: *const bme280_ctx) !void {
-        var ret: i32 = -1;
+        bme280.sensor.init() catch unreachable;
+        bma280.sensor.init();
 
-        c.board_bme280_enable();
+        while (true) {
+            var temp_data: bme280.bme280_data = undefined;
+            var notification_value: u32 = 0;
 
-        ret = c.bme280_init(self.handle);
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, &notification_value, freertos.portMAX_DELAY)) {
+                if (notification_value == 1) {
+                    bme280.sensor.readInForcedMode(&temp_data) catch unreachable;
+                    // Notify to event system
+                    _ = c.printf("Temp: %d, Stack: %d\n\r", @as(i32, @intFromFloat(100.0 * temp_data.temperature)), self.task.getStackHighWaterMark());
 
-        if (ret == 0) {
-            ret = c.bme280_set_sensor_mode(0, self.handle);
-        }
-
-        if (ret == 0) {
-            ret = c.bme280_get_sensor_settings(self.handle);
-
-            self.handle.settings.filter = c.BME280_FILTER_COEFF_OFF;
-            self.handle.settings.standby_time = c.BME280_STANDBY_TIME_0_5_MS;
-            self.handle.settings.osr_h = 0x5;
-            self.handle.settings.osr_p = 0x5;
-            self.handle.settings.osr_t = 0x5;
-
-            if (ret == 0) {
-                ret = c.bme280_set_sensor_settings(0x1F, self.handle);
-            }
-        }
-
-        if (ret != 0) return sensor_errors.bme280_init_error;
-    }
-    pub fn readInForcedMode(self: *const bme280_ctx, data: *bme280_data) !void {
-        var ret: i32 = -1;
-        var bme280_delay: u32 = c.bme280_cal_meas_delay(&self.handle.settings);
-
-        ret = c.bme280_set_sensor_mode(0x01, self.handle);
-
-        if (ret == 0) {
-            board.msDelay(bme280_delay);
-
-            ret = c.bme280_get_sensor_data(0x07, data, self.handle);
-        }
-
-        if (ret != 0) return sensor_errors.bme280_forced_read_error;
-    }
-};
-
-fn _tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    var task_handle = freertos.Task.initFromHandle(@ptrCast(freertos.TaskHandle_t, freertos.c.pvTimerGetTimerID(xTimer)));
-
-    _ = task_handle.notify(1, .eSetBits);
-}
-
-fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
-    _ = pvParameters;
-
-    bme280.init() catch unreachable;
-
-    while (true) {
-        var temp_data: bme280_data = undefined;
-        var notification_value: u32 = 0;
-
-        if (task.waitForNotify(0, 0xFFFFFFFF, &notification_value, freertos.portMAX_DELAY)) {
-            if (notification_value == 1) {
-                bme280.readInForcedMode(&temp_data) catch unreachable;
-                // Notify to event system
-                _ = c.printf("Temp: %d, Stack: %d\n\r", @intFromFloat(i32, 100.0 * temp_data.temperature), task.getStackHighWaterMark());
-
-                network.lwm2m_service.updateTemperature(@as(f32, @floatCast(f32, temp_data.temperature)));
+                    network.lwm2m.service.updateTemperature(@as(f32, @as(f32, @floatCast(temp_data.temperature))));
+                }
             }
         }
     }
-}
-
-pub fn init_sensor_service() !void {
-    task.create(_sensorSampingTask, "tempTask", config.rtos_stack_depth_sensor, null, config.rtos_prio_sensor) catch unreachable;
-    timer.create("tempTimer", 1000, freertos.pdTRUE, task.getHandle(), _tempTimerCallback) catch unreachable;
-    timer.start(null) catch unreachable;
-}
+    pub fn init(self: *@This()) !void {
+        self.task.create(_sensorSampingTask, "tempTask", config.rtos_stack_depth_sensor, self, config.rtos_prio_sensor) catch unreachable;
+        self.timer.create("tempTimer", 1000, freertos.pdTRUE, self, _tempTimerCallback) catch unreachable;
+        self.timer.start(null) catch unreachable;
+    }
+};
