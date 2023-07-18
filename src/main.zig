@@ -157,10 +157,6 @@ pub const microzig_options = struct {
     };
 };
 
-// Types
-
-pub var sensor_service: sensors.service = undefined;
-
 const user = struct {
     task: freertos.Task,
     timer: freertos.Timer,
@@ -180,14 +176,11 @@ const user = struct {
 
         self.timer.start(null) catch unreachable;
 
-        //const test_string: []u8 = ;
-
         while (true) {
             var test_var: u32 = 0;
 
             if (self.queue.receive(@as(*void, @ptrCast(&test_var)), null)) {
                 leds.yellow.toggle();
-                //_ = usb.usb.write("test String", 9);
             }
         }
     }
@@ -227,7 +220,7 @@ pub export fn main() void {
 
     user_task.create();
 
-    sensor_service.init() catch unreachable;
+    sensors.service.init() catch unreachable;
 
     network.start();
 

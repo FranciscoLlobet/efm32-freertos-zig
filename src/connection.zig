@@ -3,8 +3,6 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
-const mqtt = @import("mqtt.zig");
-const lwm2m = @import("lwm2m.zig");
 
 const c = @cImport({
     @cInclude("network.h");

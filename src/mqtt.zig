@@ -4,7 +4,6 @@ const network = @import("network.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const board = @import("microzig").board;
-const json = @import("std").json;
 const connection = @import("connection.zig");
 
 const c = @cImport({
@@ -156,8 +155,6 @@ fn task_function(pvParameters: ?*anyopaque) callconv(.C) void {
 
     self.initMqtt();
 
-    self.task.suspendTask();
-
     const temp = struct { temp: f32, timestamp: u32 };
 
     var string = std.ArrayList(u8).init(freertos.allocator);
@@ -215,8 +212,9 @@ fn task_function(pvParameters: ?*anyopaque) callconv(.C) void {
 
 pub fn init(self: *@This()) void {
     self.task.create(task_function, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
-    self.connection = connection.init(.mqtt);
+    self.task.suspendTask();
     self.publish_timer.create("mqtt_update", (1 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
+    self.connection = connection.init(.mqtt);
 }
 
 pub var service: @This() = undefined;

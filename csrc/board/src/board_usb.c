@@ -54,7 +54,5 @@ void BOARD_USB_Init(void)
 	usbx.powerAttribute = (uint8_t)0x80;
 	usbx.releaseBcd = (uint16_t)0x01;
 	usbx.useFifo = 0;
-	USBX_init(&usbx);
-
-	
+	//USBX_init(&usbx);
 }

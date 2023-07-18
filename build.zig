@@ -19,12 +19,6 @@ const compile = std.Build.Step.Compile;
 pub fn build(b: *std.build.Builder) void {
     const optimize = b.standardOptimizeOption(.{});
 
-    //const c_base_path = "csrc/":
-    //const c_system_path = "csrc/system/";
-    //const gecko_sdk_path = c_system_path ++ "gecko-sdk/";
-
-    //@field(compile, "link_gc_sections") = true;
-
     const include_path_array = [_][]const u8{
         // Configuration Files for miso
         "csrc/system/config",
@@ -86,9 +80,11 @@ pub fn build(b: *std.build.Builder) void {
         exe.addSystemIncludePath("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include");
         exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libc_nano.a");
         exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libgcc.a");
+
         for (include_path_array) |path| {
             exe.addIncludePath(path);
         }
+
         for (src_paths) |path| {
             exe.addCSourceFile(path, &c_flags);
         }
@@ -104,7 +100,6 @@ pub fn build(b: *std.build.Builder) void {
         //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
         exe.installArtifact(b);
     }
-
 
     inline for (@typeInfo(chips).Struct.decls) |decl| {
         if (!decl.is_pub)

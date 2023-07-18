@@ -36,5 +36,5 @@ pub export fn get_lwm2m_task_handle() callconv(.C) freertos.TaskHandle_t {
 }
 
 pub export fn get_mqtt_task_handle() callconv(.C) freertos.TaskHandle_t {
-    return lwm2m.service.getTaskHandle();
+    return mqtt.service.getTaskHandle();
 }
