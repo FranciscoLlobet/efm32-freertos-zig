@@ -213,6 +213,7 @@ void miso_load_config(void)
 		(void)printf("CONFIG signature verified successfully\r\n");
 	}
 
+    mbedtls_pk_free(&pk_ctx);
 
 	if (NULL != read_buffer)
 	{
