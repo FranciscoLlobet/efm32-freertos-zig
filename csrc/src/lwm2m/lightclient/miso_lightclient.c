@@ -88,6 +88,8 @@ extern void free_test_object(lwm2m_object_t *object);
 extern void free_accelerometer_object(lwm2m_object_t *accelerometer);
 extern void* get_accelerometer_object(void);
 
+extern char * config_get_lwm2m_endpoint(void);
+
 #define MAX_PACKET_SIZE			2048
 #define LWM2M_STEP_TIMEOUT		pdMS_TO_TICKS(10000)
 
@@ -345,11 +347,6 @@ void print_state(lwm2m_context_t *lwm2mH)
 
 #define OBJ_COUNT 5
 
-#define COMPLETE_SERVER_URI    "coap://leshan.eclipseprojects.io:5683"
-
-//lwm2m_context_t *lwm2mH = NULL;
-//lwm2m_object_t *objArray[OBJ_COUNT];
-
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -363,9 +360,6 @@ int lwm2m_client_task_runner(void *param1)
 
 	lwm2m_context_t *lwm2mH = NULL;
 	lwm2m_object_t *objArray[OBJ_COUNT];
-
-	const char *localPort = "56830";
-	char *name = "wakaama_xdk110";
 
 	int result;
 	int opt;
@@ -428,7 +422,7 @@ int lwm2m_client_task_runner(void *param1)
 	 * We configure the liblwm2m library with the name of the client - which shall be unique for each client -
 	 * the number of objects we will be passing through and the objects array
 	 */
-	result = lwm2m_configure(lwm2mH, name, NULL, NULL, OBJ_COUNT, objArray);
+	result = lwm2m_configure(lwm2mH, config_get_lwm2m_endpoint(), NULL, NULL, OBJ_COUNT, objArray);
 	if (result != 0)
 	{
 		fprintf(stderr, "lwm2m_configure() failed: 0x%X\r\n", result);

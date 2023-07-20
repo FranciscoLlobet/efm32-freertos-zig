@@ -17,9 +17,6 @@
 
 #define WIFI_TASK_PRIORITY      (UBaseType_t)( miso_rtos_prio_above_normal )
 
-
-extern int lwm2m_client_task_runner(void *param1);
-
 TimerHandle_t sntp_sync_timer = NULL;
 TaskHandle_t wifi_task_handle = NULL;
 SemaphoreHandle_t wifi_event_semaphore = NULL;
@@ -320,6 +317,7 @@ void create_wifi_service_task(void)
 	WIFI_TASK_PRIORITY, &wifi_task_handle);
 
 	sntp_sync_timer = xTimerCreate("ntpService", 1000, pdTRUE, NULL, sntp_sync_timer_callback);
+	vTaskSuspend(wifi_task_handle);
 }
 
 void CC3100_WlanEvtHdlr(SlWlanEvent_t *pSlWlanEvent)

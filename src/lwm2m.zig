@@ -20,7 +20,7 @@ timer_update: freertos.Timer,
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
     var ret: i32 = 0;
-    self.task.suspendTask();
+
     self.reg_update.start(null) catch unreachable;
     self.timer_update.start(null) catch unreachable;
 
@@ -40,9 +40,6 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     }
 }
 
-// test conditional compilation
-const lwm2mTaskFunction = if (config.enable_lwm2m) taskFunction else dummyTaskFunction;
-
 fn reg_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     _ = freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_registration, .eSetBits);
 }
@@ -52,7 +49,9 @@ fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(lwm2mTaskFunction, "lwm2m", config.rtos_stack_depth_lwm2m, self, config.rtos_prio_lwm2m) catch unreachable;
+    self.task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", config.rtos_stack_depth_lwm2m, self, config.rtos_prio_lwm2m) catch unreachable;
+
+    self.task.suspendTask();
 
     if (config.enable_lwm2m) {
         self.reg_update.create("lwm2m_reg_update", (5 * 60 * 1000), freertos.pdTRUE, self, reg_update_function) catch unreachable;

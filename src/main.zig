@@ -9,6 +9,7 @@ const leds = @import("leds.zig");
 const mqtt = @import("mqtt.zig");
 const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
+const user = @import("user.zig");
 
 const c_board = @cImport({
     @cInclude("board.h");
@@ -157,43 +158,6 @@ pub const microzig_options = struct {
     };
 };
 
-const user = struct {
-    task: freertos.Task,
-    timer: freertos.Timer,
-    queue: freertos.Queue,
-
-    fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-        var self = freertos.getAndCastTimerID(@This(), xTimer);
-        var test_var: u32 = 0xAA55;
-
-        _ = self.queue.send(@as(*void, @ptrCast(&test_var)), null);
-    }
-
-    fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-        var self = freertos.getAndCastPvParameters(@This(), pvParameters);
-
-        c_board.miso_load_config();
-
-        self.timer.start(null) catch unreachable;
-
-        while (true) {
-            var test_var: u32 = 0;
-
-            if (self.queue.receive(@as(*void, @ptrCast(&test_var)), null)) {
-                leds.yellow.toggle();
-            }
-        }
-    }
-
-    pub fn create(self: *@This()) void {
-        self.task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, self, config.rtos_prio_user_task) catch unreachable;
-        self.queue.create(4, 1) catch unreachable;
-        self.timer.create("user_timer", 2000, freertos.pdTRUE, self, myTimerFunction) catch unreachable;
-    }
-};
-
-pub var user_task: user = undefined;
-
 // Button On-Change Callback
 pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
     var instance = buttons.getInstance(handle);
@@ -218,7 +182,7 @@ pub export fn main() void {
 
     usb.usb.init();
 
-    user_task.create();
+    user.user_task.create();
 
     sensors.service.init() catch unreachable;
 

@@ -74,3 +74,52 @@ Bosch SensorTec Sensor APIs:
 - BMG160_driver
 - BMI160_driver
 - BMM150-Sensor-API
+
+## Configuration fields
+
+Configuration can be loaded via SD card by `config.txt`
+
+| Field     | Encoding         |
+| ----------|------------------|
+| wifi.ssid | character string |
+| wifi.key  |                  |
+| lwm2m.device |               |
+
+```json
+{
+    "wifi":{
+        "ssid":"WIFI_SSID",
+        "key":"WIFI_KEY"
+    },
+    "lwm2m":{
+        "device":"LWM2M_DEVICE_NAME",
+        "uri":"coaps://leshan.eclipseprojects.io:5684",
+        "psk":{
+            "id":"LWM2M_PSK_ID",
+            "key":"LWM2M_PSK_KEY"
+        },
+        "bootstrap":false,
+        "server_cert":"LWM2M_SERVER_CERT"
+    },
+    "ntp":{
+        "url":[
+            "0.de.pool.ntp.org",
+            "1.de.pool.ntp.org"
+        ]
+    },
+    "mqtt":{
+        "url":"mqtt://localhost:1883",
+        "device":"MQTT_DEVICE_ID",
+        "username": "MQTT_USER_NAME",
+        "password": "MQTT_PASSWORD",
+        "psk" : {
+            "id": "MQTT_PSK_ID",
+            "key":"MQTT_PSK_KEY"
+        },
+        "cert" : {
+            "client" : "MQTT_CERT",
+            "server_ca" : "MQTT_SERVER_CA",
+        }
+    }
+}
+```

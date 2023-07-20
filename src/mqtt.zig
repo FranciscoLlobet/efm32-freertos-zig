@@ -150,7 +150,7 @@ fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     _ = @as(*@This(), @as(*@This(), @ptrCast(@alignCast(freertos.c.pvTimerGetTimerID(xTimer))))).task.notify((1 << 2), .eSetBits);
 }
 
-fn task_function(pvParameters: ?*anyopaque) callconv(.C) void {
+fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     self.initMqtt();
@@ -210,11 +210,21 @@ fn task_function(pvParameters: ?*anyopaque) callconv(.C) void {
     }
 }
 
+fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
+    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+
+    while (true) {
+        self.task.suspendTask();
+    }
+}
+
 pub fn init(self: *@This()) void {
-    self.task.create(task_function, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
+    self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
-    self.publish_timer.create("mqtt_update", (1 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
     self.connection = connection.init(.mqtt);
+    if (config.enable_mqtt) {
+        self.publish_timer.create("mqtt_update", (1 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
+    }
 }
 
 pub var service: @This() = undefined;

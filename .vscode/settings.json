@@ -35,6 +35,12 @@
         "httpcli.h": "c",
         "simplelink.h": "c",
         "user.h": "c",
-        "ssock.h": "c"
+        "ssock.h": "c",
+        "ff.h": "c",
+        "type_traits": "c",
+        "ecp.h": "c",
+        "pem.h": "c",
+        "x509_crt.h": "c",
+        "x509.h": "c"
     }
 }

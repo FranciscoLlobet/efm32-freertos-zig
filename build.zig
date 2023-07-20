@@ -21,7 +21,7 @@ pub fn build(b: *std.build.Builder) void {
 
     const include_path_array = [_][]const u8{
         // Configuration Files for miso
-        "csrc/system/config",
+        "csrc/config",
         // C-Bootstraps
         "csrc/system/cmsis",
         // Board package
