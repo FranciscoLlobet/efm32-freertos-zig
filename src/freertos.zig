@@ -1,8 +1,7 @@
 const std = @import("std");
 const cpu = @import("microzig").cpu;
 pub const c = @cImport({
-    @cDefine("EFM32GG390F1024", "1");
-    @cDefine("__PROGRAM_START", "__main");
+    @cInclude("board.h");
     @cInclude("FreeRTOS.h");
     @cInclude("task.h");
     @cInclude("timers.h");
@@ -88,49 +87,47 @@ pub const eNotifyAction = enum(u32) {
 };
 
 pub const Task = struct {
-    task_handle: TaskHandle_t = undefined,
+    handle: TaskHandle_t = undefined,
 
-    pub fn initFromHandle(task_handle: ?TaskHandle_t) @This() {
-        return @This(){
-            .task_handle = task_handle orelse c.xTaskGetCurrentTaskHandle(),
-        };
+    pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
+        return @This(){ .handle = task_handle };
     }
     pub fn create(self: *Task, pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
-        if (c.pdPASS != c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, &self.task_handle)) {
+        if (c.pdPASS != c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, &self.handle)) {
             return FreeRtosError.TaskCreationFailed;
         }
     }
     pub fn setHandle(self: *Task, handle: TaskHandle_t) !void {
-        if (self.task_handle != undefined) {
-            self.task_handle = handle;
+        if (self.handle != undefined) {
+            self.handle = handle;
         } else {
             return FreeRtosError.TaskHandleAlreadyExists;
         }
     }
     pub fn getHandle(self: *Task) TaskHandle_t {
-        return self.task_handle;
+        return self.handle;
     }
     pub fn resumeTask(self: *Task) void {
-        c.vTaskResume(self.task_handle);
+        c.vTaskResume(self.handle);
     }
     pub fn suspendTask(self: *Task) void {
-        c.vTaskSuspend(self.task_handle);
+        c.vTaskSuspend(self.handle);
     }
     pub fn resumeTaskFromIsr(self: *Task) BaseType_t {
-        return c.xTaskResumeFromISR(self.task_handle);
+        return c.xTaskResumeFromISR(self.handle);
     }
     pub fn notify(self: *Task, ulValue: u32, eAction: eNotifyAction) bool {
-        return (pdPASS == c.xTaskGenericNotify(self.task_handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null));
+        return (pdPASS == c.xTaskGenericNotify(self.handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null));
     }
     pub fn notifyFromISR(self: *Task, ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
-        return (pdPASS == c.xTaskNotifyFromISR(self.task_handle, ulValue, eAction, pxHigherPriorityTaskWoken));
+        return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
     pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, pulNotificationValue: *u32, xTicksToWait: TickType_t) bool {
         _ = self;
         return (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, pulNotificationValue, xTicksToWait));
     }
     pub fn getStackHighWaterMark(self: *Task) u32 {
-        return @as(u32, c.uxTaskGetStackHighWaterMark(self.task_handle));
+        return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
     }
 };
 

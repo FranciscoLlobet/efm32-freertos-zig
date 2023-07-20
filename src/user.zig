@@ -22,9 +22,9 @@ fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
-    c.miso_load_config();
-
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
+
+    c.miso_load_config();
 
     wifi_task.resumeTask();
 
