@@ -88,6 +88,7 @@ static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 static int _send_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 
 static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+static int _read_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
 static int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
 static int _send_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
 
@@ -633,7 +634,7 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, con
 		ctx->close_fn = NULL;
 		break;
 	case miso_protocol_tls_ip4:
-		ctx->read_fn = _read_dtls;
+		ctx->read_fn = _read_tls;
 		ctx->send_fn = _send_tls;
 		ctx->close_fn = NULL;
 		break;
@@ -712,6 +713,39 @@ static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
 
 	if (0 > numBytes)
+	{
+		/* Close DTLS session and perform handshake */
+		do
+		{
+			result = mbedtls_ssl_close_notify(ctx->ssl_context);
+		} while ((MBEDTLS_ERR_SSL_WANT_READ == result) || (MBEDTLS_ERR_SSL_WANT_WRITE == result));
+
+		result = mbedtls_ssl_session_reset(ctx->ssl_context);
+
+		if (0 == result)
+		{
+			do
+			{
+				result = mbedtls_ssl_handshake(ctx->ssl_context);
+			} while ((MBEDTLS_ERR_SSL_WANT_READ == result) || (MBEDTLS_ERR_SSL_WANT_WRITE == result));
+		}
+	}
+
+	return numBytes;
+}
+
+static int _read_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+{
+	int numBytes = -1;
+	int result = 0;
+
+	do
+	{
+		numBytes = mbedtls_ssl_read(ctx->ssl_context, buffer, length);
+	} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
+
+
+	if (0 > numBytes && !(MBEDTLS_ERR_SSL_TIMEOUT == numBytes)) // This version lets the app decide what to do with the timeout
 	{
 		/* Close DTLS session and perform handshake */
 		do

@@ -35,8 +35,7 @@ id: [128]u8,
 id_len: usize,
 
 //id: [c.MBEDTLS_SSL_CID_OUT_LEN_MAX]u8,
-
-var entropy_seed: u32 = 0xAAAA5555;
+const tls_read_timeout: u32 = 5000;
 
 pub fn init(self: *@This()) i32 {
     var ret: i32 = -1;
@@ -57,7 +56,7 @@ pub fn init(self: *@This()) i32 {
     }
     if (ret == 0) {
         c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
-        c.mbedtls_ssl_conf_read_timeout(&self.config, 0);
+        c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
         c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
         //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
         ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
