@@ -10,6 +10,7 @@ const mqtt = @import("mqtt.zig");
 const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
 const user = @import("user.zig");
+const events = @import("events.zig");
 
 const c_board = @cImport({
     @cInclude("board.h");

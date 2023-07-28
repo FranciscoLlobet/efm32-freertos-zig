@@ -84,3 +84,9 @@ int miso_mbedtls_mutex_unlock( mbedtls_threading_mutex_t * mutex )
 
     return ret;
 }
+
+
+void miso_mbedts_set_treading_alt(void)
+{
+    UISO_MBED_TLS_THREADING_SET_ALT();
+}

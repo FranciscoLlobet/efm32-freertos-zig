@@ -5,6 +5,7 @@ const config = @import("config.zig");
 const system = @import("system.zig");
 const board = @import("microzig").board;
 const connection = @import("connection.zig");
+const mbedtls_psk = @import("mbedtls_psk.zig");
 
 const c = @cImport({
     @cDefine("MQTTC_PAL_FILE", "miso_mqtt_pal.h");
@@ -164,9 +165,13 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     _ = string;
     _ = local_temp;
 
-    var connRet = self.connection.create("192.168.50.133", "1883", null, .tcp_ip4);
+    var connRet = self.connection.initSsl(); // Think about making ssl a subclass of connection
 
-    _ = connRet;
+    if (connRet == 0) {
+        connRet = self.connection.create("192.168.50.133", "8883", null, .tls_ip4);
+    }
+
+    _ = c.printf("connRet: %d\n", connRet);
 
     const connect_flags: u8 = c.MQTT_CONNECT_CLEAN_SESSION;
 
@@ -218,11 +223,11 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     }
 }
 
-pub fn init(self: *@This()) void {
+pub fn create(self: *@This()) void {
     self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
-    self.connection = connection.init(.mqtt);
     if (config.enable_mqtt) {
+        self.connection = connection.init(.mqtt);
         self.publish_timer.create("mqtt_update", (1 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
     }
 }

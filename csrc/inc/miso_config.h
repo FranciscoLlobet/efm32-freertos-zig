@@ -19,4 +19,7 @@ char * config_get_lwm2m_endpoint(void);
 char * config_get_mqtt_device_id(void);
 char * config_get_mqtt_url(void);
 
+char * config_get_mqtt_psk_id(void);
+char * config_get_mqtt_psk_key(void);
+
 #endif /* UISO_CONFIG_H_ */

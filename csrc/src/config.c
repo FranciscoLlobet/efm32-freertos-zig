@@ -33,6 +33,9 @@ unsigned char config_sha256[32] = {0};
 char config_mqtt_uri[128] = {0};
 char config_mqtt_device_id[128] = {0};
 
+char config_mqtt_psk_id[128] = {0};
+char config_mqtt_psk_key[64] = {0};
+
 mbedtls_ecdsa_context ecdsa_ctx;
 
 
@@ -74,6 +77,16 @@ char * config_get_mqtt_device_id(void)
 char * config_get_lwm2m_endpoint(void)
 {
 	return (char*) &config_lwm2m_endpoint[0];
+}
+
+char * config_get_mqtt_psk_id(void)
+{
+	return (char*) &config_mqtt_psk_id[0];
+}
+
+char * config_get_mqtt_psk_key(void)
+{
+	return (char*) &config_mqtt_psk_key[0];
 }
 
 FATFS fs;
@@ -480,7 +493,36 @@ void miso_load_config(void)
 					strncpy(dest_ptr, src_ptr, src_len);
 				}
 			}
-			
+			else if (((mqtt_psk_key + 1) == json_tokens[i].parent)
+					&& (json_tokens[i].type == JSMN_STRING))
+			{
+				char *dest_ptr = NULL;
+				size_t dest_len = 0;
+
+				if (0 == strncmp(json_key, "id", strlen("id")))
+				{
+					dest_ptr = &config_mqtt_psk_id[0];
+					dest_len = sizeof(config_mqtt_psk_id);
+				}
+				else if (0 == strncmp(json_key, "key", strlen("key")))
+				{
+					dest_ptr = &config_mqtt_psk_key[0];
+					dest_len = sizeof(config_mqtt_psk_key);
+				}
+
+				if ((JSMN_STRING == json_tokens[i + 1].type)
+						&& (dest_ptr != NULL))
+				{
+					char *src_ptr = (char*) read_buffer
+							+ json_tokens[i + 1].start;
+					size_t src_len = json_tokens[i + 1].end
+							- json_tokens[i + 1].start;
+					if (src_len > dest_len)
+						src_len = dest_len;
+
+					strncpy(dest_ptr, src_ptr, src_len);
+				}
+			}
 
 		}
 	}

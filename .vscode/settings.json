@@ -41,6 +41,8 @@
         "ecp.h": "c",
         "pem.h": "c",
         "x509_crt.h": "c",
-        "x509.h": "c"
+        "x509.h": "c",
+        "miso.h": "c",
+        "lwm2m_security.h": "c"
     }
 }

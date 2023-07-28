@@ -1,6 +1,7 @@
 const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
+const fatfs = @import("fatfs.zig");
 
 const task_priorities = enum(freertos.BaseType_t) {
     rtos_prio_idle = 0, // Idle task priority
@@ -15,8 +16,8 @@ const task_priorities = enum(freertos.BaseType_t) {
 pub const min_task_stack_depth: u16 = freertos.c.configMINIMAL_STACK_SIZE;
 
 // Enable or Disable features at compile time
-pub const enable_lwm2m = true;
-pub const enable_mqtt = false;
+pub const enable_lwm2m = false;
+pub const enable_mqtt = true;
 
 pub const rtos_prio_sensor = @intFromEnum(task_priorities.rtos_prio_low);
 pub const rtos_stack_depth_sensor: u16 = 440;

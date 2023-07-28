@@ -28,7 +28,7 @@ pub fn start() void {
     lwm2m.service.create();
 
     // Create the MQTT service
-    mqtt.service.init();
+    mqtt.service.create();
 }
 
 pub export fn get_lwm2m_task_handle() callconv(.C) freertos.TaskHandle_t {

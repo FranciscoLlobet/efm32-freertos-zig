@@ -9,10 +9,19 @@ const FSIZE_t = c.FSIZE_t;
 const UINT = c.UINT;
 const FR_OK = c.FR_OK;
 const FILINFO = c.FILINFO;
+const FATFS = c.FATFS;
 
 var fileSystem: c.FATFS = undefined;
 
 fp: *c.FIL,
+
+pub export fn miso_getFs() callconv(.C) *FATFS {
+    return &fileSystem;
+}
+
+pub fn setFs(fs: *FATFS) void {
+    fileSystem = fs;
+}
 
 pub fn mount() bool {
     return (FR_OK == c.f_mount(&fileSystem, "SD", 1));

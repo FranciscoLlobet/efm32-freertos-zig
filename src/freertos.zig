@@ -185,7 +185,6 @@ pub const Semaphore = struct {
     pub fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken));
     }
-
     pub fn initFromHandle(handle: SemaphoreHandle_t) @This() {
         return @This(){ .handle = handle };
     }
