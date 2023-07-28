@@ -45,6 +45,7 @@
         "miso.h": "c",
         "lwm2m_security.h": "c",
         "error.h": "c",
-        "threading.h": "c"
+        "threading.h": "c",
+        "socket.h": "c"
     }
 }

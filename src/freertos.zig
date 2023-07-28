@@ -37,6 +37,7 @@ const FreeRtosError = error{
     TimerCreationFailed,
 
     TimerStartFailed,
+    TimerStopFailed,
 };
 
 // Kernel function
@@ -206,8 +207,10 @@ pub const Timer = struct {
             return FreeRtosError.TimerStartFailed;
         }
     }
-    pub fn stop(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
-        return c.xTimerStop(self.handle, xTicksToWait);
+    pub fn stop(self: *Timer, xTicksToWait: ?TickType_t) !void {
+        if (c.pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(c_uint, 0), null, xTicksToWait orelse portMAX_DELAY)) {
+            return FreeRtosError.TimerStopFailed;
+        }
     }
     pub fn delete(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerDelete(self.handle, xTicksToWait);

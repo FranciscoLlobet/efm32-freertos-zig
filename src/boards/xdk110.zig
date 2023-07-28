@@ -1,9 +1,10 @@
 const std = @import("std");
 const microzig = @import("microzig");
-const c = @cImport({
+pub const c = @cImport({
     @cDefine("EFM32GG390F1024", "1");
     @cDefine("__PROGRAM_START", "__main");
     @cInclude("board.h");
+    @cInclude("simplelink.h");
 });
 
 pub const cpu_frequency = 48_000_000; // 48MHz

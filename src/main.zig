@@ -178,6 +178,10 @@ pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) vo
     }
 }
 
+pub export fn system_reset() callconv(.C) void {
+    system.reset();
+}
+
 pub export fn main() void {
     board.init();
 

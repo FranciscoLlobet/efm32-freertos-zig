@@ -3,13 +3,15 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const leds = @import("leds.zig");
 
-fn _performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
+fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = param2;
     _ = param1;
 
     leds.red.on();
     leds.yellow.on();
     leds.orange.on();
+
+    _ = board.c.sl_Stop(0xFFFF);
 
     board.msDelay(1000);
 
@@ -19,15 +21,11 @@ fn _performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
 }
 
 pub fn reset() void {
-    if (!freertos.xTimerPendFunctionCall(_performReset, null, 0, freertos.portMAX_DELAY)) {
-        _performReset(null, 0);
+    if (!freertos.xTimerPendFunctionCall(performReset, null, 0, freertos.portMAX_DELAY)) {
+        performReset(null, 0);
     }
 }
 
 pub fn shutdown() void {
-    reset();
-}
-
-pub export fn system_reset() callconv(.C) void {
     reset();
 }

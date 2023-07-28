@@ -5,7 +5,6 @@ const config = @import("config.zig");
 const system = @import("system.zig");
 const board = @import("microzig").board;
 const connection = @import("connection.zig");
-const mbedtls_psk = @import("mbedtls_psk.zig");
 
 const c = @cImport({
     @cDefine("MQTTC_PAL_FILE", "miso_mqtt_pal.h");
@@ -18,6 +17,7 @@ const c = @cImport({
 // Setting alias for types
 const mqtt_client = c.mqtt_client;
 const printf = c.printf;
+const MQTT_OK: i32 = @intCast(c.MQTT_OK);
 
 pub export fn mqtt_pal_sendall(fd: ?*anyopaque, buf: [*c]u8, len: usize, flags: i32) callconv(.C) isize {
     _ = flags;
@@ -44,8 +44,14 @@ pub const publish_qos = enum(u8) {
     qos_2 = c.MQTT_PUBLISH_QOS_2,
 };
 
+pub const errors = error{
+    send_error,
+    recieve_error,
+};
+
 pub const errorEnum = enum(i32) {
     ok = c.MQTT_OK,
+
     unknown = c.MQTT_ERROR_UNKNOWN,
     nullptr = c.MQTT_ERROR_NULLPTR,
     controlForbiddenType = c.MQTT_ERROR_CONTROL_FORBIDDEN_TYPE,
@@ -113,15 +119,23 @@ fn connect(self: *@This()) void {
 
 }
 
-fn send(self: *@This()) void {
-    if (c.MQTT_OK != c.__mqtt_send(&self.client)) {
-        c.mqtt_clear_error(&self.client);
+fn send(self: *@This()) !void {
+    var ret: i32 = @intCast(c.__mqtt_send(&self.client));
+    if (ret != MQTT_OK) {
+        ret = c.mqtt_clear_error(&self.client);
+    }
+    if (ret != MQTT_OK) {
+        return errors.send_error;
     }
 }
 
-fn receive(self: *@This()) void {
-    if (c.MQTT_OK != c.__mqtt_recv(&self.client)) {
-        c.mqtt_clear_error(&self.client);
+fn receive(self: *@This()) !void {
+    var ret: i32 = @intCast(c.__mqtt_recv(&self.client));
+    if (ret != MQTT_OK) {
+        ret = c.mqtt_clear_error(&self.client);
+    }
+    if (ret != MQTT_OK) {
+        return errors.recieve_error;
     }
 }
 
@@ -188,15 +202,16 @@ fn innerLoop(self: *@This()) i32 {
     _ = c.printf("test_ret: %d\n", test_ret);
 
     // start connection
-    self.send();
+    //self.send() catch {};
 
     self.subscribe("zig/ret/#", 1);
 
-    self.send();
+    //self.send() catch {};
 
     self.publish_timer.start(null) catch unreachable;
 
-    while (true) {
+    ret = MQTT_OK;
+    while (ret == MQTT_OK) {
         const test_message: [*:0]const u8 = "Test message";
         //"Test message {s}", counter;
 
@@ -206,14 +221,15 @@ fn innerLoop(self: *@This()) i32 {
         if (self.task.waitForNotify(0x0, 0xFFFFFFFF, &notification, 0)) {
             if ((1 << 2) == ((1 << 2) & notification)) {
                 self.publish("zig/application", test_message, c.strlen(test_message), .qos_1, false);
+                _ = c.printf("Publish!\n\r");
             }
 
             if ((1 << 0) == ((1 << 0) & notification)) {
-                self.receive();
+                self.receive() catch break;
             }
 
             if ((1 << 1) == ((1 << 1) & notification)) {
-                self.send();
+                self.send() catch break;
             }
         }
 
@@ -224,9 +240,9 @@ fn innerLoop(self: *@This()) i32 {
         // get out of issues
     }
 
-    self.publish_timer.stop(null);
-    self.connection.close();
-    self.connection.ssl.deinit();
+    self.publish_timer.stop(null) catch unreachable;
+    _ = self.connection.close();
+    _ = self.connection.ssl.deinit();
 
     return ret;
 }

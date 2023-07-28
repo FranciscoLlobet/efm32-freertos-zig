@@ -3,7 +3,7 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
-const mbedtls_psk = @import("mbedtls_psk.zig");
+pub const mbedtls_psk = @import("mbedtls_psk.zig");
 
 const c = @cImport({
     @cInclude("network.h");
