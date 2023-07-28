@@ -37,14 +37,28 @@ id_len: usize,
 //id: [c.MBEDTLS_SSL_CID_OUT_LEN_MAX]u8,
 const tls_read_timeout: u32 = 5000;
 
+pub fn deinit(self: *@This()) i32 {
+    var ret: i32 = 0;
+
+    self.cleanup();
+
+    return ret;
+}
+
+fn cleanup(self: *@This()) void {
+    c.miso_mbedtls_deinit_timer(&self.timer);
+    c.mbedtls_ctr_drbg_free(&self.drbg);
+    c.mbedtls_entropy_free(&self.entropy);
+    c.mbedtls_ssl_free(&self.context);
+    c.mbedtls_ssl_config_free(&self.config);
+}
+
 pub fn init(self: *@This()) i32 {
     var ret: i32 = -1;
 
     self.entropy_seed = 0xAAAA5555;
 
     c.miso_mbedtls_init_timer(&self.timer);
-    c.miso_mbedts_set_treading_alt();
-
     c.mbedtls_ssl_init(&self.context);
     c.mbedtls_ssl_config_init(&self.config);
     c.mbedtls_ctr_drbg_init(&self.drbg);

@@ -8,6 +8,7 @@
 #include "miso.h"
 
 #include "mbedtls/error.h"
+#include "threading_alt.h"
 
 #include "wifi_service.h"
 
@@ -143,6 +144,11 @@ int create_network_mediator(void)
 	if (0 == ret)
 	{
 		initialize_socket_management();
+	}
+
+	if(0 == ret)
+	{
+		miso_mbedtls_set_treading_alt();
 	}
 
 	if (0 == ret)

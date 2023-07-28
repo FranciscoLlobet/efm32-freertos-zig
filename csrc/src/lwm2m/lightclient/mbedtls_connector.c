@@ -126,7 +126,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	enum lwm2m_security_mode_e security_mode = get_security_mode(securityObjP, secObjInstID);
 
 	miso_mbedtls_init_timer(&ssl_timer);
-	UISO_MBED_TLS_THREADING_SET_ALT();
+	//UISO_MBED_TLS_THREADING_SET_ALT();
 
 	mbedtls_ssl_init(&ssl_context);
 
@@ -271,7 +271,7 @@ void mbedtls_cleanup(void)
 	mbedtls_pk_free(&own_pk);
 
 	miso_mbedtls_deinit_timer(&ssl_timer);
-	mbedtls_threading_free_alt();
+	//mbedtls_threading_free_alt();
 
 	mbedtls_ctr_drbg_free(&drbg_context);
 	mbedtls_entropy_free(&entropy_context);

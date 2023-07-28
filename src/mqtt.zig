@@ -165,6 +165,14 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     _ = string;
     _ = local_temp;
 
+    while (true) {
+        _ = self.innerLoop();
+    }
+}
+
+fn innerLoop(self: *@This()) i32 {
+    var ret: i32 = 0;
+
     var connRet = self.connection.initSsl(); // Think about making ssl a subclass of connection
 
     if (connRet == 0) {
@@ -212,7 +220,15 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         if (0 == self.connection.waitRx(1)) {
             self.notifyPendingReceive();
         }
+
+        // get out of issues
     }
+
+    self.publish_timer.stop(null);
+    self.connection.close();
+    self.connection.ssl.deinit();
+
+    return ret;
 }
 
 fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {

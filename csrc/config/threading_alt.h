@@ -53,8 +53,6 @@ extern void miso_mbedtls_mutex_free( mbedtls_threading_mutex_t * mutex );
 extern int miso_mbedtls_mutex_lock( mbedtls_threading_mutex_t * mutex );
 extern int miso_mbedtls_mutex_unlock( mbedtls_threading_mutex_t * mutex );
 
-#define UISO_MBED_TLS_THREADING_SET_ALT()    do{mbedtls_threading_set_alt(miso_mbedtls_mutex_init,miso_mbedtls_mutex_free,miso_mbedtls_mutex_lock,miso_mbedtls_mutex_unlock);}while(0)
-
-extern void miso_mbedts_set_treading_alt(void);
+extern void miso_mbedtls_set_treading_alt(void);
 
 #endif /* ifndef __THREADING_ALT_H__ */
