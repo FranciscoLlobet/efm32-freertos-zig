@@ -6,6 +6,7 @@ pub const c = @cImport({
     @cInclude("task.h");
     @cInclude("timers.h");
     @cInclude("semphr.h");
+    @cInclude("message_buffer.h");
 });
 
 pub const BaseType_t = c.BaseType_t;
@@ -18,6 +19,7 @@ pub const TimerHandle_t = c.TimerHandle_t;
 pub const TickType_t = c.TickType_t;
 pub const PendedFunction_t = c.PendedFunction_t;
 pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
+pub const MessageBufferHandle_t = c.MessageBufferHandle_t;
 
 pub const portMAX_DELAY = c.portMAX_DELAY;
 pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
@@ -135,21 +137,21 @@ pub const Task = struct {
 pub const Queue = struct {
     handle: QueueHandle_t = undefined,
 
-    pub fn create(self: *Queue, item_size: UBaseType_t, queue_length: UBaseType_t) !void {
+    pub fn create(self: *@This(), item_size: UBaseType_t, queue_length: UBaseType_t) !void {
         self.handle = c.xQueueCreate(item_size, queue_length);
         if (self.handle == null) {
             return FreeRtosError.QueueCreationFailed;
         }
     }
-    pub fn send(self: *Queue, item_to_queue: *const void, comptime ticks_to_wait: ?UBaseType_t) bool {
+    pub fn send(self: *@This(), item_to_queue: *const void, comptime ticks_to_wait: ?UBaseType_t) bool {
         var ticks = ticks_to_wait orelse portMAX_DELAY;
         return (pdTRUE == c.xQueueSend(self.handle, item_to_queue, ticks));
     }
-    pub fn receive(self: *Queue, buffer: *void, comptime ticks_to_wait: ?UBaseType_t) bool {
+    pub fn receive(self: *@This(), buffer: *void, comptime ticks_to_wait: ?UBaseType_t) bool {
         var ticks = ticks_to_wait orelse portMAX_DELAY;
         return (pdTRUE == c.xQueueReceive(self.handle, buffer, ticks));
     }
-    pub fn delete(self: *Queue) void {
+    pub fn delete(self: *@This()) void {
         c.xQueueDelete(self.handle);
         self.handle = undefined;
     }
@@ -223,6 +225,20 @@ pub const Timer = struct {
     }
     pub fn initFromHandle(handle: TimerHandle_t) @This() {
         return @This(){ .handle = handle };
+    }
+};
+
+pub const MessageBuffer = struct {
+    handle: MessageBufferHandle_t = undefined,
+    pub fn create(self: *@This(), xBufferSizeBytes: usize) void {
+        self.handle = c.xStreamBufferGenericCreate(xBufferSizeBytes, 0, pdTRUE, null, null);
+    }
+    pub fn send(self: *@This(), pvTxData: ?*const anyopaque, xDataLengthBytes: usize, comptime xTicksToWait: ?TickType_t) usize {
+        return c.xMessageBufferSend(self.handle, pvTxData, xDataLengthBytes, xTicksToWait orelse portMAX_DELAY);
+    }
+    pub fn receive(self: *@This(), pvRxData: ?*anyopaque, xDataLengthBytes: usize, ticks_to_wait: ?TickType_t) usize {
+        var ticks = ticks_to_wait orelse portMAX_DELAY;
+        return c.xMessageBufferReceive(self.handle, pvRxData, xDataLengthBytes, ticks);
     }
 };
 

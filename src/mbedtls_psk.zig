@@ -34,7 +34,6 @@ psk_len: usize,
 id: [128]u8,
 id_len: usize,
 
-//id: [c.MBEDTLS_SSL_CID_OUT_LEN_MAX]u8,
 const tls_read_timeout: u32 = 5000;
 
 pub fn deinit(self: *@This()) i32 {

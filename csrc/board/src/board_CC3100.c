@@ -334,7 +334,7 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
 			 printf("General Error: Status=%d, Sender=%d\n",
 			               slGeneralEvent->EventData.deviceEvent.status,
 			               slGeneralEvent->EventData.deviceEvent.sender);
-			system_reset();
+			//system_reset();
 			break;
 		case SL_DEVICE_ABORT_ERROR_EVENT:
 	        printf("Abort Error: AbortType=%u, AbortData=%u\n",
@@ -353,7 +353,7 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
 			break;
 		case SL_DEVICE_DRIVER_TIMEOUT_ASYNC_EVENT:
 			printf("Driver Timeout: Async event not received.\n");
-			system_reset();
+			// system_reset();
 			break;
 		default:
 			break;

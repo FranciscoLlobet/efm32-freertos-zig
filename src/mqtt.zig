@@ -5,6 +5,7 @@ const config = @import("config.zig");
 const system = @import("system.zig");
 const board = @import("microzig").board;
 const connection = @import("connection.zig");
+const MQTTPacket = @import("MQTTPacket.zig");
 
 const c = @cImport({
     @cDefine("MQTTC_PAL_FILE", "miso_mqtt_pal.h");
@@ -37,6 +38,7 @@ task: freertos.Task,
 client: mqtt_client,
 ping_timer: freertos.Timer,
 publish_timer: freertos.Timer,
+mqttpacket: MQTTPacket,
 
 pub const publish_qos = enum(u8) {
     qos_0 = c.MQTT_PUBLISH_QOS_0,
@@ -49,47 +51,8 @@ pub const errors = error{
     recieve_error,
 };
 
-pub const errorEnum = enum(i32) {
-    ok = c.MQTT_OK,
-
-    unknown = c.MQTT_ERROR_UNKNOWN,
-    nullptr = c.MQTT_ERROR_NULLPTR,
-    controlForbiddenType = c.MQTT_ERROR_CONTROL_FORBIDDEN_TYPE,
-    controlInvalidFlags = c.MQTT_ERROR_CONTROL_INVALID_FLAGS,
-    controlWrongType = c.MQTT_ERROR_CONTROL_WRONG_TYPE,
-    controlConnectClientIdRefused = c.MQTT_ERROR_CONNECT_CLIENT_ID_REFUSED,
-    connectNullWillMessage = c.MQTT_ERROR_CONNECT_NULL_WILL_MESSAGE,
-    connectForbiddenWillQos = c.MQTT_ERROR_CONNECT_FORBIDDEN_WILL_QOS,
-    connackForbiddenFlags = c.MQTT_ERROR_CONNACK_FORBIDDEN_FLAGS,
-    connackForbiddenCode = c.MQTT_ERROR_CONNACK_FORBIDDEN_CODE,
-    publishForbiddenQos = c.MQTT_ERROR_PUBLISH_FORBIDDEN_QOS,
-    subscribeTooManyTopics = c.MQTT_ERROR_SUBSCRIBE_TOO_MANY_TOPICS,
-    malformedResponse = c.MQTT_ERROR_MALFORMED_RESPONSE,
-    subscribeTooManyTopics = c.MQTT_ERROR_UNSUBSCRIBE_TOO_MANY_TOPICS,
-    responseInvalidControlType = c.MQTT_ERROR_RESPONSE_INVALID_CONTROL_TYPE,
-    connectNotCalled = c.MQTT_ERROR_CONNECT_NOT_CALLED,
-    sendBufferIsFull = c.MQTT_ERROR_SEND_BUFFER_IS_FULL,
-    socketError = c.MQTT_ERROR_SOCKET_ERROR,
-    malformedRequest = c.MQTT_ERROR_MALFORMED_REQUEST,
-    recvBufferTooSmall = c.MQTT_ERROR_RECV_BUFFER_TOO_SMALL,
-    ackOfUnknown = c.MQTT_ERROR_ACK_OF_UNKNOWN,
-    notImplemented = c.MQTT_ERROR_NOT_IMPLEMENTED,
-    connectionRefused = c.MQTT_ERROR_CONNECTION_REFUSED,
-    subscribeFailed = c.MQTT_ERROR_SUBSCRIBE_FAILED,
-    connectionClosed = c.MQTT_ERROR_CONNECTION_CLOSED,
-    initialReconnect = c.MQTT_ERROR_INITIAL_RECONNECT,
-    invalidRemainingLength = c.MQTT_ERROR_INVALID_REMAINING_LENGTH,
-    cleanSessionIsRequired = c.MQTT_ERROR_CLEAN_SESSION_IS_REQUIRED,
-    reconnectFailed = c.MQTT_ERROR_RECONNECT_FAILED,
-    reconnecting = c.MQTT_ERROR_RECONNECTING,
-};
-
-pub fn getHandle(self: *@This()) *@This() {
-    return self;
-}
-
 pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
-    return self.task.getHandle();
+    return self.mqttpacket.task.getHandle();
 }
 
 pub fn publish(self: *@This(), topic: [*:0]const u8, message: [*:0]const u8, message_size: usize, qos: publish_qos, retain: bool) void {
@@ -108,15 +71,6 @@ pub fn subscribe(self: *@This(), topic: [*:0]const u8, max_qos_level: i32) void 
     if (c.MQTT_OK == c.mqtt_subscribe(&self.client, topic, @as(c_int, max_qos_level))) {
         self.notifyPendingSend();
     }
-}
-
-fn connect(self: *@This()) void {
-    _ = self;
-
-    //pub extern fn mqtt_connect(client: [*c]struct_mqtt_client, client_id: [*c]const u8, will_topic: [*c]const u8, will_message: ?*const anyopaque, will_message_size: usize, user_name: [*c]const u8, password: [*c]const u8, connect_flags: u8, keep_alive: u16) enum_MQTTErrors;
-
-    //_ = mqtt_init(&self.client, self.connection., sendbuf: [*c]u8, sendbufsz: usize, recvbuf: [*c]u8, recvbufsz: usize, publish_response_callback: ?*const fn ([*c]?*anyopaque, [*c]struct_mqtt_response_publish) callconv(.C) void) ;
-
 }
 
 fn send(self: *@This()) !void {
@@ -187,7 +141,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 fn innerLoop(self: *@This()) i32 {
     var ret: i32 = 0;
 
-    var connRet = self.connection.initSsl(); // Think about making ssl a subclass of connection
+    var connRet = self.connection.initSsl();
 
     if (connRet == 0) {
         connRet = self.connection.create("192.168.50.133", "8883", null, .tls_ip4);
@@ -201,12 +155,7 @@ fn innerLoop(self: *@This()) i32 {
 
     _ = c.printf("test_ret: %d\n", test_ret);
 
-    // start connection
-    //self.send() catch {};
-
     self.subscribe("zig/ret/#", 1);
-
-    //self.send() catch {};
 
     self.publish_timer.start(null) catch unreachable;
 
@@ -247,21 +196,8 @@ fn innerLoop(self: *@This()) i32 {
     return ret;
 }
 
-fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
-
-    while (true) {
-        self.task.suspendTask();
-    }
-}
-
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
-    self.task.suspendTask();
-    if (config.enable_mqtt) {
-        self.connection = connection.init(.mqtt);
-        self.publish_timer.create("mqtt_update", (1 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
-    }
+    self.mqttpacket.create();
 }
 
 pub var service: @This() = undefined;
