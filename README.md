@@ -16,9 +16,9 @@ The current version of `MISO` boasts a set of features, including:
 
 - read configuration files from a SD card,
 - connect to a designated WiFi AP,
-- get a sNTP timestamp from an internet server, 
+- get a sNTP timestamp from an internet server,
 - provide a basic secured LWM2M service client with connection management,
-- provide a basic MQTT service client,
+- provide a basic MQTT service client (QOS0 and QOS1 support),
 - mbedTLS PSK and x509 certificate authentication tested with DTLS,
 - Watchdog
 
@@ -31,43 +31,70 @@ For design, and legal reasons, the following hardware capabilities of the XDK110
 - Acoustic sensor / Microphone AKU340
 - Other IP protocols
 
-# Used 3rd party software
+## Project Setup
 
-## Base Tooling
+### Zig
+
+Download and install the Zig Compiler
+
+- [Zig Getting-Started](https://ziglang.org/learn/getting-started/)
+- [Download Zig](https://ziglang.org/download/)
+
+#### Installation Hints
+
+> This software has been tested using the [Windows x86-64Bit 0.11.0-dev.4406](https://ziglang.org/builds/zig-windows-x86_64-0.11.0-dev.4406+d370005d3.zip) build.
+
+#### Install the Arm GNU Toolchain
+
+- [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+
+### Code Checkout
+
+```powershell
+git clone https://github.com/FranciscoLlobet/efm32-freertos-zig.git
+cd .\efm32-freertos-zig\
+git submodule init
+git submodule update
+zig build
+```
+
+## Used 3rd party software
+
+### Base Tooling
 
 - [MicroZig](https://github.com/ZigEmbeddedGroup/microzig)
 - [regz](https://github.com/ZigEmbeddedGroup/regz)
 
-## MCAL and MCU peripheral services
+### MCAL and MCU peripheral services
 
 - EFM32 Gecko SDK
 
-## RTOS
+### RTOS
 
 - [FreeRTOS](https://github.com/FreeRTOS/FreeRTOS-Kernel)
 
-## Wifi Connectivity
+### Wifi Connectivity
 
 - TI Simplelink CC2100-SDK
 
-## Filesystem
+### Filesystem
 
 - [FatFs 15](http://elm-chan.org/fsw/ff/00index_e.html). The "standard" FatFS driver for embedded devices.
 
-## Utils
+### Utils
 
 - [jsmn](https://github.com/zserge/jsmn). Jsmn, a very simple JSON parser.
 
-## Crypto and DTLS provider
+### Crypto and (D)TLS provider
 
 - [mbedTLS](https://github.com/Mbed-TLS/mbedtls)
 
-## Protocol Providers
+### Protocol Providers
 
-- [MQTT-C](https://github.com/LiamBindle/MQTT-C). MQTT protocol service.
+- [Paho MQTT Embedded-C}] (https://github.com/eclipse/paho.mqtt.embedded-c). MQTT v3.1.1 protocol service.
 - [Wakaama](https://github.com/eclipse/wakaama). LWM2M protocol service.
 
-Bosch SensorTec Sensor APIs:
+### Bosch SensorTec Sensor APIs
 
 - BMA2-Sensor-API
 - BME280_driver
@@ -79,11 +106,6 @@ Bosch SensorTec Sensor APIs:
 
 Configuration can be loaded via SD card by `config.txt`
 
-| Field     | Encoding         |
-| ----------|------------------|
-| wifi.ssid | character string |
-| wifi.key  |                  |
-| lwm2m.device |               |
 
 ```json
 {

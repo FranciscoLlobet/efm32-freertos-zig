@@ -3,7 +3,7 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
-pub const mbedtls_psk = @import("mbedtls_psk.zig");
+pub const mbedtls = @import("mbedtls.zig");
 
 const c = @cImport({
     @cInclude("network.h");
@@ -12,7 +12,6 @@ const c = @cImport({
 });
 
 const network_ctx = c.miso_network_ctx_t;
-const mbedtls_ssl_context = c.mbedtls_ssl_context;
 
 pub const connection_id = enum(usize) {
     ntp = c.wifi_service_ntp_socket,
@@ -37,12 +36,19 @@ pub const protocol = enum(u32) {
     tls_ip6 = c.miso_protocol_tls_ip6,
 };
 
+pub const security_mode = enum(u32) {
+    no_sec,
+    psk,
+    certificate_ec,
+    certificate_rsa,
+};
+
 ctx: network_ctx,
 id: connection_id,
-ssl: mbedtls_psk,
+ssl: mbedtls,
 
 pub fn init(id: connection_id) @This() {
-    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = undefined };
+    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create() };
 }
 
 pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol) i32 {
@@ -68,10 +74,10 @@ pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
 pub fn waitTx(self: *@This(), timeout_s: u32) i32 {
     return c.wait_tx(self.ctx, timeout_s);
 }
-pub fn initSsl(self: *@This()) i32 {
-    var ret = self.ssl.init();
+pub fn initSsl(self: *@This(), proto: protocol, mode: security_mode) i32 {
+    var ret = self.ssl.init(proto, mode);
     if (ret == 0) {
-        ret = c.miso_network_register_ssl_context(self.ctx, @as(*mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
+        ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
     }
     return ret;
 }

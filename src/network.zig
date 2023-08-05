@@ -6,8 +6,6 @@ const system = @import("system.zig");
 const mqtt = @import("mqtt.zig");
 pub const lwm2m = @import("lwm2m.zig");
 
-pub const connection = @import("connection.zig").connection;
-
 const c = @cImport({
     @cInclude("network.h");
     @cInclude("wifi_service.h");

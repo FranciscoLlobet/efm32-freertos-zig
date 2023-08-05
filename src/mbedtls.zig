@@ -1,6 +1,6 @@
 const std = @import("std");
 const freertos = @import("freertos.zig");
-//const connection = @import("connection.zig");
+const connection = @import("connection.zig");
 const c = @cImport({
     @cDefine("MBEDTLS_CONFIG_FILE", "\"miso_mbedtls_config.h\"");
     @cInclude("miso_config.h");
@@ -14,7 +14,7 @@ const c = @cImport({
     @cInclude("mbedtls/entropy.h");
 });
 
-const mbedtls_ssl_context = c.mbedtls_ssl_context;
+//const protocol = connection.protocol;
 
 const ciphersuites_psk: [4]c_int = .{
     c.MBEDTLS_TLS_PSK_WITH_AES_128_GCM_SHA256,
@@ -23,16 +23,21 @@ const ciphersuites_psk: [4]c_int = .{
     0,
 };
 
+const ciphersuites_ec: [1]c_int = .{
+    0,
+};
+
+mode: connection.security_mode,
 timer: c.miso_mbedtls_timing_delay_t,
-context: mbedtls_ssl_context,
+context: c.mbedtls_ssl_context,
 config: c.mbedtls_ssl_config,
 drbg: c.mbedtls_ctr_drbg_context,
 entropy: c.mbedtls_entropy_context,
 entropy_seed: u32,
 psk: [64]u8,
 psk_len: usize,
-id: [128]u8,
-id_len: usize,
+//id: [128]u8,
+//id_len: usize,
 
 const tls_read_timeout: u32 = 5000;
 
@@ -52,10 +57,21 @@ fn cleanup(self: *@This()) void {
     c.mbedtls_ssl_config_free(&self.config);
 }
 
-pub fn init(self: *@This()) i32 {
+pub fn create() @This() {
+    return @This(){ .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+}
+
+pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.security_mode) i32 {
     var ret: i32 = -1;
 
-    self.entropy_seed = 0xAAAA5555;
+    ret = switch (protocol) {
+        .dtls_ip4, .dtls_ip6, .tls_ip4, .tls_ip6 => 0,
+        else => -1,
+    };
+
+    if (ret != 0) return -1; // Insupported protocol
+
+    self.mode = mode;
 
     c.miso_mbedtls_init_timer(&self.timer);
     c.mbedtls_ssl_init(&self.context);
@@ -63,7 +79,12 @@ pub fn init(self: *@This()) i32 {
     c.mbedtls_ctr_drbg_init(&self.drbg);
     c.mbedtls_entropy_init(&self.entropy);
 
-    ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, c.MBEDTLS_SSL_TRANSPORT_STREAM, c.MBEDTLS_SSL_PRESET_DEFAULT);
+    var transport: c_int = switch (protocol) {
+        .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
+        else => c.MBEDTLS_SSL_TRANSPORT_STREAM,
+    };
+
+    ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
     if (ret == 0) {
         ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
     }
@@ -77,22 +98,34 @@ pub fn init(self: *@This()) i32 {
     }
 
     if (ret == 0) {
-        c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]);
+        switch (mode) {
+            .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
+            .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
+            else => {},
+        }
     }
     if (ret == 0) {
         c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
         c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
 
         // In case of DTLS
-        // ret = c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
+        ret = switch (protocol) {
+            .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
+            else => 0,
+        };
     }
 
     // This should be done by a callback
     if (ret == 0) {
-        _ = c.memset(&self.psk, 0, self.psk.len);
-        ret = c.mbedtls_base64_decode(&self.psk, self.psk.len, &self.psk_len, c.config_get_mqtt_psk_key(), c.strlen(c.config_get_mqtt_psk_key()));
-        if (ret == 0) {
-            ret = c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, c.config_get_mqtt_psk_id(), c.strlen(c.config_get_mqtt_psk_id()));
+        if (mode == .psk) {
+            @memset(&self.psk, 0);
+
+            ret = c.mbedtls_base64_decode(&self.psk, self.psk.len, &self.psk_len, c.config_get_mqtt_psk_key(), c.strlen(c.config_get_mqtt_psk_key()));
+            if (ret == 0) {
+                ret = c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, c.config_get_mqtt_psk_id(), c.strlen(c.config_get_mqtt_psk_id()));
+            }
+        } else if (mode == .certificate_ec) {
+            //
         }
     }
 

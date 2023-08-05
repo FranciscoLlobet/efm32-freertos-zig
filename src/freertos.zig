@@ -40,6 +40,7 @@ const FreeRtosError = error{
 
     TimerStartFailed,
     TimerStopFailed,
+    TimerChangePeriodFailed,
 };
 
 // Kernel function
@@ -58,6 +59,10 @@ pub fn vPortFree(pv: ?*anyopaque) void {
 
 pub fn vTaskDelay(xTicksToDelay: TickType_t) void {
     c.vTaskDelay(xTicksToDelay);
+}
+
+pub fn xTaskGetTickCount() TickType_t {
+    return c.xTaskGetTickCount();
 }
 
 pub fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
@@ -203,15 +208,18 @@ pub const Timer = struct {
         }
     }
     pub fn start(self: *Timer, xTicksToWait: ?TickType_t) !void {
-        var pxHigherPriorityTaskWoken: BaseType_t = undefined;
-        var ticks = xTicksToWait orelse portMAX_DELAY;
-        if (c.pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), &pxHigherPriorityTaskWoken, ticks)) {
+        if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStartFailed;
         }
     }
     pub fn stop(self: *Timer, xTicksToWait: ?TickType_t) !void {
-        if (c.pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(c_uint, 0), null, xTicksToWait orelse portMAX_DELAY)) {
+        if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(TickType_t, 0), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStopFailed;
+        }
+    }
+    pub fn changePeriod(self: *Timer, xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
+        if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_CHANGE_PERIOD, xNewPeriod, null, xBlockTime orelse portMAX_DELAY)) {
+            return FreeRtosError.TimerChangePeriodFailed;
         }
     }
     pub fn delete(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
