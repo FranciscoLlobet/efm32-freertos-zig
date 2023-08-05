@@ -111,10 +111,10 @@ const c_flags = [_][]const u8{ "-DMBEDTLS_CONFIG_FILE=\"miso_mbedtls_config.h\""
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
-        exe.addIncludePath(path);
+        exe.addIncludePath(std.build.LazyPath{ .path = path });
     }
 
     for (source_path) |path| {
-        exe.addCSourceFile(path, &c_flags);
+        exe.addCSourceFile(std.Build.Step.Compile.CSourceFile{ .file = std.build.LazyPath{ .path = path }, .flags = &c_flags });
     }
 }

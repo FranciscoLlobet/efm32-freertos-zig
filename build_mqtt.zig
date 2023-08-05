@@ -21,10 +21,10 @@ const c_flags = [_][]const u8{ "-DMQTT_CLIENT=1", "-O2", "-fdata-sections", "-ff
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
-        exe.addIncludePath(path);
+        exe.addIncludePath(.{ .path = path });
     }
 
     for (source_path) |path| {
-        exe.addCSourceFile(path, &c_flags);
+        exe.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
     }
 }

@@ -1,7 +1,7 @@
 const std = @import("std");
 const microzig = @import("deps/microzig/build.zig");
 
-const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections"  };
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections" };
 
 const include_path = [_][]const u8{
     // FreeRTOS
@@ -22,10 +22,10 @@ const source_paths = [_][]const u8{
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
-        exe.addIncludePath(path);
+        exe.addIncludePath(.{ .path = path });
     }
 
     for (source_paths) |path| {
-        exe.addCSourceFile(path, &c_flags);
+        exe.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
     }
 }

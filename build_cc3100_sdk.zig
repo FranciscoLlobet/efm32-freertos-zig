@@ -28,10 +28,10 @@ const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-D__OSI__=1", "-D__SL__", "
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
-        exe.addIncludePath(path);
+        exe.addIncludePath(std.build.LazyPath{ .path = path });
     }
 
     for (source_path) |path| {
-        exe.addCSourceFile(path, &c_flags);
+        exe.addCSourceFile(std.Build.Step.Compile.CSourceFile{ .file = std.build.LazyPath{ .path = path }, .flags = &c_flags });
     }
 }

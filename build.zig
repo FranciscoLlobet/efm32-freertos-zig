@@ -66,8 +66,8 @@ pub fn build(b: *std.build.Builder) void {
     const c_flags = [_][]const u8{ "-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections", "-ffunction-sections" };
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
-        if (!decl.is_pub)
-            continue;
+        //if (!decl)
+        //    continue;
 
         const exe = microzig.addEmbeddedExecutable(b, .{
             .name = @field(boards, decl.name).name ++ ".elf",
@@ -77,16 +77,17 @@ pub fn build(b: *std.build.Builder) void {
             .backing = .{ .board = @field(boards, decl.name) },
             .optimize = optimize,
         });
-        exe.addSystemIncludePath("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include");
-        exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libc_nano.a");
-        exe.addObjectFile("C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libgcc.a");
+
+        exe.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+        exe.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libc_nano.a" });
+        exe.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v6-m\\nofp\\libgcc.a" });
 
         for (include_path_array) |path| {
-            exe.addIncludePath(path);
+            exe.addIncludePath(.{ .path = path });
         }
 
         for (src_paths) |path| {
-            exe.addCSourceFile(path, &c_flags);
+            exe.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
         }
 
         build_ff.build_ff(exe);
@@ -98,21 +99,6 @@ pub fn build(b: *std.build.Builder) void {
         build_wakaama.aggregate(exe);
         build_mqtt.aggregate(exe);
         //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
-        exe.installArtifact(b);
-    }
-
-    inline for (@typeInfo(chips).Struct.decls) |decl| {
-        if (!decl.is_pub)
-            continue;
-
-        const exe = microzig.addEmbeddedExecutable(b, .{
-            .name = @field(chips, decl.name).name ++ ".minimal",
-            .source_file = .{
-                .path = "test/programs/minimal.zig",
-            },
-            .backing = .{ .chip = @field(chips, decl.name) },
-            .optimize = optimize,
-        });
         exe.installArtifact(b);
     }
 }

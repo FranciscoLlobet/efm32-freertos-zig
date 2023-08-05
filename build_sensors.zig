@@ -17,14 +17,14 @@ const source_path = [_][]const u8{
     "csrc/sensors/BMM150-Sensor-API/bmm150.c",
 };
 
-const c_flags = [_][]const u8{"-DEFM32GG390F1024", "-fdata-sections", "-ffunction-sections"};
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-fdata-sections", "-ffunction-sections" };
 
 pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
     for (include_path) |path| {
-        exe.addIncludePath(path);
+        exe.addIncludePath(.{ .path = path });
     }
 
     for (source_path) |path| {
-        exe.addCSourceFile(path, &c_flags);
+        exe.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
     }
 }
