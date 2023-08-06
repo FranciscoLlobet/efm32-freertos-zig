@@ -48,9 +48,9 @@ QueueHandle_t wifi_queue_handle = NULL;
 
 
 
-#define WIFI_EVENT_MANAGER_TIMEOUT    (pdMS_TO_TICKS(24000))
+#define WIFI_EVENT_MANAGER_TIMEOUT    (pdMS_TO_TICKS(24000)) // Eventloop 
 
-#define WIFI_NTP_SYNC_PERIOD		(12*3600*1000) /* Sync for at least one hour */
+#define WIFI_NTP_SYNC_PERIOD		(12*3600*1000) /* Sync every 12 hours */
 
 extern TaskHandle_t user_task_handle;
 
@@ -103,7 +103,7 @@ void sntp_sync_timer_callback(TimerHandle_t pxTimer)
 void wifi_task(void *param)
 {
 	(void) param;
-
+	restart:;
 	uint32_t ulNotifiedValue = 0;
 
 	volatile _i16 role = 0;
@@ -195,7 +195,7 @@ void wifi_task(void *param)
 	NULL, &secParams, NULL);
 
 	/* Connection manager logic */
-	do
+	while(1)
 	{
 		if (pdTRUE
 				== xTaskNotifyWait(WIFI_PENDING_STATE, UINT32_MAX, &ulNotifiedValue,
@@ -228,16 +228,15 @@ void wifi_task(void *param)
 					xTimerStop(sntp_sync_timer, portMAX_DELAY);
 				}
 
-				// Suspend LWM2M Task
-				//vTaskSuspend(user_task_handle);
+				// Suspend all the apps that need networking
 				vTaskSuspend(network_monitor_task_handle);
-
 				vTaskSuspend(get_lwm2m_task_handle());
 				vTaskSuspend(get_mqtt_task_handle());
 		
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Disconnected %x\n\r",
 						ulNotifiedValue);
-
+				
+				break; // Break the loop
 			}
 
 			if (ulNotifiedValue & (uint32_t) wifi_ip_v4_acquired)
@@ -252,6 +251,7 @@ void wifi_task(void *param)
 
 			if (ulNotifiedValue & ((uint32_t) wifi_ip_v4_acquired | (uint32_t) wifi_ip_v6_acquired))
 			{
+				// Restart the network monitor
 				vTaskResume(network_monitor_task_handle);
 			}
 
@@ -289,6 +289,7 @@ void wifi_task(void *param)
 							((uint32_t)wifi_ntp_synced_event | WIFI_PENDING_STATE), eSetBits);
 				} else
 				{
+					// Retry in 16s
 					xTimerChangePeriod(sntp_sync_timer, pdMS_TO_TICKS(16*1000), portMAX_DELAY);
 				}
 
@@ -307,7 +308,11 @@ void wifi_task(void *param)
 			sl_iostream_printf(sl_iostream_swo_handle, "No event\n\r");
 		}
 
-	} while (1);
+	} //while (1);
+
+	(void)sl_Stop(0xff);
+   
+	goto restart;
 
 }
 

@@ -272,7 +272,7 @@ enum sntp_return_codes_e miso_sntp_request(sntp_server_t *server,
 
 	if (sntp_success == sntp_rcode)
 	{
-		sntp_sync_state = 1;
+		sntp_sync_state = (uint32_t)time_stamp;
 	}
 	else
 	{
