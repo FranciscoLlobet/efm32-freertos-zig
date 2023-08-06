@@ -47,18 +47,31 @@ ctx: network_ctx,
 id: connection_id,
 ssl: mbedtls,
 
-pub fn init(id: connection_id) @This() {
-    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create() };
+pub fn init(id: connection_id, auth_callback: ?mbedtls.auth_callback_fn) @This() {
+    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(auth_callback) };
 }
 
-pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol) i32 {
+pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol, mode: ?security_mode) i32 {
     var c_local_port: [*c]const u8 = undefined;
+    var ret: i32 = 0;
     if (local_port) |l_port| {
         c_local_port = @as([*c]const u8, @ptrCast(l_port));
     }
 
-    return @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), @as([*c]const u8, @ptrCast(port)), c_local_port, @as(c.enum_miso_protocol, @intFromEnum(proto))));
+    if (mode) |s_mode| {
+        ret = self.ssl.init(proto, s_mode);
+        if (ret == 0) {
+            ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
+        }
+    }
+
+    if (ret == 0) {
+        ret = @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), @as([*c]const u8, @ptrCast(port)), c_local_port, @as(c.enum_miso_protocol, @intFromEnum(proto))));
+    }
+
+    return ret;
 }
+
 pub fn close(self: *@This()) i32 {
     return c.miso_close_network_connection(self.ctx);
 }
@@ -73,11 +86,4 @@ pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
 }
 pub fn waitTx(self: *@This(), timeout_s: u32) i32 {
     return c.wait_tx(self.ctx, timeout_s);
-}
-pub fn initSsl(self: *@This(), proto: protocol, mode: security_mode) i32 {
-    var ret = self.ssl.init(proto, mode);
-    if (ret == 0) {
-        ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
-    }
-    return ret;
 }

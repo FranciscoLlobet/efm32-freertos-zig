@@ -1,7 +1,7 @@
 const std = @import("std");
 const freertos = @import("freertos.zig");
 const connection = @import("connection.zig");
-const c = @cImport({
+pub const c = @cImport({
     @cDefine("MBEDTLS_CONFIG_FILE", "\"miso_mbedtls_config.h\"");
     @cInclude("miso_config.h");
     @cInclude("network.h");
@@ -12,9 +12,7 @@ const c = @cImport({
     @cInclude("mbedtls/base64.h");
     @cInclude("mbedtls/net_sockets.h");
     @cInclude("mbedtls/entropy.h");
-});
-
-//const protocol = connection.protocol;
+}); // pub in order to be able to import from client modules
 
 const ciphersuites_psk: [4]c_int = .{
     c.MBEDTLS_TLS_PSK_WITH_AES_128_GCM_SHA256,
@@ -27,17 +25,32 @@ const ciphersuites_ec: [1]c_int = .{
     0,
 };
 
+pub const auth_callback_fn = *const fn (*@This(), connection.security_mode) i32;
+
+/// Security mode
 mode: connection.security_mode,
-timer: c.miso_mbedtls_timing_delay_t,
+
+/// MbedTLS Context
 context: c.mbedtls_ssl_context,
+
+/// MbedTLS Configuration
 config: c.mbedtls_ssl_config,
+
 drbg: c.mbedtls_ctr_drbg_context,
 entropy: c.mbedtls_entropy_context,
+timer: c.miso_mbedtls_timing_delay_t,
+
+/// Entropy Seed
 entropy_seed: u32,
+
+/// PSK buffer
 psk: [64]u8,
+
+/// PSK Length
 psk_len: usize,
-//id: [128]u8,
-//id_len: usize,
+
+/// Authentication callback
+auth_callback: ?auth_callback_fn,
 
 const tls_read_timeout: u32 = 5000;
 
@@ -49,7 +62,14 @@ pub fn deinit(self: *@This()) i32 {
     return ret;
 }
 
-fn cleanup(self: *@This()) void {
+fn defaultAuth(self: *@This(), security_mode: connection.security_mode) i32 {
+    _ = self;
+    _ = security_mode;
+
+    return -1;
+}
+
+pub fn cleanup(self: *@This()) void {
     c.miso_mbedtls_deinit_timer(&self.timer);
     c.mbedtls_ctr_drbg_free(&self.drbg);
     c.mbedtls_entropy_free(&self.entropy);
@@ -57,8 +77,8 @@ fn cleanup(self: *@This()) void {
     c.mbedtls_ssl_config_free(&self.config);
 }
 
-pub fn create() @This() {
-    return @This(){ .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+pub fn create(auth_callback: ?auth_callback_fn) @This() {
+    return @This(){ .auth_callback = (auth_callback orelse defaultAuth), .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
 }
 
 pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.security_mode) i32 {
@@ -117,15 +137,10 @@ pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.secu
 
     // This should be done by a callback
     if (ret == 0) {
-        if (mode == .psk) {
-            @memset(&self.psk, 0);
-
-            ret = c.mbedtls_base64_decode(&self.psk, self.psk.len, &self.psk_len, c.config_get_mqtt_psk_key(), c.strlen(c.config_get_mqtt_psk_key()));
-            if (ret == 0) {
-                ret = c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, c.config_get_mqtt_psk_id(), c.strlen(c.config_get_mqtt_psk_id()));
-            }
-        } else if (mode == .certificate_ec) {
-            //
+        if (self.auth_callback) |auth_callback| {
+            ret = auth_callback(self, self.mode);
+        } else {
+            ret = self.defaultAuth(self.mode);
         }
     }
 
@@ -136,8 +151,6 @@ pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.secu
     if (ret == 0) {
         c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
     }
-
-    // register the context ?
 
     return ret;
 }

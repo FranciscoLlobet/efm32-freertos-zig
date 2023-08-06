@@ -74,6 +74,24 @@ workBuffer: [256]u8 align(@alignOf(u32)),
 txBuffer: [256]u8 align(@alignOf(u32)),
 rxBuffer: [512]u8 align(@alignOf(u32)),
 
+fn init() @This() {
+    return @This(){ .connection = undefined, .connectionCounter = 0, .rxQueue = undefined, .txQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .workBufferMutex = undefined, .task = undefined, .state = .not_connected, .packetIdState = 0, .transport = undefined, .connack_rc = 0, .workBuffer = undefined, .rxBuffer = undefined, .txBuffer = undefined };
+}
+
+fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
+    var ret: i32 = 0;
+
+    if (security_mode == .psk) {
+        @memset(&self.psk, 0);
+        ret = connection.mbedtls.c.mbedtls_base64_decode(&self.psk, self.psk.len, &self.psk_len, config.c.config_get_mqtt_psk_key(), config.c.strlen(config.c.config_get_mqtt_psk_key()));
+        if (ret == 0) {
+            ret = connection.mbedtls.c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, config.c.config_get_mqtt_psk_id(), config.c.strlen(config.c.config_get_mqtt_psk_id()));
+        }
+    }
+
+    return 0;
+}
+
 // Use XorShift Algorithm to generate the packet id
 fn generatePacketId(self: *@This()) u16 {
     if (self.packetIdState != 0) {
@@ -241,7 +259,7 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.txQueue.create(1024); // Create message buffer
-        self.connection = connection.init(.mqtt);
+        self.connection = connection.init(.mqtt, authCallback);
         self.pingTimer.create("mqttPing", 60000, freertos.pdTRUE, self, pingTimer) catch unreachable;
         self.pubTimer.create("pubTimer", 1000, freertos.pdTRUE, self, pubTimer) catch unreachable;
         self.workBufferMutex.createMutex() catch unreachable;
@@ -365,14 +383,15 @@ pub fn processConnAck(self: *@This()) i32 {
     return connRet;
 }
 
+/// Add
 pub fn connect(self: *@This()) i32 {
     self.state = .connecting;
-    var connRet = self.connection.initSsl(.tls_ip4, .psk);
+    var connRet: i32 = 0;
     //var connRet: i32 = 0;
     var packetId: i32 = 0;
 
     if (connRet == 0) {
-        connRet = self.connection.create("192.168.50.133", "8883", null, .tls_ip4);
+        connRet = self.connection.create("192.168.50.133", "8883", null, .tls_ip4, .psk);
         //connRet = self.connection.create("192.168.50.133", "1883", null, .tcp_ip4);
     }
 
@@ -463,4 +482,4 @@ pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
     return self.task.getHandle();
 }
 
-pub var service: @This() = undefined;
+pub var service: @This() = init();
