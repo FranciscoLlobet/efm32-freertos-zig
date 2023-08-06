@@ -13,6 +13,8 @@ fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
 
     _ = board.c.sl_Stop(0xFFFF);
 
+    // Add code to stop/close the FS
+
     freertos.c.taskENTER_CRITICAL();
 
     board.mcuReset();
