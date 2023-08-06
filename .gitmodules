@@ -34,6 +34,3 @@
 [submodule "csrc/connectivity/paho.mqtt.embedded-c"]
 	path = csrc/connectivity/paho.mqtt.embedded-c
 	url = git@github.com:FranciscoLlobet/paho.mqtt.embedded-c.git
-[submodule "paho.mqtt.embedded-c"]
-	path = paho.mqtt.embedded-c
-	url = git@github.com:FranciscoLlobet/paho.mqtt.embedded-c.git
