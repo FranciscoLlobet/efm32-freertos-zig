@@ -2,6 +2,9 @@ const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const fatfs = @import("fatfs.zig");
+pub const c = @cImport({
+    @cInclude("miso_config.h");
+});
 
 const task_priorities = enum(freertos.BaseType_t) {
     rtos_prio_idle = 0, // Idle task priority
