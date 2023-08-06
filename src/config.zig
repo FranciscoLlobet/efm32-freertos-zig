@@ -32,4 +32,4 @@ pub const rtos_prio_mqtt = @intFromEnum(task_priorities.rtos_prio_normal);
 pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1300 else min_task_stack_depth;
 
 pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_user_task: u16 = 2000;
+pub const rtos_stack_depth_user_task: u16 = 1300;

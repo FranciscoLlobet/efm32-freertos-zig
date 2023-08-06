@@ -35,6 +35,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
         if (self.queue.receive(@as(*void, @ptrCast(&test_var)), null)) {
             leds.yellow.toggle();
+            _ = c.printf("UserTask: %d\r\n", self.task.getStackHighWaterMark());
         }
     }
 }
