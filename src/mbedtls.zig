@@ -21,9 +21,19 @@ const ciphersuites_psk: [4]c_int = .{
     0,
 };
 
-const ciphersuites_ec: [1]c_int = .{
+const ciphersuites_ec: [3]c_int = .{
+    c.MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+    c.MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM,
     0,
 };
+
+const sig_algorithms: [2]u16 = .{
+    c.MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
+    c.MBEDTLS_TLS1_3_SIG_NONE,
+};
+
+const groups: [2]u16 =
+    .{ c.MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, c.MBEDTLS_SSL_IANA_TLS_GROUP_NONE };
 
 pub const auth_callback_fn = *const fn (*@This(), connection.security_mode) i32;
 
@@ -44,7 +54,7 @@ timer: c.miso_mbedtls_timing_delay_t,
 entropy_seed: u32,
 
 /// PSK buffer
-psk: [64]u8,
+psk: [64]u8, // probably no longer needed
 
 /// PSK Length
 psk_len: usize,
@@ -137,8 +147,8 @@ pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.secu
 
     // This should be done by a callback
     if (ret == 0) {
-        if (self.auth_callback) |auth_callback| {
-            ret = auth_callback(self, self.mode);
+        if (self.auth_callback) |_| {
+            ret = self.auth_callback.?(self, self.mode);
         } else {
             ret = self.defaultAuth(self.mode);
         }
