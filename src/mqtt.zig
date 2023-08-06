@@ -136,6 +136,10 @@ fn read(self: *@This()) msgTypes {
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
+    @memset(&self.txBuffer, 0);
+    @memset(&self.rxBuffer, 0);
+    @memset(&self.workBuffer, 0);
+
     self.connectionCounter = 0;
 
     // Get to connect

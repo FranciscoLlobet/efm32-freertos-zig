@@ -6,7 +6,6 @@ const sensors = @import("sensors.zig");
 const network = @import("network.zig");
 const config = @import("config.zig");
 const leds = @import("leds.zig");
-const mqtt = @import("mqtt.zig");
 const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
 const user = @import("user.zig");

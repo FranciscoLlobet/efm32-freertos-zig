@@ -4,6 +4,7 @@ const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const mqtt = @import("mqtt.zig");
+const http = @import("http.zig");
 pub const lwm2m = @import("lwm2m.zig");
 
 const c = @cImport({
@@ -27,6 +28,9 @@ pub fn start() void {
 
     // Create the MQTT service
     mqtt.service.create();
+
+    // Create the HTTP service
+    http.service.create();
 }
 
 pub export fn get_lwm2m_task_handle() callconv(.C) freertos.TaskHandle_t {
