@@ -35,5 +35,6 @@ int create_network_mediator(void);
 
 extern TaskHandle_t get_lwm2m_task_handle(void);
 extern TaskHandle_t get_mqtt_task_handle(void);
+extern TaskHandle_t get_http_task_handle(void);
 
 #endif /* WIFI_SERVICE_H_ */

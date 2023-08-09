@@ -37,3 +37,6 @@
 [submodule "csrc/connectivity/llhttp"]
 	path = csrc/connectivity/llhttp
 	url = https://github.com/FranciscoLlobet/llhttp.git
+[submodule "csrc/connectivity/picohttpparser"]
+	path = csrc/connectivity/picohttpparser
+	url = https://github.com/FranciscoLlobet/picohttpparser.git

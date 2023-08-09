@@ -8,6 +8,7 @@ const build_cc3100_sdk = @import("build_cc3100_sdk.zig");
 const build_mbedts = @import("build_mbedtls.zig");
 const build_wakaama = @import("build_wakaama.zig");
 const build_mqtt = @import("build_mqtt.zig");
+const build_lhttp = @import("build_lhttp.zig");
 pub const boards = @import("src/boards.zig");
 pub const chips = @import("src/chips.zig");
 const builtin = @import("builtin");
@@ -98,6 +99,7 @@ pub fn build(b: *std.build.Builder) void {
         build_mbedts.aggregate(exe);
         build_wakaama.aggregate(exe);
         build_mqtt.aggregate(exe);
+        build_lhttp.aggregate(exe);
         //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
         exe.installArtifact(b);
     }

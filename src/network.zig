@@ -40,3 +40,7 @@ pub export fn get_lwm2m_task_handle() callconv(.C) freertos.TaskHandle_t {
 pub export fn get_mqtt_task_handle() callconv(.C) freertos.TaskHandle_t {
     return mqtt.service.getTaskHandle();
 }
+
+pub export fn get_http_task_handle() callconv(.C) freertos.TaskHandle_t {
+    return http.service.getTaskHandle();
+}

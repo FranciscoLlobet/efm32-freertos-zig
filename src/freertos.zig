@@ -137,6 +137,10 @@ pub const Task = struct {
     pub fn getStackHighWaterMark(self: *Task) u32 {
         return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
     }
+    pub fn delayTask(self: *Task, xTicksToDelay: TickType_t) void {
+        _ = self;
+        c.vTaskDelay(xTicksToDelay);
+    }
 };
 
 pub const Queue = struct {
