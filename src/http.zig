@@ -9,15 +9,23 @@ const c = @cImport({
     @cInclude("picohttpparser.h");
 });
 
+// Connection instance
 connection: connection,
+// Task Instance
 task: freertos.Task,
+// Optional timer
 timer: freertos.Timer,
+// Array to store parsed header information
 headers: [24]c.phr_header,
+// TX Buffer mutex
+tx_mutex: freertos.Semaphore,
+// TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
+// RX Buffer
 rx_buffer: [1024]u8 align(@alignOf(u32)),
 
-// "content-type"
-
+// Authentication callback function.
+// Used during the connection phase for providing PSK credentials
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
     _ = self;
     _ = security_mode;
@@ -25,47 +33,150 @@ fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mo
     return 0;
 }
 
+// Structure representing a parsed Content-Range response header.
+const rangeResponse = struct {
+    start: usize,
+    end: usize,
+    total: ?usize,
+
+    // Function to parse the Content-Range header
+    fn match(header: c.phr_header) ?@This() {
+        if (!std.mem.eql(u8, header.value[0.."bytes ".len], "bytes ")) {
+            return null;
+        }
+
+        var ret: @This() = .{ .start = 0, .end = 0, .total = null };
+        var iter = std.mem.splitAny(u8, header.value["bytes ".len..header.value_len], "-/");
+
+        ret.start = std.fmt.parseInt(usize, iter.first(), 10) catch unreachable;
+        if (iter.next()) |val| {
+            ret.end = std.fmt.parseInt(usize, val, 10) catch unreachable;
+        }
+        if (iter.next()) |val| {
+            ret.total = std.fmt.parseInt(usize, val, 10) catch unreachable;
+        }
+        return ret;
+    }
+};
+
+// Structure representing a parsed HTTP response.
 const parsedResponse = struct {
-    // Parsed code
-    // Parsed content-type
-    status_code: i32,
+    status_code: ?std.http.Status,
     content_type: ?contentType,
     content_length: ?isize,
-    content_range_start: ?isize,
-    content_range_end: ?isize,
-    accept_ranges: ?bool,
-    //
+    range: ?rangeResponse,
+    accept_ranges: ?acceptRanges,
 
     payload: ?*u8,
     payload_length: usize,
 };
+
+// Function to send an HTTP GET request to a specified URL.
+pub fn sendGetRequest(self: *@This(), url: []const u8) i32 {
+    var ret: i32 = -1;
+    var uri = std.Uri.parse(url) catch unreachable;
+
+    if (self.tx_mutex.take(null)) {
+        const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
+        ret = self.connection.send(@ptrCast(request), request.len);
+        _ = self.tx_mutex.give();
+    }
+
+    return ret;
+}
+
+// Function to send an HTTP GET request with a specific byte range.
+// The range is specified by the 'start' and 'end' parameters.
+pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: usize) i32 {
+    var ret: i32 = -1;
+    var uri = std.Uri.parse(url) catch unreachable;
+
+    if (self.tx_mutex.take(null)) {
+        const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
+        ret = self.connection.send(@ptrCast(request), request.len);
+        _ = self.tx_mutex.give();
+    }
+
+    return ret;
+}
+
+// Function to send an HTTP HEAD request to a specified URL.
+// HEAD requests retrieve the headers without the message body.
+pub fn sendHeadRequest(self: *@This(), url: []const u8) i32 {
+    var ret: i32 = -1;
+    var uri = std.Uri.parse(url) catch unreachable;
+
+    if (self.tx_mutex.take(null)) {
+        const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
+        ret = self.connection.send(@ptrCast(request), request.len);
+        _ = self.tx_mutex.give();
+    }
+
+    return ret;
+}
+
+// Function to process the HTTP response headers.
+fn processHeaders(self: *@This(), headers: []c.phr_header, pret: i32, rx_count: usize, status: i32, response: *parsedResponse) void {
+    response.payload_length = rx_count - @as(usize, @intCast(pret));
+    response.payload = if (response.payload_length != 0) &self.rx_buffer[rx_count - response.payload_length] else null;
+
+    // process the response status
+    response.status_code = @enumFromInt(@as(u10, @intCast(status)));
+    response.content_type = null;
+    response.content_length = null;
+    response.range = null;
+    response.accept_ranges = null;
+
+    // Process specific headers based on their type.
+    for (headers) |header| {
+        if (responseHeaders.getResponseType(header)) |val| {
+            switch (val) {
+                .contentRange => {
+                    // Parse and store the Content-Range header details.
+                    response.range = rangeResponse.match(header);
+                },
+                .acceptRanges => {
+                    // Parse and store the Accept-Ranges header value.
+                    response.accept_ranges = acceptRanges.match(header);
+                },
+                .contentLength => {
+                    response.content_length = std.fmt.parseInt(i32, header.value[0..header.value_len], 10) catch null;
+                },
+                .etag => {
+                    // TODO: Process ETag header value.
+                },
+                .connection => {
+                    // TODO: Determine if the connection is 'keep-alive' or 'close'.
+                },
+                else => {
+                    // ... other headers can be added and processed as needed ...
+                },
+            }
+        }
+    }
+}
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     const url = "http://192.168.50.133:80/test.json";
 
-    var parsed = std.Uri.parse(url) catch unreachable;
+    //var parsed = std.Uri.parse(url) catch unreachable;
 
-    var zigHeader = std.http.Headers{ .allocator = freertos.allocator };
-
-    // Prepare Header
-    zigHeader.append("Accept", contentType.getString(.application_json)) catch unreachable;
-    zigHeader.append("User-Agent", "Miso (FreeRTOS)") catch unreachable;
-
-    // Write Header
-
-    zigHeader.deinit();
+    //    var zigHeader = std.http.Headers{ .allocator = freertos.allocator };
+    //    zigHeader.append("Host", parsed.host.?) catch unreachable;
+    //    zigHeader.append("Accept", contentType.getString(.application_json)) catch unreachable;
+    //    zigHeader.append("User-Agent", "Miso (FreeRTOS)") catch unreachable;
+    //    zigHeader.deinit();
 
     while (true) {
         var ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
 
-        const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ parsed.path, parsed.host.? }) catch unreachable;
-
         if (ret == 0) {
-            ret = self.connection.send(@ptrCast(request), request.len);
+            ret = self.sendGetRequest(url);
         }
 
+        // Receive GET/HEAD request
         @memset(&self.rx_buffer, 0);
         if (0 == self.connection.waitRx(5)) {
             var parsed_response: parsedResponse = undefined;
@@ -78,54 +189,29 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             var minor_version: i32 = undefined;
             var status: i32 = undefined;
             var msg: [*c]u8 = undefined;
-            var meg_len: usize = undefined;
+            var msg_len: usize = undefined;
             //var last_len: usize = @intCast(ret);
             var num_headers: usize = 24;
 
             while (pret == -2) {
                 ret = self.connection.recieve(&self.rx_buffer[rx_count], self.rx_buffer.len - rx_count);
                 if (ret > 0) {
-                    pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &meg_len, &self.headers, &num_headers, prevbuflen);
+                    pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
                     prevbuflen = rx_count;
                     rx_count += @intCast(ret);
                 } else {
                     break;
                 }
-            } // return tx_count - pret
+            } // return tx_count - pret: payload and payload_len
 
-            if ((pret > 0) and (ret >= 0)) {
-                parsed_response.payload_length = rx_count - @as(usize, @intCast(pret));
-                parsed_response.payload = if (parsed_response.payload_length != 0) &self.rx_buffer[rx_count - parsed_response.payload_length] else null;
+            // Process the parsed response
 
-                // process the response status
-                parsed_response.status_code = status;
-                parsed_response.content_type = null;
-                parsed_response.content_length = null;
-                parsed_response.content_range_start = null;
-                parsed_response.content_range_end = null;
-                parsed_response.accept_ranges = null;
-
-                // Parse GET response headers
-                for (self.headers[0..num_headers]) |header| {
-                    if (responseHeaders.getResponseType(header)) |val| {
-                        if (val == .contentType) {
-                            parsed_response.content_type = contentType.match(header);
-                        } else if (val == .contentLength) {
-                            parsed_response.content_length = std.fmt.parseInt(i32, header.value[0..header.value_len], 10) catch unreachable;
-                        } else if (val == .contentRange) {
-                            // process content range
-                        } else if (val == .acceptRanges) {
-                            // Convert this into a stringmap loopkup which should be safer
-                            if (std.mem.eql(u8, "bytes", header.value[0..header.value_len])) {
-                                parsed_response.accept_ranges = true;
-                            } else if (std.mem.eql(u8, "none", header.value[0..header.value_len])) {
-                                parsed_response.accept_ranges = false;
-                            }
-                        }
-                    }
+            if (ret >= 0) {
+                if (pret > 0) {
+                    self.processHeaders(self.headers[0..num_headers], pret, rx_count, status, &parsed_response);
                 }
-                _ = c.printf("Content-Length: %d\r\n", parsed_response.content_length.?);
             }
+            _ = c.printf("Content-Length: %d", parsed_response.content_length.?);
         }
 
         ret = self.connection.close();
@@ -150,6 +236,7 @@ pub fn create(self: *@This()) void {
 
     if (config.enable_http) {
         self.connection = connection.init(.http, authCallback);
+        self.tx_mutex.createMutex() catch unreachable;
     }
 }
 
@@ -157,17 +244,17 @@ pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
     return self.task.getHandle();
 }
 
-pub var service: @This() = undefined;
-
 const httpHeaderIndexes = enum(i32) {
-    http_get,
-    http_post,
-    http_put,
-};
+    get,
+    post,
+    put,
+    delete,
+    head,
+    options,
+    patch,
 
-const method_strings = [_][]u8{ "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH" };
-const header_vals = 0;
-//const header_kvs = struct{}
+    const method_strings = [_][]u8{ "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH" };
+};
 
 const responseHeaders = enum(usize) {
     contentType = 0,
@@ -177,11 +264,27 @@ const responseHeaders = enum(usize) {
     contentLocation = 4,
     contentEncoding = 5,
     acceptRanges = 6,
+    etag = 7,
 
-    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "Content-Type", .contentType }, .{ "Content-Length", .contentLength }, .{ "Content-Range", .contentRange }, .{ "Connection", .connection }, .{ "Content-Location", .contentLocation }, .{ "Content-Encoding", .contentEncoding }, .{ "Accept-Ranges", .acceptRanges } });
+    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "Content-Type", .contentType }, .{ "Content-Length", .contentLength }, .{ "Content-Range", .contentRange }, .{ "Connection", .connection }, .{ "Content-Location", .contentLocation }, .{ "Content-Encoding", .contentEncoding }, .{ "Accept-Ranges", .acceptRanges }, .{ "Etag", .etag } });
 
     fn getResponseType(header: c.phr_header) ?@This() {
         return stringMap.get(header.name[0..(header.name_len)]);
+    }
+};
+
+const acceptRanges = enum(usize) {
+    none = @intFromBool(false),
+    bytes = @intFromBool(true),
+
+    fn match(header: c.phr_header) ?@This() {
+        var ret: ?@This() = null;
+        if (std.mem.eql(u8, "bytes", header.value[0..header.value_len])) {
+            ret = .bytes;
+        } else if (std.mem.eql(u8, "none", header.value[0..header.value_len])) {
+            ret = .none;
+        }
+        return ret;
     }
 };
 
@@ -221,3 +324,5 @@ const contentType = enum(usize) {
         return strings[@intFromEnum(id)];
     }
 };
+
+pub var service: @This() = undefined;
