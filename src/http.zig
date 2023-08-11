@@ -3,6 +3,7 @@ const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
+const file = @import("fatfs.zig").file;
 
 const c = @cImport({
     @cInclude("board.h");
@@ -19,10 +20,14 @@ timer: freertos.Timer,
 headers: [24]c.phr_header,
 // TX Buffer mutex
 tx_mutex: freertos.Semaphore,
+// Rx Buffer mutex
+rx_mutex: freertos.Semaphore,
 // TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
 // RX Buffer
 rx_buffer: [1024]u8 align(@alignOf(u32)),
+
+file: file,
 
 // Authentication callback function.
 // Used during the connection phase for providing PSK credentials
@@ -67,8 +72,47 @@ const parsedResponse = struct {
     range: ?rangeResponse,
     accept_ranges: ?acceptRanges,
 
-    payload: ?*u8,
-    payload_length: usize,
+    payload: ?[]u8,
+
+    // Function to process the HTTP response headers.
+    fn processHeaders(self: *@This(), headers: []c.phr_header, payload: ?[]u8, status: i32) void {
+        self.payload = payload;
+
+        // process the response status
+        self.status_code = @enumFromInt(@as(u10, @intCast(status)));
+        self.content_type = null;
+        self.content_length = null;
+        self.range = null;
+        self.accept_ranges = null;
+
+        // Process specific headers based on their type.
+        for (headers) |header| {
+            if (responseHeaders.getResponseType(header)) |val| {
+                switch (val) {
+                    .contentRange => {
+                        // Parse and store the Content-Range header details.
+                        self.range = rangeResponse.match(header);
+                    },
+                    .acceptRanges => {
+                        // Parse and store the Accept-Ranges header value.
+                        self.accept_ranges = acceptRanges.match(header);
+                    },
+                    .contentLength => {
+                        self.content_length = std.fmt.parseInt(i32, header.value[0..header.value_len], 10) catch null;
+                    },
+                    .etag => {
+                        // TODO: Process ETag header value.
+                    },
+                    .connection => {
+                        // TODO: Determine if the connection is 'keep-alive' or 'close'.
+                    },
+                    else => {
+                        // ... other headers can be added and processed as needed ...
+                    },
+                }
+            }
+        }
+    }
 };
 
 // Function to send an HTTP GET request to a specified URL.
@@ -115,45 +159,43 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) i32 {
     return ret;
 }
 
-// Function to process the HTTP response headers.
-fn processHeaders(self: *@This(), headers: []c.phr_header, pret: i32, rx_count: usize, status: i32, response: *parsedResponse) void {
-    response.payload_length = rx_count - @as(usize, @intCast(pret));
-    response.payload = if (response.payload_length != 0) &self.rx_buffer[rx_count - response.payload_length] else null;
+fn recieveResponse(self: *@This()) struct { payload: ?[]u8, headers: []c.phr_header, status: i32 } {
+    var rx_count: usize = 0;
+    var pret: i32 = -2; // Incomplete request
+    var prevbuflen: usize = 0;
+    var ret: i32 = 0;
 
-    // process the response status
-    response.status_code = @enumFromInt(@as(u10, @intCast(status)));
-    response.content_type = null;
-    response.content_length = null;
-    response.range = null;
-    response.accept_ranges = null;
+    var minor_version: i32 = undefined;
+    var status: i32 = undefined;
+    var msg: [*c]u8 = undefined;
+    var msg_len: usize = undefined;
+    var num_headers: usize = 24;
+    var payload_len: usize = undefined;
+    var payload: ?[]u8 = undefined;
+    if (self.rx_mutex.take(null)) {
+        @memset(&self.rx_buffer, 0);
 
-    // Process specific headers based on their type.
-    for (headers) |header| {
-        if (responseHeaders.getResponseType(header)) |val| {
-            switch (val) {
-                .contentRange => {
-                    // Parse and store the Content-Range header details.
-                    response.range = rangeResponse.match(header);
-                },
-                .acceptRanges => {
-                    // Parse and store the Accept-Ranges header value.
-                    response.accept_ranges = acceptRanges.match(header);
-                },
-                .contentLength => {
-                    response.content_length = std.fmt.parseInt(i32, header.value[0..header.value_len], 10) catch null;
-                },
-                .etag => {
-                    // TODO: Process ETag header value.
-                },
-                .connection => {
-                    // TODO: Determine if the connection is 'keep-alive' or 'close'.
-                },
-                else => {
-                    // ... other headers can be added and processed as needed ...
-                },
+        while (pret == -2) {
+            if (0 == self.connection.waitRx(5)) {
+                ret = self.connection.recieve(&self.rx_buffer[rx_count], self.rx_buffer.len - rx_count);
+                if (ret > 0) {
+                    pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
+                    prevbuflen = rx_count;
+                    rx_count += @intCast(ret);
+                } else {
+                    break;
+                }
             }
         }
+
+        if ((pret) > 0 and (ret >= 0)) {
+            payload_len = rx_count - @as(usize, @intCast(pret));
+            payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
+        }
+        _ = self.rx_mutex.give();
     }
+
+    return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = status };
 }
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -176,43 +218,19 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             ret = self.sendGetRequest(url);
         }
 
+        var parsed_response: parsedResponse = undefined;
+
         // Receive GET/HEAD request
-        @memset(&self.rx_buffer, 0);
-        if (0 == self.connection.waitRx(5)) {
-            var parsed_response: parsedResponse = undefined;
 
-            var rx_count: usize = 0;
-            var pret: i32 = -2; // Incomplete request
-            var prevbuflen: usize = 0;
-            ret = 0;
+        var rx = self.recieveResponse();
 
-            var minor_version: i32 = undefined;
-            var status: i32 = undefined;
-            var msg: [*c]u8 = undefined;
-            var msg_len: usize = undefined;
-            //var last_len: usize = @intCast(ret);
-            var num_headers: usize = 24;
+        parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
 
-            while (pret == -2) {
-                ret = self.connection.recieve(&self.rx_buffer[rx_count], self.rx_buffer.len - rx_count);
-                if (ret > 0) {
-                    pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
-                    prevbuflen = rx_count;
-                    rx_count += @intCast(ret);
-                } else {
-                    break;
-                }
-            } // return tx_count - pret: payload and payload_len
+        self.file = file.open("SD:TEST.JSN", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write)) catch unreachable;
+        _ = self.file.write(parsed_response.payload.?, parsed_response.payload.?.len) catch unreachable;
+        self.file.close() catch unreachable;
 
-            // Process the parsed response
-
-            if (ret >= 0) {
-                if (pret > 0) {
-                    self.processHeaders(self.headers[0..num_headers], pret, rx_count, status, &parsed_response);
-                }
-            }
-            _ = c.printf("Content-Length: %d", parsed_response.content_length.?);
-        }
+        _ = c.printf("Content-Length: %d", parsed_response.content_length.?);
 
         ret = self.connection.close();
 
@@ -237,6 +255,7 @@ pub fn create(self: *@This()) void {
     if (config.enable_http) {
         self.connection = connection.init(.http, authCallback);
         self.tx_mutex.createMutex() catch unreachable;
+        self.rx_mutex.createMutex() catch unreachable;
     }
 }
 

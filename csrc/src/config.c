@@ -89,8 +89,6 @@ char * config_get_mqtt_psk_key(void)
 	return (char*) &config_mqtt_psk_key[0];
 }
 
-FATFS fs;
-
 //extern int calculate_sha256_of_file(const char *filename, uint8_t *hash);
 //extern int verify_signature_of_file(const char *file, const char *sig_file, const char * pub_key_file);
 
@@ -106,8 +104,6 @@ void miso_load_config(void)
 	FIL file;
 	
 	mbedtls_sha256_context sha256_ctx;
-
-	fRes = f_mount(&fs, "SD", 1);
 
 // Process the configuration file 
     if(FR_OK == fRes)
@@ -545,15 +541,5 @@ void miso_load_config(void)
 	{
 		vPortFree(read_buffer);
 	}
-
-	if (FR_OK == fRes)
-	{
-		fRes = f_unmount("SD");
-	}
-	else
-	{
-		(void) f_unmount("SD");
-	}
-
 
 }

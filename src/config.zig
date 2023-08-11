@@ -39,7 +39,7 @@ pub const rtos_prio_http = @intFromEnum(task_priorities.rtos_prio_normal);
 pub const rtos_stack_depth_http: u16 = if (enable_http) 1400 else min_task_stack_depth;
 
 pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_user_task: u16 = 1300;
+pub const rtos_stack_depth_user_task: u16 = 1500;
 
 // version
 pub const miso_version_mayor: u8 = 0;

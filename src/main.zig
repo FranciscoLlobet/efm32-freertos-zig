@@ -10,6 +10,7 @@ const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
 const user = @import("user.zig");
 const events = @import("events.zig");
+const fatfs = @import("fatfs.zig");
 
 const c_board = @cImport({
     @cInclude("board.h");
@@ -179,6 +180,10 @@ pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) vo
 
 pub export fn system_reset() callconv(.C) void {
     system.reset();
+}
+
+pub export fn system_getFs() callconv(.C) [*c]fatfs.FATFS {
+    return &fatfs.fileSystem;
 }
 
 pub export fn main() void {
