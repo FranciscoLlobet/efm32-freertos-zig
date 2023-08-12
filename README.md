@@ -42,7 +42,7 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/builds/zig-windows-x86_64-0.11.0-dev.4406+d370005d3.zip) build.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) build.
 
 #### Install the Arm GNU Toolchain
 
