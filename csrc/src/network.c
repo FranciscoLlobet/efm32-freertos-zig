@@ -15,7 +15,7 @@
 // #include "simplelink.h"
 #include "sl_sleeptimer.h"
 
-#define NETWORK_MONITOR_TASK (UBaseType_t)(miso_task_runtime_services)
+#define NETWORK_MONITOR_TASK (UBaseType_t)(miso_task_connectivity_service)
 
 #define SIMPLELINK_MAX_SEND_MTU 1472
 
@@ -293,7 +293,7 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			const struct timeval tv =
-				{.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
+				{.tv_sec = 0, .tv_usec = 50000}; // Here we have the select cycle time
 
 			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 

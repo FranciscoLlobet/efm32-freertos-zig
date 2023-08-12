@@ -25,7 +25,7 @@ rx_mutex: freertos.Semaphore,
 // TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
 // RX Buffer
-rx_buffer: [1024]u8 align(@alignOf(u32)),
+rx_buffer: [1536]u8 align(@alignOf(u32)),
 
 file: file,
 
@@ -66,11 +66,12 @@ const rangeResponse = struct {
 
 // Structure representing a parsed HTTP response.
 const parsedResponse = struct {
-    status_code: ?std.http.Status,
+    status_code: u32,
     content_type: ?contentType,
-    content_length: ?isize,
+    content_length: ?usize,
     range: ?rangeResponse,
     accept_ranges: ?acceptRanges,
+    keep_alive: ?keepAlive,
 
     payload: ?[]u8,
 
@@ -79,7 +80,7 @@ const parsedResponse = struct {
         self.payload = payload;
 
         // process the response status
-        self.status_code = @enumFromInt(@as(u10, @intCast(status)));
+        self.status_code = @intCast(status);
         self.content_type = null;
         self.content_length = null;
         self.range = null;
@@ -98,13 +99,14 @@ const parsedResponse = struct {
                         self.accept_ranges = acceptRanges.match(header);
                     },
                     .contentLength => {
-                        self.content_length = std.fmt.parseInt(i32, header.value[0..header.value_len], 10) catch null;
+                        self.content_length = std.fmt.parseInt(usize, header.value[0..header.value_len], 10) catch null;
                     },
                     .etag => {
                         // TODO: Process ETag header value.
                     },
                     .connection => {
                         // TODO: Determine if the connection is 'keep-alive' or 'close'.
+                        self.keep_alive = keepAlive.match(header);
                     },
                     else => {
                         // ... other headers can be added and processed as needed ...
@@ -201,7 +203,7 @@ fn recieveResponse(self: *@This()) struct { payload: ?[]u8, headers: []c.phr_hea
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
-    const url = "http://192.168.50.133:80/test.json";
+    const url = "http://192.168.50.133:80/XDK110.bin";
 
     //var parsed = std.Uri.parse(url) catch unreachable;
 
@@ -214,29 +216,76 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (true) {
         var ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
 
-        if (ret == 0) {
-            ret = self.sendGetRequest(url);
-        }
+        const blockSize: usize = 512;
+        var currentPosition: usize = 0;
+        var fileSize: usize = undefined;
 
         var parsed_response: parsedResponse = undefined;
+        if (ret == 0) {
+            ret = self.sendHeadRequest(url);
+        }
 
-        // Receive GET/HEAD request
+        if (ret >= 0) {
+            var rx = self.recieveResponse();
+            parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
+            if ((parsed_response.status_code >= 200) and (parsed_response.status_code < 300)) {
+                ret = 0;
+            } else {
+                ret = -1;
+            }
+        }
 
-        var rx = self.recieveResponse();
+        if (ret >= 0) {
+            fileSize = parsed_response.content_length.?;
+        }
 
-        parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
+        if (ret >= 0) {
+            self.file = file.open("SD:XDK110.bin", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write)) catch unreachable;
+        }
 
-        self.file = file.open("SD:TEST.JSN", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write)) catch unreachable;
-        _ = self.file.write(parsed_response.payload.?, parsed_response.payload.?.len) catch unreachable;
-        self.file.close() catch unreachable;
+        while (currentPosition < fileSize) {
+            var requestEnd = currentPosition + (blockSize - 1);
+            ret = self.sendGetRangeRequest(url, currentPosition, if (requestEnd > (fileSize - 1)) (fileSize - 1) else requestEnd);
+            if (ret >= 0) {
+                var rx = self.recieveResponse();
+                parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
+                if ((parsed_response.status_code > 200) and (parsed_response.status_code < 300)) {
+                    currentPosition = parsed_response.range.?.start;
+                    //if (self.file.size() != 0) {
+                    //    self.file.lseek(currentPosition) catch unreachable;
+                    //}
+                    _ = self.file.write(parsed_response.payload.?, parsed_response.payload.?.len) catch unreachable;
+                    currentPosition = self.file.tell() catch unreachable;
 
-        _ = c.printf("Content-Length: %d", parsed_response.content_length.?);
+                    ret = 0;
+                } else {
+                    ret = -1;
+                    break;
+                }
+            }
+            if (parsed_response.keep_alive) |kA| {
+                if (kA == .close) {
+                    // Reconnect logic
+                    _ = self.connection.close();
+
+                    ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+                }
+            }
+        }
+
+        var fSize = self.file.size();
+
+        self.file.close() catch {};
+
+        _ = c.printf("FILE SIZE: %d\r\n", fSize);
 
         ret = self.connection.close();
 
         self.task.delayTask(5000);
 
         _ = c.printf("HTTP: %d\n\r", self.task.getStackHighWaterMark());
+
+        self.task.suspendTask();
     }
 }
 
@@ -304,6 +353,17 @@ const acceptRanges = enum(usize) {
             ret = .none;
         }
         return ret;
+    }
+};
+
+const keepAlive = enum(usize) {
+    keep_alive = 0,
+    close = 1,
+
+    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "keep-alive", .keep_alive }, .{ "close", .close } });
+
+    fn match(header: c.phr_header) ?@This() {
+        return stringMap.get(header.value[0..(header.value_len)]);
     }
 };
 
