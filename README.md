@@ -42,7 +42,7 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0-dev.4406](https://ziglang.org/builds/zig-windows-x86_64-0.11.0-dev.4406+d370005d3.zip) build.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/builds/zig-windows-x86_64-0.11.0-dev.4406+d370005d3.zip) build.
 
 #### Install the Arm GNU Toolchain
 
@@ -55,7 +55,14 @@ git clone https://github.com/FranciscoLlobet/efm32-freertos-zig.git
 cd .\efm32-freertos-zig\
 git submodule init
 git submodule update
+```
+
+### Build and deploy
+
+```powershell
 zig build
+zig objcopy -O binary .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.bin 
+zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex 
 ```
 
 ## Used 3rd party software
@@ -67,7 +74,7 @@ zig build
 
 ### MCAL and MCU peripheral services
 
-- EFM32 Gecko SDK
+- [EFM32 Gecko SDK](https://github.com/SiliconLabs/gecko_sdk)
 
 ### RTOS
 
@@ -75,7 +82,7 @@ zig build
 
 ### Wifi Connectivity
 
-- TI Simplelink CC2100-SDK
+- TI Simplelink CC3100-SDK
 
 ### Filesystem
 
@@ -91,8 +98,9 @@ zig build
 
 ### Protocol Providers
 
-- [Paho MQTT Embedded-C}] (https://github.com/eclipse/paho.mqtt.embedded-c). MQTT v3.1.1 protocol service.
+- [Paho MQTT Embedded-C](https://github.com/eclipse/paho.mqtt.embedded-c). MQTT v3.1.1 protocol service.
 - [Wakaama](https://github.com/eclipse/wakaama). LWM2M protocol service.
+- [PicoHTTParser](https://github.com/h2o/picohttpparser). Tiny HTTP request and response parser.
 
 ### Bosch SensorTec Sensor APIs
 

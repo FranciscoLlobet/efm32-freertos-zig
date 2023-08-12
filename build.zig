@@ -67,9 +67,6 @@ pub fn build(b: *std.build.Builder) void {
     const c_flags = [_][]const u8{ "-DEFM32GG390F1024 -DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\" -fdata-sections", "-ffunction-sections" };
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
-        //if (!decl)
-        //    continue;
-
         const exe = microzig.addEmbeddedExecutable(b, .{
             .name = @field(boards, decl.name).name ++ ".elf",
             .source_file = .{
