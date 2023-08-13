@@ -64,7 +64,7 @@ pub fn build(b: *std.build.Builder) void {
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{ "-O0", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\"", "-fdata-sections", "-ffunction-sections" };
+    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\"", "-fdata-sections", "-ffunction-sections" };
 
     inline for (@typeInfo(boards).Struct.decls) |decl| {
         const exe = microzig.addEmbeddedExecutable(b, .{

@@ -70,6 +70,9 @@ static struct miso_sockets_s system_sockets[wifi_service_max] = {0}; /* new syst
 // static SemaphoreHandle_t network_monitor_mutex = NULL;
 static SemaphoreHandle_t rx_tx_mutex = NULL;
 
+// Connection mutex
+static SemaphoreHandle_t conn_mutex = NULL;
+
 static QueueHandle_t rx_queue = NULL;
 static QueueHandle_t tx_queue = NULL;
 
@@ -136,9 +139,14 @@ int create_network_mediator(void)
 {
 	int ret = 0;
 
+	// Create and suspend
 	if (pdFALSE == xTaskCreate(select_task, "SelectTask", 1144, NULL, NETWORK_MONITOR_TASK, &network_monitor_task_handle))
 	{
 		ret = -1;
+	}
+	else
+	{
+		vTaskSuspend(network_monitor_task_handle);
 	}
 
 	if (0 == ret)
@@ -156,6 +164,13 @@ int create_network_mediator(void)
 		rx_tx_mutex = xSemaphoreCreateMutex();
 		if (NULL == rx_tx_mutex)
 			ret = -1;
+	}
+
+	if(0 == ret)
+	{
+		conn_mutex = xSemaphoreCreateMutex();
+        if (NULL == conn_mutex)
+            ret = -1;
 	}
 
 	if (0 == ret)
@@ -217,9 +232,6 @@ int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s)
 static void select_task(void *param)
 {
 	(void)param;
-
-	// Add network mutex
-	vTaskSuspend(NULL);
 
 	fd_set read_fd_set;
 	fd_set write_fd_set;
@@ -612,6 +624,7 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, con
 		return (int)UISO_NETWORK_NULL_CTX;
 	}
 
+	(void)xSemaphoreTake(conn_mutex, portMAX_DELAY);
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
 	ctx->protocol = (int32_t)proto; // Set the protocol here
@@ -677,13 +690,14 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, con
 	}
 
 	(void)xSemaphoreGive(rx_tx_mutex);
+	(void)xSemaphoreGive(conn_mutex);
 	return ret;
 }
 
 int miso_close_network_connection(miso_network_ctx_t ctx)
 {
 	int ret = UISO_NETWORK_OK;
-
+	(void)xSemaphoreTake(conn_mutex, portMAX_DELAY);
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
     if (ctx->sd >= 0)
@@ -707,7 +721,7 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 	}
 
 	(void)xSemaphoreGive(rx_tx_mutex);
-
+	(void)xSemaphoreGive(conn_mutex);
 	return ret;
 }
 
