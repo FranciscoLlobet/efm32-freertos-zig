@@ -4,6 +4,7 @@ const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
 const file = @import("fatfs.zig").file;
+const led = @import("leds.zig");
 
 const c = @cImport({
     @cInclude("board.h");
@@ -28,6 +29,16 @@ tx_buffer: [256]u8 align(@alignOf(u32)),
 rx_buffer: [1536]u8 align(@alignOf(u32)),
 
 file: file,
+
+const @"error" = error{
+    rx_error,
+    tx_error,
+    parse_error,
+    timeout,
+    connection_error,
+    generic,
+    file_size_mismatch,
+};
 
 // Authentication callback function.
 // Used during the connection phase for providing PSK credentials
@@ -118,9 +129,9 @@ const parsedResponse = struct {
 };
 
 // Function to send an HTTP GET request to a specified URL.
-pub fn sendGetRequest(self: *@This(), url: []const u8) i32 {
+pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
     var ret: i32 = -1;
-    var uri = std.Uri.parse(url) catch unreachable;
+    var uri = try std.Uri.parse(url);
 
     if (self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
@@ -128,14 +139,16 @@ pub fn sendGetRequest(self: *@This(), url: []const u8) i32 {
         _ = self.tx_mutex.give();
     }
 
-    return ret;
+    if (ret < 0) {
+        return @"error".tx_error;
+    }
 }
 
 // Function to send an HTTP GET request with a specific byte range.
 // The range is specified by the 'start' and 'end' parameters.
-pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: usize) i32 {
+pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: usize) !void {
     var ret: i32 = -1;
-    var uri = std.Uri.parse(url) catch unreachable;
+    var uri = try std.Uri.parse(url);
 
     if (self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
@@ -143,14 +156,16 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
         _ = self.tx_mutex.give();
     }
 
-    return ret;
+    if (ret < 0) {
+        return @"error".tx_error;
+    }
 }
 
 // Function to send an HTTP HEAD request to a specified URL.
 // HEAD requests retrieve the headers without the message body.
-pub fn sendHeadRequest(self: *@This(), url: []const u8) i32 {
+pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
     var ret: i32 = -1;
-    var uri = std.Uri.parse(url) catch unreachable;
+    var uri = try std.Uri.parse(url);
 
     if (self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
@@ -158,10 +173,12 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) i32 {
         _ = self.tx_mutex.give();
     }
 
-    return ret;
+    if (ret < 0) {
+        return @"error".tx_error;
+    }
 }
 
-fn recieveResponse(self: *@This()) struct { payload: ?[]u8, headers: []c.phr_header, status: i32 } {
+fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_header, status: i32 } {
     var rx_count: usize = 0;
     var pret: i32 = -2; // Incomplete request
     var prevbuflen: usize = 0;
@@ -184,20 +201,100 @@ fn recieveResponse(self: *@This()) struct { payload: ?[]u8, headers: []c.phr_hea
                     pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
                     prevbuflen = rx_count;
                     rx_count += @intCast(ret);
-                } else {
+                }
+                if ((pret == -1) or (ret <= 0)) {
                     break;
                 }
+            } else {
+                // rx Timeout
             }
         }
 
         if ((pret) > 0 and (ret >= 0)) {
             payload_len = rx_count - @as(usize, @intCast(pret));
             payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
+        } else {
+            // error
+            _ = self.rx_mutex.give();
+            return @"error".rx_error;
         }
         _ = self.rx_mutex.give();
     }
 
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = status };
+}
+
+fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
+    var parsed_response: parsedResponse = undefined;
+    errdefer {
+        _ = self.file.close() catch {};
+        _ = self.connection.close();
+    }
+
+    var ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+    defer {
+        _ = self.connection.close();
+    }
+    if (ret != 0) {
+        return @"error".connection_error;
+    }
+
+    var currentPosition: usize = 0;
+    var fileSize: usize = undefined;
+
+    if (ret == 0) {
+        try self.sendHeadRequest(url);
+    }
+
+    var rx = try self.recieveResponse();
+
+    parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
+    if (!((parsed_response.status_code >= 200) and (parsed_response.status_code < 300))) {
+        return @"error".generic; //
+    }
+
+    fileSize = parsed_response.content_length.?;
+
+    self.file = try file.open("SD:XDK110.bin", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
+    defer {
+        self.file.close() catch {};
+    }
+
+    while (currentPosition < fileSize) {
+        var requestEnd = currentPosition + (block_size - 1);
+        try self.sendGetRangeRequest(url, currentPosition, if (requestEnd > (fileSize - 1)) (fileSize - 1) else requestEnd);
+
+        rx = try self.recieveResponse();
+
+        parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
+        if ((parsed_response.status_code > 200) and (parsed_response.status_code < 300)) {
+            // If the positions do not match, then lseek to the response start position
+            if (currentPosition != parsed_response.range.?.start) {
+                try self.file.lseek(parsed_response.range.?.start);
+            }
+            _ = try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len);
+
+            // Move current position to the end of the file pointer
+            currentPosition = self.file.tell();
+
+            try self.file.sync();
+        } else {
+            ret = -1;
+            break;
+        }
+        if (parsed_response.keep_alive) |kA| {
+            if (kA == .close) {
+                // Reconnect logic
+                _ = self.connection.close();
+
+                ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+            }
+        }
+    }
+
+    if (self.file.tell() != fileSize) {
+        return @"error".file_size_mismatch;
+    }
 }
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -214,72 +311,11 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     //    zigHeader.deinit();
 
     while (true) {
-        var ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
-
         const blockSize: usize = 512;
-        var currentPosition: usize = 0;
-        var fileSize: usize = undefined;
 
-        var parsed_response: parsedResponse = undefined;
-        if (ret == 0) {
-            ret = self.sendHeadRequest(url);
-        }
-
-        if (ret >= 0) {
-            var rx = self.recieveResponse();
-            parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
-            if ((parsed_response.status_code >= 200) and (parsed_response.status_code < 300)) {
-                ret = 0;
-            } else {
-                ret = -1;
-            }
-        }
-
-        if (ret >= 0) {
-            fileSize = parsed_response.content_length.?;
-        }
-
-        if (ret >= 0) {
-            self.file = file.open("SD:XDK110.bin", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write)) catch unreachable;
-        }
-
-        while (currentPosition < fileSize) {
-            var requestEnd = currentPosition + (blockSize - 1);
-            ret = self.sendGetRangeRequest(url, currentPosition, if (requestEnd > (fileSize - 1)) (fileSize - 1) else requestEnd);
-            if (ret >= 0) {
-                var rx = self.recieveResponse();
-                parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
-                if ((parsed_response.status_code > 200) and (parsed_response.status_code < 300)) {
-                    currentPosition = parsed_response.range.?.start;
-                    //if (self.file.size() != 0) {
-                    //    self.file.lseek(currentPosition) catch unreachable;
-                    //}
-                    _ = self.file.write(parsed_response.payload.?, parsed_response.payload.?.len) catch unreachable;
-                    currentPosition = self.file.tell() catch unreachable;
-
-                    ret = 0;
-                } else {
-                    ret = -1;
-                    break;
-                }
-            }
-            if (parsed_response.keep_alive) |kA| {
-                if (kA == .close) {
-                    // Reconnect logic
-                    _ = self.connection.close();
-
-                    ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
-                }
-            }
-        }
-
-        var fSize = self.file.size();
-
-        self.file.close() catch {};
-
-        _ = c.printf("FILE SIZE: %d\r\n", fSize);
-
-        ret = self.connection.close();
+        self.filedownload(url, blockSize) catch {
+            _ = c.printf("ERROR\n\r!");
+        };
 
         self.task.delayTask(5000);
 
@@ -345,20 +381,16 @@ const acceptRanges = enum(usize) {
     none = @intFromBool(false),
     bytes = @intFromBool(true),
 
+    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "bytes", .bytes }, .{ "none", .none } });
+
     fn match(header: c.phr_header) ?@This() {
-        var ret: ?@This() = null;
-        if (std.mem.eql(u8, "bytes", header.value[0..header.value_len])) {
-            ret = .bytes;
-        } else if (std.mem.eql(u8, "none", header.value[0..header.value_len])) {
-            ret = .none;
-        }
-        return ret;
+        return stringMap.get(header.value[0..(header.value_len)]);
     }
 };
 
 const keepAlive = enum(usize) {
-    keep_alive = 0,
-    close = 1,
+    keep_alive = @intFromBool(true),
+    close = @intFromBool(false),
 
     const stringMap = std.ComptimeStringMap(@This(), .{ .{ "keep-alive", .keep_alive }, .{ "close", .close } });
 
