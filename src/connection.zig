@@ -11,6 +11,11 @@ const c = @cImport({
     @cInclude("lwm2m_client.h");
 });
 
+const connection_error = error{
+    create_error,
+    close_error,
+};
+
 const network_ctx = c.miso_network_ctx_t;
 
 pub const connection_id = enum(usize) {
@@ -51,7 +56,7 @@ pub fn init(id: connection_id, auth_callback: ?mbedtls.auth_callback_fn) @This()
     return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(auth_callback) };
 }
 
-pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol, mode: ?security_mode) i32 {
+pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol, mode: ?security_mode) !void {
     var c_local_port: [*c]const u8 = undefined;
     var ret: i32 = 0;
     if (local_port) |l_port| {
@@ -69,11 +74,15 @@ pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[
         ret = @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), @as([*c]const u8, @ptrCast(port)), c_local_port, @as(c.enum_miso_protocol, @intFromEnum(proto))));
     }
 
-    return ret;
+    if (ret != 0) {
+        return connection_error.create_error;
+    }
 }
 
-pub fn close(self: *@This()) i32 {
-    return c.miso_close_network_connection(self.ctx);
+pub fn close(self: *@This()) !void {
+    if (0 != c.miso_close_network_connection(self.ctx)) {
+        return connection_error.close_error;
+    }
 }
 pub fn send(self: *@This(), buffer: *const u8, length: usize) i32 {
     return c.miso_network_send(self.ctx, @as([*c]const u8, @ptrCast(buffer)), length);

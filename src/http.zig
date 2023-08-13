@@ -227,24 +227,19 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
 fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
     errdefer {
-        _ = self.file.close() catch {};
-        _ = self.connection.close();
+        self.file.close() catch {};
+        self.connection.close() catch {};
     }
 
-    var ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+    try self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
     defer {
-        _ = self.connection.close();
-    }
-    if (ret != 0) {
-        return @"error".connection_error;
+        self.connection.close() catch {};
     }
 
     var currentPosition: usize = 0;
     var fileSize: usize = undefined;
 
-    if (ret == 0) {
-        try self.sendHeadRequest(url);
-    }
+    try self.sendHeadRequest(url);
 
     var rx = try self.recieveResponse();
 
@@ -268,26 +263,27 @@ fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
 
         parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
         if ((parsed_response.status_code > 200) and (parsed_response.status_code < 300)) {
+
             // If the positions do not match, then lseek to the response start position
             if (currentPosition != parsed_response.range.?.start) {
                 try self.file.lseek(parsed_response.range.?.start);
             }
             _ = try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len);
 
-            // Move current position to the end of the file pointer
+            // Move current position to the current file pointer
             currentPosition = self.file.tell();
 
             try self.file.sync();
         } else {
-            ret = -1;
-            break;
+            return @"error".generic; //
+            //break;
         }
         if (parsed_response.keep_alive) |kA| {
             if (kA == .close) {
                 // Reconnect logic
-                _ = self.connection.close();
+                try self.connection.close();
 
-                ret = self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+                try self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
             }
         }
     }

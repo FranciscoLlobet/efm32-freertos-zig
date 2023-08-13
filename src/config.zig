@@ -21,7 +21,7 @@ pub const min_task_stack_depth: u16 = freertos.c.configMINIMAL_STACK_SIZE;
 // Enable or Disable features at compile time
 pub const enable_lwm2m = false;
 pub const enable_mqtt = true;
-pub const enable_http = true;
+pub const enable_http = false;
 
 pub const rtos_prio_sensor = @intFromEnum(task_priorities.rtos_prio_low);
 pub const rtos_stack_depth_sensor: u16 = 440;

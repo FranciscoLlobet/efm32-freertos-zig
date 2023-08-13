@@ -305,7 +305,7 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			const struct timeval tv =
-				{.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
+				{.tv_sec = 0, .tv_usec = 0}; // Here we have the select cycle time
 
 			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 

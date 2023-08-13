@@ -32,6 +32,16 @@ const state = enum(i32) {
     disconnecting,
 };
 
+const mqtt_error = error{
+    packetlen,
+    enqueue_failed,
+    dequeue_failed,
+    connect_failed,
+    send_failed,
+    connack_failed,
+    parse_failed,
+};
+
 pub const MQTTString_initializer = MQTTString{ .cstring = null, .lenstring = .{ .len = 0, .data = null } };
 
 // Manually translated initializer
@@ -114,7 +124,7 @@ fn getFn(ptr: ?*anyopaque, buf: [*c]u8, buf_len: c_int) callconv(.C) c_int {
     return ret;
 }
 
-fn processSendQueue(self: *@This()) i32 {
+fn processSendQueue(self: *@This()) !void {
     var ret: i32 = 1;
 
     while (ret > 0) {
@@ -125,7 +135,10 @@ fn processSendQueue(self: *@This()) i32 {
             ret = 0;
         }
     }
-    return ret;
+
+    if (0 > ret) {
+        return mqtt_error.send_failed;
+    }
 }
 
 fn read(self: *@This()) msgTypes {
@@ -145,24 +158,26 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     // Get to connect
     while (true) {
         var packetId: i32 = undefined;
-        var ret = self.connect();
+        self.connect() catch {
+            _ = self.disconnect() catch {};
+            continue;
+        };
 
-        if (ret == 0) {
-            self.connectionCounter += 1;
-            // connection time
-        }
+        self.connectionCounter += 1;
 
-        while (ret == 0) {
-            ret = self.processSendQueue();
+        while (true) {
+            self.processSendQueue() catch {
+                break;
+            };
 
             if (0 == self.connection.waitRx(1)) {
                 var readRet = self.read();
-                if (readRet == msgTypes.try_again) {
-                    ret = 0;
-                } else if ((readRet == msgTypes.connect) or (readRet == msgTypes.subscribe)) {
-                    ret = -1;
+                if (readRet == msgTypes.try_again) {} else if ((readRet == msgTypes.connect) or (readRet == msgTypes.subscribe)) {
+                    break;
                 } else if (readRet == msgTypes.connack) {
-                    ret = self.processConnAck();
+                    self.processConnAck() catch {
+                        break;
+                    };
                 } else if (readRet == msgTypes.publish) {
                     var dup: u8 = undefined;
                     var qos: c_int = undefined;
@@ -175,17 +190,16 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                     if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&self.rxBuffer[0]), self.rxBuffer.len)) {
                         packetId = switch (qos) {
                             0 => 0,
-                            1 => self.preparePubAckPacket(rx_packetId),
+                            1 => self.preparePubAckPacket(rx_packetId) catch -1,
                             else => -1,
                         };
                         if (packetId >= 0) {
                             _ = c.printf("publish recieved\r\n");
-                            ret = 0;
                         } else {
-                            ret = -1;
+                            break;
                         }
                     } else {
-                        ret = -1; // error state
+                        break; // error state
                     }
                 } else if (readRet == msgTypes.puback) {
                     // Response for Client pub qos1
@@ -196,33 +210,29 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                     if (1 == c.MQTTDeserialize_ack(&packetType, &dup, &rx_packetId, @ptrCast(&self.rxBuffer[0]), self.rxBuffer.len)) {
                         // notify application about received ack ?
                         _ = c.printf("puback recieved\r\n");
-                        ret = 0;
                     } else {
-                        ret = -1;
+                        break;
                     }
                 } else if (readRet == msgTypes.pubrec) {
-                    ret = -1;
+                    break;
                 } else if (readRet == msgTypes.pubrel) {
-                    ret = -1;
+                    break;
                 } else if (readRet == msgTypes.pubcomp) {
-                    ret = -1;
+                    break;
                 } else if (readRet == msgTypes.suback) {
-                    ret = 0; // The suback
+                    break;
                     // MQTTDeserialize_suback(&submsgid, 1, &subcount, &granted_qos, buf, buflen);
                 } else if (readRet == msgTypes.unsubscribe) {
-                    ret = -1;
-                } else if (readRet == msgTypes.unsuback) {
-                    ret = 0;
-                } else if (readRet == msgTypes.pingreq) {
-                    ret = -1;
+                    break;
+                } else if (readRet == msgTypes.unsuback) {} else if (readRet == msgTypes.pingreq) {
+                    break;
                 } else if (readRet == msgTypes.pingresp) {
                     // process the ping response
-                    ret = 0;
                     _ = c.printf("pingresp!");
                 } else if (readRet == msgTypes.disconnect) {
-                    ret = -1;
+                    break;
                 } else {
-                    ret = -1;
+                    break;
                     // Generic error
                 }
             } else {
@@ -230,9 +240,9 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             }
         }
 
-        ret = self.disconnect();
+        self.disconnect() catch {};
 
-        _ = c.printf("Disconnected... reconnect: %d", ret, self.connectionCounter);
+        _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
     }
 
     // Go to disconnect phase
@@ -249,13 +259,13 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     var self = freertos.getAndCastTimerID(@This(), xTimer);
 
-    _ = self.preparePingPacket();
+    _ = self.preparePingPacket() catch {};
 }
 
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     var self = freertos.getAndCastTimerID(@This(), xTimer);
     const payload = "test";
-    _ = self.preparePublishPacket("zig/pub", payload, payload.len, 1);
+    _ = self.preparePublishPacket("zig/pub", payload, payload.len, 1) catch {};
 }
 
 pub fn create(self: *@This()) void {
@@ -265,7 +275,7 @@ pub fn create(self: *@This()) void {
         self.txQueue.create(1024); // Create message buffer
         self.connection = connection.init(.mqtt, authCallback);
         self.pingTimer.create("mqttPing", 60000, freertos.pdTRUE, self, pingTimer) catch unreachable;
-        self.pubTimer.create("pubTimer", 1000, freertos.pdTRUE, self, pubTimer) catch unreachable;
+        self.pubTimer.create("pubTimer", 10000, freertos.pdTRUE, self, pubTimer) catch unreachable;
         self.workBufferMutex.createMutex() catch unreachable;
     }
     self.transport.getfn = getFn;
@@ -274,18 +284,18 @@ pub fn create(self: *@This()) void {
     self.packetIdState = 0x5555;
 }
 
-fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) i32 {
+fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) !u16 {
     if (packetLen <= 0) {
-        return -1;
+        return mqtt_error.packetlen;
     } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(&self.workBuffer[0]), @intCast(packetLen), null))) {
-        return -1;
+        return mqtt_error.enqueue_failed;
     }
     _ = self.workBufferMutex.give();
 
     return @intCast(packetId orelse 0);
 }
 
-fn prepareConnectPacket(self: *@This(), clientID: [*:0]const u8, username: ?[*:0]const u8, password: ?[*:0]const u8) i32 {
+fn prepareConnectPacket(self: *@This(), clientID: [*:0]const u8, username: ?[*:0]const u8, password: ?[*:0]const u8) !u16 {
     var connectPacket = MQTTPacket_connectData_initializer;
     connectPacket.clientID.cstring = @constCast(clientID);
 
@@ -306,7 +316,7 @@ fn prepareConnectPacket(self: *@This(), clientID: [*:0]const u8, username: ?[*:0
     return self.sendtoTxQueue(packetLen, null);
 }
 
-fn preparePubAckPacket(self: *@This(), packetId: u16) i32 {
+fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetLen: isize = c.MQTTSerialize_puback(@ptrCast(&self.workBuffer[0]), self.workBuffer.len, packetId);
@@ -314,7 +324,7 @@ fn preparePubAckPacket(self: *@This(), packetId: u16) i32 {
     return self.sendtoTxQueue(packetLen, null);
 }
 
-fn preparePubCompPacket(self: *@This(), packetId: u16) i32 {
+fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetLen: isize = c.MQTTSerialize_pubcomp(@ptrCast(&self.workBuffer[0]), self.workBuffer.len, packetId);
@@ -322,7 +332,7 @@ fn preparePubCompPacket(self: *@This(), packetId: u16) i32 {
     return self.sendtoTxQueue(packetLen, packetId);
 }
 
-fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) i32 {
+fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetLen: isize = c.MQTTSerialize_pubrel(@ptrCast(&self.workBuffer[0]), self.workBuffer.len, dup, packetId);
@@ -330,7 +340,7 @@ fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) i32 {
     return self.sendtoTxQueue(packetLen, packetId);
 }
 
-fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) i32 {
+fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetId = self.generatePacketId();
@@ -341,7 +351,7 @@ fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString
     return self.sendtoTxQueue(packetLen, packetId);
 }
 
-fn preparePingPacket(self: *@This()) i32 {
+fn preparePingPacket(self: *@This()) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetLen: isize = c.MQTTSerialize_pingreq(@ptrCast(&self.workBuffer[0]), self.workBuffer.len);
@@ -349,7 +359,7 @@ fn preparePingPacket(self: *@This()) i32 {
     return self.sendtoTxQueue(packetLen, null);
 }
 
-fn prepareDisconnectPacket(self: *@This()) i32 {
+fn prepareDisconnectPacket(self: *@This()) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var packetLen: isize = c.MQTTSerialize_disconnect(@ptrCast(&self.workBuffer[0]), self.workBuffer.len);
@@ -357,7 +367,7 @@ fn prepareDisconnectPacket(self: *@This()) i32 {
     return self.sendtoTxQueue(packetLen, null);
 }
 
-pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) i32 {
+pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
     _ = self.workBufferMutex.take(null);
 
     var topic_name = MQTTString{ .cstring = @constCast(topic), .lenstring = .{ .len = 0, .data = null } };
@@ -370,62 +380,47 @@ pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]
     return self.sendtoTxQueue(packetLen, packetId);
 }
 
-pub fn processConnAck(self: *@This()) i32 {
-    var connRet: i32 = undefined;
+pub fn processConnAck(self: *@This()) !void {
     var sessionPresent: u8 = undefined;
 
     if (1 == c.MQTTDeserialize_connack(&sessionPresent, &self.connack_rc, &self.rxBuffer[0], self.rxBuffer.len)) {
-        if (self.connack_rc == c.MQTT_CONNECTION_ACCEPTED) {
-            connRet = 0;
-        } else {
-            connRet = -1;
+        if (self.connack_rc != c.MQTT_CONNECTION_ACCEPTED) {
+            return mqtt_error.connack_failed;
         }
     } else {
-        connRet = -1;
+        return mqtt_error.parse_failed;
     }
-
-    return connRet;
 }
 
 /// Add
-pub fn connect(self: *@This()) i32 {
+pub fn connect(self: *@This()) !void {
     self.state = .connecting;
-    var connRet: i32 = 0;
     //var connRet: i32 = 0;
-    var packetId: i32 = 0;
+    var packetId: u16 = 0;
 
-    if (connRet == 0) {
-        connRet = self.connection.create("192.168.50.133", "8883", null, .tls_ip4, .psk);
-        //connRet = self.connection.create("192.168.50.133", "1883", null, .tcp_ip4);
+    try self.connection.create("192.168.50.133", "8883", null, .tls_ip4, .psk);
+    errdefer {
+        self.connection.close() catch {};
     }
 
-    if (connRet == 0) {
-        connRet = self.prepareConnectPacket("zigMQTT", null, null);
-    }
+    _ = try self.prepareConnectPacket("zigMQTT", null, null);
 
-    if (connRet == 0) {
-        connRet = self.processSendQueue();
-    }
+    try self.processSendQueue();
 
     // Wait for the connack
     if (0 == self.connection.waitRx(5)) {
         if (msgTypes.connack == self.read()) {
-            connRet = self.processConnAck();
+            try self.processConnAck();
+        } else {
+            //
         }
     }
 
-    if (connRet == 0) {
-        var subTopic = MQTTString{ .cstring = @constCast("zig/test"), .lenstring = .{ .len = 0, .data = null } };
-        var qos: c_int = 1;
-        packetId = self.prepareSubscribePacket(1, &subTopic, &qos);
-        if (packetId < 0) {
-            connRet = -1;
-        }
-    }
+    var subTopic = MQTTString{ .cstring = @constCast("zig/test"), .lenstring = .{ .len = 0, .data = null } };
+    var qos: c_int = 1;
+    packetId = try self.prepareSubscribePacket(1, &subTopic, &qos);
 
-    if (connRet == 0) {
-        connRet = self.processSendQueue();
-    }
+    try self.processSendQueue();
 
     // Wait for the connack
     if (0 == self.connection.waitRx(5)) {
@@ -435,51 +430,34 @@ pub fn connect(self: *@This()) i32 {
             var maxCount: c_int = 1;
             var count: c_int = 0;
             var grantedQoSs: c_int = 0;
-            if (1 == c.MQTTDeserialize_suback(&rx_packetId, maxCount, &count, &grantedQoSs, &self.rxBuffer[0], self.rxBuffer.len)) {
-                if (packetId != @as(i32, @intCast(rx_packetId))) {
-                    connRet = -1; // wrong packet id
-                }
-                _ = c.printf("Suback received\r\n");
-            } else {
-                connRet = -1; //
+            if (1 != c.MQTTDeserialize_suback(&rx_packetId, maxCount, &count, &grantedQoSs, &self.rxBuffer[0], self.rxBuffer.len)) {
+                return mqtt_error.parse_failed;
             }
+            if (packetId != rx_packetId) {
+                return mqtt_error.parse_failed;
+            }
+            _ = c.printf("Suback received\r\n");
         }
     }
 
-    if (connRet == 0) {
-        self.state = .connected;
-        self.pingTimer.changePeriod(60000, null) catch unreachable;
-        self.pubTimer.start(null) catch unreachable;
-    } else {
+    self.state = .connected;
+    self.pingTimer.changePeriod(60000, null) catch unreachable;
+
+    errdefer {
         self.state = .err;
     }
-
-    // wait for connack
-    return connRet;
 }
 
-pub fn disconnect(self: *@This()) i32 {
-    var ret: i32 = 0;
+pub fn disconnect(self: *@This()) !void {
     self.pingTimer.stop(null) catch {};
 
-    ret = self.prepareDisconnectPacket();
-    if (ret == 0) {
-        ret = self.processSendQueue();
-    }
+    _ = try self.prepareDisconnectPacket();
+    try self.processSendQueue();
 
-    if (ret == 0) {
-        ret = self.connection.close();
-    } else {
-        _ = self.connection.close();
-    }
-
-    if (ret == 0) {
-        ret = self.connection.ssl.deinit();
-    } else {
+    defer {
+        self.connection.close() catch {};
         _ = self.connection.ssl.deinit();
     }
-
-    return ret;
 }
 
 pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
