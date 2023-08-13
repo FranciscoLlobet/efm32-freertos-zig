@@ -104,7 +104,7 @@ pub const file = struct {
     }
 
     pub fn sync(self: *@This()) !void {
-        if (FR_OK == c.f_sync(&self.handle)) {
+        if (FR_OK != c.f_sync(&self.handle)) {
             return fRet.frError.generic_error;
         }
     }
@@ -114,12 +114,12 @@ pub const file = struct {
     }
 
     pub fn lseek(self: *@This(), offset: usize) !void {
-        if (FR_OK == c.f_lseek(&self.handle, offset)) {
+        if (FR_OK != c.f_lseek(&self.handle, offset)) {
             return fRet.frError.generic_error;
         }
     }
 
-    pub fn tell(self: *@This()) !usize {
+    pub fn tell(self: *@This()) usize {
         return c.f_tell(&self.handle);
     }
 
