@@ -293,7 +293,7 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			const struct timeval tv =
-				{.tv_sec = 0, .tv_usec = 50000}; // Here we have the select cycle time
+				{.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
 
 			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
@@ -686,12 +686,15 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
-	if (ctx->protocol & UISO_SECURITY_BIT_MASK)
+    if (ctx->sd >= 0)
 	{
-		do
-		{
-			ret = mbedtls_ssl_close_notify(ctx->ssl_context);
-		} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
+		if (ctx->protocol & UISO_SECURITY_BIT_MASK)
+			{
+				do
+				{
+					ret = mbedtls_ssl_close_notify(ctx->ssl_context);
+				} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
+			}
 	}
 
 	if (ret == UISO_NETWORK_OK)
