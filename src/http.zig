@@ -13,10 +13,6 @@ const c = @cImport({
 
 // Connection instance
 connection: connection,
-// Task Instance
-task: freertos.Task,
-// Optional timer
-timer: freertos.Timer,
 // Array to store parsed header information
 headers: [24]c.phr_header,
 // TX Buffer mutex
@@ -224,7 +220,7 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = status };
 }
 
-fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
+pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
     errdefer {
         self.file.close() catch {};
@@ -250,7 +246,7 @@ fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
 
     fileSize = parsed_response.content_length.?;
 
-    self.file = try file.open("SD:XDK110.bin", @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
+    self.file = try file.open(file_name, @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
     defer {
         self.file.close() catch {};
     }
@@ -293,55 +289,12 @@ fn filedownload(self: *@This(), url: []const u8, block_size: usize) !void {
     }
 }
 
-fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
-
-    const url = "http://192.168.50.133:80/XDK110.bin";
-
-    //var parsed = std.Uri.parse(url) catch unreachable;
-
-    //    var zigHeader = std.http.Headers{ .allocator = freertos.allocator };
-    //    zigHeader.append("Host", parsed.host.?) catch unreachable;
-    //    zigHeader.append("Accept", contentType.getString(.application_json)) catch unreachable;
-    //    zigHeader.append("User-Agent", "Miso (FreeRTOS)") catch unreachable;
-    //    zigHeader.deinit();
-
-    while (true) {
-        const blockSize: usize = 512;
-
-        self.filedownload(url, blockSize) catch {
-            _ = c.printf("ERROR\n\r!");
-        };
-
-        self.task.delayTask(5000);
-
-        _ = c.printf("HTTP: %d\n\r", self.task.getStackHighWaterMark());
-
-        self.task.suspendTask();
-    }
-}
-
-fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
-
-    while (true) {
-        self.task.suspendTask();
-    }
-}
-
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_http) taskFunction else dummyTaskFunction, "http", config.rtos_stack_depth_http, self, config.rtos_prio_http) catch unreachable;
-    self.task.suspendTask();
-
     if (config.enable_http) {
         self.connection = connection.init(.http, authCallback);
         self.tx_mutex.createMutex() catch unreachable;
         self.rx_mutex.createMutex() catch unreachable;
     }
-}
-
-pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
-    return self.task.getHandle();
 }
 
 const httpHeaderIndexes = enum(i32) {

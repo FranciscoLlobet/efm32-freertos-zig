@@ -63,4 +63,20 @@ enum
  */
 void miso_reboot(void);
 
+enum miso_event
+{
+	miso_connectivity_on = (1 << 0),
+	miso_connectivity_off = (1 << 1),
+};
+
+extern void miso_notify_event(enum miso_event event);
+
+
+
+void miso_mqtt_resume(void);
+void miso_mqtt_suspend(void);
+
+void miso_lwm2m_resume(void);
+void miso_lwm2m_suspend(void);
+
 #endif /* UISO_H_ */

@@ -14,6 +14,7 @@ const fatfs = @import("fatfs.zig");
 
 const c_board = @cImport({
     @cInclude("board.h");
+    @cInclude("miso.h");
     @cInclude("sl_simple_led.h");
     @cInclude("miso_config.h");
 });
@@ -184,6 +185,10 @@ pub export fn system_reset() callconv(.C) void {
 
 pub export fn system_getFs() callconv(.C) [*c]fatfs.FATFS {
     return &fatfs.fileSystem;
+}
+
+pub export fn miso_notify_event(event: c_board.miso_event) callconv(.C) void {
+    _ = user.user_task.task.notify(event, .eSetBits);
 }
 
 pub export fn main() void {

@@ -86,15 +86,15 @@ pub fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
     return @as(*T, @ptrCast(@alignCast(pvParameters)));
 }
 
-pub const eNotifyAction = enum(u32) {
-    eSetBits = c.eSetBits,
-    eIncrement = c.eIncrement,
-    eSetValueWithOverwrite = c.eSetValueWithOverwrite,
-    eSetValueWithoutOverwrite = c.eSetValueWithoutOverwrite,
-    eNoAction = c.eNoAction,
-};
-
 pub const Task = struct {
+    pub const eNotifyAction = enum(u32) {
+        eSetBits = c.eSetBits,
+        eIncrement = c.eIncrement,
+        eSetValueWithOverwrite = c.eSetValueWithOverwrite,
+        eSetValueWithoutOverwrite = c.eSetValueWithoutOverwrite,
+        eNoAction = c.eNoAction,
+    };
+
     handle: TaskHandle_t = undefined,
 
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
@@ -130,9 +130,9 @@ pub const Task = struct {
     pub fn notifyFromISR(self: *Task, ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
-    pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, pulNotificationValue: *u32, xTicksToWait: TickType_t) bool {
+    pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, pulNotificationValue: *u32, xTicksToWait: ?TickType_t) bool {
         _ = self;
-        return (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, pulNotificationValue, xTicksToWait));
+        return (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, pulNotificationValue, xTicksToWait orelse portMAX_DELAY));
     }
     pub fn getStackHighWaterMark(self: *Task) u32 {
         return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
@@ -153,12 +153,10 @@ pub const Queue = struct {
         }
     }
     pub fn send(self: *@This(), item_to_queue: *const void, comptime ticks_to_wait: ?UBaseType_t) bool {
-        var ticks = ticks_to_wait orelse portMAX_DELAY;
-        return (pdTRUE == c.xQueueSend(self.handle, item_to_queue, ticks));
+        return (pdTRUE == c.xQueueSend(self.handle, item_to_queue, ticks_to_wait orelse portMAX_DELAY));
     }
     pub fn receive(self: *@This(), buffer: *void, comptime ticks_to_wait: ?UBaseType_t) bool {
-        var ticks = ticks_to_wait orelse portMAX_DELAY;
-        return (pdTRUE == c.xQueueReceive(self.handle, buffer, ticks));
+        return (pdTRUE == c.xQueueReceive(self.handle, buffer, ticks_to_wait orelse portMAX_DELAY));
     }
     pub fn delete(self: *@This()) void {
         c.xQueueDelete(self.handle);

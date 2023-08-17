@@ -52,8 +52,6 @@ QueueHandle_t wifi_queue_handle = NULL;
 
 #define WIFI_NTP_SYNC_PERIOD		(12*3600*1000) /* Sync every 12 hours */
 
-extern TaskHandle_t user_task_handle;
-
 enum wifi_connection_state_e
 {
 	wifi_initial = WIFI_INITIAL_STATE,
@@ -205,17 +203,6 @@ void wifi_task(void *param)
 
 			if (ulNotifiedValue & (uint32_t) wifi_connected)
 			{
-				if (0 == sntp_is_synced())
-				{
-					/* Start NTP Syncing in 5s */
-					xTimerChangePeriod(sntp_sync_timer, (5 * 1000), portMAX_DELAY);
-				}
-				else
-				{
-					/* Redo NTP Syncing in 16s */
-					xTimerChangePeriod(sntp_sync_timer, (16 * 1000), portMAX_DELAY);
-				}
-
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Connected %x\n\r",
 						ulNotifiedValue);
 			}
@@ -229,10 +216,11 @@ void wifi_task(void *param)
 				}
 
 				// Suspend all the apps that need networking
+				// Send disconnect notification
+
 				vTaskSuspend(network_monitor_task_handle);
 				vTaskSuspend(get_lwm2m_task_handle());
 				vTaskSuspend(get_mqtt_task_handle());
-				vTaskSuspend(get_http_task_handle());
 		
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Disconnected %x\n\r",
 						ulNotifiedValue);
@@ -252,8 +240,22 @@ void wifi_task(void *param)
 
 			if (ulNotifiedValue & ((uint32_t) wifi_ip_v4_acquired | (uint32_t) wifi_ip_v6_acquired))
 			{
+				if (0 == sntp_is_synced())
+				{
+					/* Start NTP Syncing in 5s */
+					xTimerChangePeriod(sntp_sync_timer, (5 * 1000), portMAX_DELAY);
+				}
+				else
+				{
+					/* Redo NTP Syncing in 16s */
+					xTimerChangePeriod(sntp_sync_timer, (16 * 1000), portMAX_DELAY);
+				}
+				
 				// Restart the network monitor
 				vTaskResume(network_monitor_task_handle);
+
+
+
 			}
 
 			if (ulNotifiedValue & (uint32_t) wifi_ip_released)
@@ -300,10 +302,10 @@ void wifi_task(void *param)
 
 			if (ulNotifiedValue & (uint32_t) wifi_ntp_synced_event)
 			{
-				// Resume LWM2M Task
-				vTaskResume(get_lwm2m_task_handle());
-				vTaskResume(get_mqtt_task_handle());
-				vTaskResume(get_http_task_handle());
+				// Send connectivity event
+				miso_notify_event(miso_connectivity_on);
+				//vTaskResume(get_lwm2m_task_handle());
+				//vTaskResume(get_mqtt_task_handle());
 			}
 		} else
 		{

@@ -70,6 +70,7 @@ pub const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
 
 connection: connection,
 connectionCounter: usize,
+disconnectionCounter: usize,
 rxQueue: freertos.Queue,
 
 pingTimer: freertos.Timer,
@@ -82,7 +83,7 @@ var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
 
 fn init() @This() {
-    return @This(){ .connection = undefined, .connectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555) };
+    return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555) };
 }
 
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
@@ -302,6 +303,81 @@ const packet = struct {
     }
 };
 
+fn loop(self: *@This()) !void {
+    try self.connect();
+    defer self.disconnect() catch {};
+
+    while (true) {
+        try self.processSendQueue();
+
+        if (0 == self.connection.waitRx(1)) {
+            var readRet = self.packet.read(&rxBuffer);
+            if (readRet == msgTypes.try_again) {} else if ((readRet == msgTypes.connect) or (readRet == msgTypes.subscribe)) {
+                break;
+            } else if (readRet == msgTypes.connack) {
+                try self.packet.processConnAck(&rxBuffer);
+            } else if (readRet == msgTypes.publish) {
+                var dup: u8 = undefined;
+                var qos: c_int = undefined;
+                var retained: u8 = undefined;
+
+                var topicName = MQTTString_initializer;
+                var payload: [*c]u8 = undefined;
+                var payloadLen: isize = undefined;
+
+                var rx_packetId: u16 = undefined;
+
+                if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&rxBuffer[0]), rxBuffer.len)) {
+                    var packetId = switch (qos) {
+                        0 => 0,
+                        1 => try self.packet.preparePubAckPacket(rx_packetId),
+                        else => 0,
+                    };
+
+                    _ = packetId;
+                    _ = c.printf("publish recieved\r\n");
+                } else {
+                    break; // error state
+                }
+            } else if (readRet == msgTypes.puback) {
+                // Response for Client pub qos1
+                var packetType: u8 = undefined;
+                var dup: u8 = undefined;
+                var rx_packetId: u16 = undefined;
+
+                rx_packetId = self.packet.deserializeAck(&rxBuffer, &packetType, &dup) catch {
+                    1;
+                };
+            } else if (readRet == msgTypes.pubrec) {
+                break;
+            } else if (readRet == msgTypes.pubrel) {
+                break;
+            } else if (readRet == msgTypes.pubcomp) {
+                break;
+            } else if (readRet == msgTypes.suback) {
+                break;
+                // MQTTDeserialize_suback(&submsgid, 1, &subcount, &granted_qos, buf, buflen);
+            } else if (readRet == msgTypes.unsubscribe) {
+                break;
+            } else if (readRet == msgTypes.unsuback) {
+                // unsuback
+            } else if (readRet == msgTypes.pingreq) {
+                break;
+            } else if (readRet == msgTypes.pingresp) {
+                // process the ping response
+                _ = c.printf("pingresp!");
+            } else if (readRet == msgTypes.disconnect) {
+                break;
+            } else {
+                break;
+                // Generic error
+            }
+        } else {
+            _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
+        }
+    }
+}
+
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     var self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
@@ -310,92 +386,11 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     @memset(&packet.workBuffer, 0);
 
     self.connectionCounter = 0;
+    self.disconnectionCounter = 0;
 
     // Get to connect
     while (true) {
-        var packetId: i32 = undefined;
-        self.connect() catch {
-            _ = self.disconnect() catch {};
-            continue;
-        };
-
-        self.connectionCounter += 1;
-
-        while (true) {
-            self.processSendQueue() catch {
-                break;
-            };
-
-            if (0 == self.connection.waitRx(1)) {
-                var readRet = self.packet.read(&rxBuffer);
-                if (readRet == msgTypes.try_again) {} else if ((readRet == msgTypes.connect) or (readRet == msgTypes.subscribe)) {
-                    break;
-                } else if (readRet == msgTypes.connack) {
-                    self.packet.processConnAck(&rxBuffer) catch {
-                        break;
-                    };
-                } else if (readRet == msgTypes.publish) {
-                    var dup: u8 = undefined;
-                    var qos: c_int = undefined;
-                    var retained: u8 = undefined;
-
-                    var topicName = MQTTString_initializer;
-                    var payload: [*c]u8 = undefined;
-                    var payloadLen: isize = undefined;
-
-                    var rx_packetId: u16 = undefined;
-
-                    if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&rxBuffer[0]), rxBuffer.len)) {
-                        packetId = switch (qos) {
-                            0 => 0,
-                            1 => self.packet.preparePubAckPacket(rx_packetId) catch -1,
-                            else => -1,
-                        };
-                        if (packetId >= 0) {
-                            _ = c.printf("publish recieved\r\n");
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break; // error state
-                    }
-                } else if (readRet == msgTypes.puback) {
-                    // Response for Client pub qos1
-                    var packetType: u8 = undefined;
-                    var dup: u8 = undefined;
-                    var rx_packetId: u16 = undefined;
-
-                    rx_packetId = self.packet.deserializeAck(&rxBuffer, &packetType, &dup) catch {
-                        1;
-                    };
-                } else if (readRet == msgTypes.pubrec) {
-                    break;
-                } else if (readRet == msgTypes.pubrel) {
-                    break;
-                } else if (readRet == msgTypes.pubcomp) {
-                    break;
-                } else if (readRet == msgTypes.suback) {
-                    break;
-                    // MQTTDeserialize_suback(&submsgid, 1, &subcount, &granted_qos, buf, buflen);
-                } else if (readRet == msgTypes.unsubscribe) {
-                    break;
-                } else if (readRet == msgTypes.unsuback) {} else if (readRet == msgTypes.pingreq) {
-                    break;
-                } else if (readRet == msgTypes.pingresp) {
-                    // process the ping response
-                    _ = c.printf("pingresp!");
-                } else if (readRet == msgTypes.disconnect) {
-                    break;
-                } else {
-                    break;
-                    // Generic error
-                }
-            } else {
-                _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
-            }
-        }
-
-        self.disconnect() catch {};
+        self.loop() catch {};
 
         _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
     }
@@ -439,6 +434,8 @@ pub fn connect(self: *@This()) !void {
     self.state = .connecting;
     //var connRet: i32 = 0;
     var packetId: u16 = 0;
+
+    self.connectionCounter += 1;
 
     try self.connection.create("192.168.50.133", "8883", null, .tls_ip4, .psk);
     errdefer {
@@ -495,7 +492,12 @@ pub fn disconnect(self: *@This()) !void {
     defer {
         self.connection.close() catch {};
         _ = self.connection.ssl.deinit();
+        self.disconnectionCounter += 1;
     }
+}
+
+pub fn resumeTask(self: *@This()) void {
+    self.task.resumeTask();
 }
 
 pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
