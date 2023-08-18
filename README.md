@@ -153,3 +153,33 @@ Configuration can be loaded via SD card by `config.txt`
     }
 }
 ```
+
+## Configuration signature
+
+Sign Configuration
+
+For signing the configuration, please create a private key
+
+```console
+openssl ecparam -genkey -name prime256v1 -noout -out private_key.pem
+```
+
+Generate the public key
+
+```console
+openssl ec -in private_key.pem -pubout -out config.pub
+```
+
+- `private_key.pem` a private key used for signing the configuration.
+- `config.pub` a public key used for signing the configuration.
+- `config.sig` a signature file.
+
+```console
+openssl dgst -sha256 -sign private_key.pem -out config.sig config.txt
+```
+
+Verify Configuration
+
+```console
+openssl dgst -sha256 -verify config.pub -signature config.sig config.txt
+```

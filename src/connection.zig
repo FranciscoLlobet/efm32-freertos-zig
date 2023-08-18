@@ -48,6 +48,28 @@ pub const security_mode = enum(u32) {
     certificate_rsa,
 };
 
+pub const schemes = enum {
+    ntp,
+    http,
+    https,
+    mqtt,
+    mqtts,
+    coap,
+    coaps,
+
+    pub const stringmap = std.ComptimeStringMap(@This(), .{ .{ "ntp", .ntp }, .{ "http", .http }, .{ "https", .https }, .{ "mqtt", .mqtt }, .{ "mqtts", .mqtts }, .{ "coap", .coap }, .{ "coaps", .coaps } });
+
+    pub fn getProtocol(self: @This()) protocol {
+        return switch (self) {
+            .ntp, .coap => protocol.udp_ip4,
+            .coaps => protocol.dtls_ip4,
+            .http, .mqtt => protocol.tcp_ip4,
+            .https, .mqtts => protocol.tls_ip4,
+            //else => protocol.no_protocol,
+        };
+    }
+};
+
 ctx: network_ctx,
 id: connection_id,
 ssl: mbedtls,

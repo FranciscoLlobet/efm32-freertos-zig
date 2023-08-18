@@ -154,7 +154,7 @@ int create_network_mediator(void)
 		initialize_socket_management();
 	}
 
-	if(0 == ret)
+	if (0 == ret)
 	{
 		miso_mbedtls_set_treading_alt();
 	}
@@ -166,11 +166,11 @@ int create_network_mediator(void)
 			ret = -1;
 	}
 
-	if(0 == ret)
+	if (0 == ret)
 	{
 		conn_mutex = xSemaphoreCreateMutex();
-        if (NULL == conn_mutex)
-            ret = -1;
+		if (NULL == conn_mutex)
+			ret = -1;
 	}
 
 	if (0 == ret)
@@ -700,15 +700,15 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 	(void)xSemaphoreTake(conn_mutex, portMAX_DELAY);
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
-    if (ctx->sd >= 0)
+	if (ctx->sd >= 0)
 	{
 		if (ctx->protocol & UISO_SECURITY_BIT_MASK)
+		{
+			do
 			{
-				do
-				{
-					ret = mbedtls_ssl_close_notify(ctx->ssl_context);
-				} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
-			}
+				ret = mbedtls_ssl_close_notify(ctx->ssl_context);
+			} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
+		}
 	}
 
 	if (ret == UISO_NETWORK_OK)
@@ -766,7 +766,6 @@ static int _read_tls(miso_network_ctx_t ctx, unsigned char *buffer, size_t lengt
 	{
 		numBytes = mbedtls_ssl_read(ctx->ssl_context, buffer, length);
 	} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
-
 
 	if (0 > numBytes && !(MBEDTLS_ERR_SSL_TIMEOUT == numBytes)) // This version lets the app decide what to do with the timeout
 	{

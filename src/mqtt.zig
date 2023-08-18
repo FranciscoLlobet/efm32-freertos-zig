@@ -7,6 +7,7 @@ const connection = @import("connection.zig");
 const c = @cImport({
     @cDefine("MQTT_CLIENT", "1");
     @cInclude("MQTTPacket.h");
+    @cInclude("miso_config.h");
 });
 
 const MQTTSerialize_ack = c.MQTTSerialize_ack;
@@ -78,12 +79,14 @@ pubTimer: freertos.Timer, // delete this!
 task: freertos.Task,
 state: state,
 packet: @This().packet,
+uri_string: [*c]u8,
+device_id: [*c]u8,
 
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
 
 fn init() @This() {
-    return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555) };
+    return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555), .uri_string = undefined, .device_id = undefined };
 }
 
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
@@ -303,8 +306,8 @@ const packet = struct {
     }
 };
 
-fn loop(self: *@This()) !void {
-    try self.connect();
+fn loop(self: *@This(), uri: std.Uri) !void {
+    try self.connect(uri);
     defer self.disconnect() catch {};
 
     while (true) {
@@ -388,9 +391,14 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     self.connectionCounter = 0;
     self.disconnectionCounter = 0;
 
+    self.uri_string = c.config_get_mqtt_url();
+    self.device_id = c.config_get_mqtt_device_id();
+
     // Get to connect
     while (true) {
-        self.loop() catch {};
+        var uri = std.Uri.parse(self.uri_string[0..c.strlen(self.uri_string)]) catch unreachable;
+
+        self.loop(uri) catch {};
 
         _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
     }
@@ -430,21 +438,19 @@ pub fn create(self: *@This()) void {
 }
 
 /// Add
-pub fn connect(self: *@This()) !void {
+pub fn connect(self: *@This(), uri: std.Uri) !void {
     self.state = .connecting;
     //var connRet: i32 = 0;
     var packetId: u16 = 0;
 
     self.connectionCounter += 1;
 
-    var uri = try std.Uri.parse("mqtts://192.168.50.133:8883");
-
-    try self.connection.create(uri.host.?, uri.port.?, null, .tls_ip4, .psk);
+    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.stringmap.get(uri.scheme).?.getProtocol(), .psk);
     errdefer {
         self.connection.close() catch {};
     }
 
-    _ = try self.packet.prepareConnectPacket("zigMQTT", null, null);
+    _ = try self.packet.prepareConnectPacket(self.device_id, null, null);
 
     try self.processSendQueue();
 
