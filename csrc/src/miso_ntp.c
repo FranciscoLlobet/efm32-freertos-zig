@@ -91,7 +91,7 @@ enum sntp_return_codes_e miso_sntp_request(sntp_server_t *server,
 	uint32_t local_origin_timestamp = 0;
 	uint32_t local_origin_timestamp_fraction = 0;
 
-	res = miso_create_network_connection(miso_get_network_ctx(wifi_service_ntp_socket), server->server_name, "123", "123",miso_protocol_udp_ip4);
+	res = miso_create_network_connection(miso_get_network_ctx(wifi_service_ntp_socket), server->server_name, strlen(server->server_name), (uint16_t)123, (uint16_t)123, miso_protocol_udp_ip4);
 
 	if (sntp_success == sntp_rcode)
 	{

@@ -36,7 +36,7 @@ connection_t connection_create(connection_t connList, char *host, char *port,
 	connection_t newConn = lwm2m_malloc(sizeof(struct connection_s));
 	if(NULL != newConn)
 	{
-		ret = miso_create_network_connection(miso_get_network_ctx(wifi_service_lwm2m_socket), host, port, NULL, (enum miso_protocol)protocol);
+		ret = miso_create_network_connection(miso_get_network_ctx(wifi_service_lwm2m_socket), host, strlen(host), atoi(port), 0, (enum miso_protocol)protocol);
 		if(ret >= 0)
 		{
 			/* Prepare */

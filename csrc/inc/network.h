@@ -111,8 +111,8 @@ miso_network_ctx_t miso_get_network_ctx(enum wifi_socket_id_e id);
  * @param proto
  * @return
  */
-int miso_create_network_connection(miso_network_ctx_t ctx, const char *host,
-		const char *port, const char * local_port, enum miso_protocol proto);
+int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, size_t host_len, uint16_t port, uint16_t local_port,
+								   enum miso_protocol proto);
 
 int miso_close_network_connection(miso_network_ctx_t ctx);
 
@@ -124,8 +124,8 @@ int miso_close_network_connection(miso_network_ctx_t ctx);
  */
 int miso_network_register_ssl_context(miso_network_ctx_t ctx, mbedtls_ssl_context * ssl_ctx);
 
-int miso_network_read(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-int miso_network_send(miso_network_ctx_t ctx, const uint8_t *buffer, size_t length);
+int miso_network_read(miso_network_ctx_t ctx, unsigned char *buffer, size_t length);
+int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length);
 
 int miso_network_get_socket(miso_network_ctx_t ctx);
 

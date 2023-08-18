@@ -19,7 +19,7 @@
 
 #define SIMPLELINK_MAX_SEND_MTU 1472
 
-typedef int (*_network_send_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+typedef int (*_network_send_fn)(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 typedef int (*_network_read_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 typedef int (*_network_close_fn)(miso_network_ctx_t ctx);
 
@@ -84,21 +84,21 @@ static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t tim
 TaskHandle_t network_monitor_task_handle = NULL;
 
 /* mbedTLS Support */
-static int _network_send(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _network_send(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 static int _network_recv(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 static int _network_close(miso_network_ctx_t ctx);
 
-static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _send_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_udp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
+static int _send_tcp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 
-static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-static int _read_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-static int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
-static int _send_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length);
+static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length);
+static int _read_tls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length);
+static int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length);
+static int _send_tls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length);
 
 /* mbedTLS BIO */
-static int _send_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
-static int _send_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
+static int _send_bio_tcp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
+static int _send_bio_udp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 static int _recv_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 static int _recv_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
 
@@ -309,7 +309,7 @@ static void select_task(void *param)
 
 			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
-			int result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, &tv);
+			int result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
 
 			(void)xSemaphoreGive(rx_tx_mutex);
 
@@ -360,7 +360,7 @@ static void select_task(void *param)
 }
 
 /* Basic network operations */
-static int _network_connect(miso_network_ctx_t ctx, const char *host, const char *port, const char *local_port,
+static int _network_connect(miso_network_ctx_t ctx, const char *host, size_t host_len, uint16_t port, uint16_t local_port,
 							enum miso_protocol proto)
 {
 	int ret = (int)UISO_NETWORK_GENERIC_ERROR;
@@ -371,7 +371,7 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, const char
 	/* Only resolve for IPv4 */
 	memset(host_addr, 0, sizeof(SlSockAddrIn_t));
 
-	dns_status = sl_NetAppDnsGetHostByName((_i8 *)host, strlen(host), &(host_addr->sin_addr.s_addr),
+	dns_status = sl_NetAppDnsGetHostByName((_i8 *)host, host_len, &(host_addr->sin_addr.s_addr),
 										   SL_AF_INET);
 
 	if (dns_status < 0)
@@ -381,7 +381,7 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, const char
 	else
 	{
 		ctx->peer.sin_family = SL_AF_INET;
-		ctx->peer.sin_port = __REV16(atoi(port));
+		ctx->peer.sin_port = __REV16(port);
 		ctx->peer.sin_addr.s_addr = __REV(host_addr->sin_addr.s_addr);
 		ctx->peer_len = sizeof(struct SlSockAddrIn_t);
 	}
@@ -428,10 +428,10 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, const char
 	// Bind to local port
 	if (ret == (int)UISO_NETWORK_OK)
 	{
-		if (NULL != local_port)
+		if (0 != local_port)
 		{
 			ctx->local.sin_family = SL_AF_INET;
-			ctx->local.sin_port = __REV16(atoi(local_port));
+			ctx->local.sin_port = __REV16(local_port);
 			ctx->local.sin_addr.s_addr = (uint32_t)(0);
 			ctx->local_len = sizeof(struct SlSockAddrIn_t);
 			if (0 != sl_Bind(ctx->sd, (SlSockAddr_t *)&ctx->local, (_i16)ctx->local_len))
@@ -478,13 +478,13 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, const char
 	return ret;
 }
 
-static int _send_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_bio_udp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len)
 {
 	return (int)sl_SendTo((_i16)ctx->sd, (void *)buf, (_i16)len, (_i16)0,
 						  (SlSockAddr_t *)&(ctx->peer), sizeof(SlSockAddrIn_t));
 }
 
-static int _send_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_bio_tcp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len)
 {
 	return (int)sl_Send((_i16)ctx->sd, (void *)buf, (_i16)len, (_i16)0);
 }
@@ -516,7 +516,7 @@ static int _recv_bio_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return ret;
 }
 
-static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_udp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len)
 {
 	size_t offset = 0;
 	int n_bytes_sent = 0;
@@ -534,7 +534,7 @@ static int _send_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 	return offset;
 }
 
-static int _send_tcp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
+static int _send_tcp(miso_network_ctx_t ctx, const unsigned char *buf, size_t len)
 {
 	size_t offset = 0;
 	int n_bytes_sent = 0;
@@ -615,7 +615,7 @@ int miso_network_register_ssl_context(miso_network_ctx_t ctx, mbedtls_ssl_contex
 	return UISO_NETWORK_OK;
 }
 
-int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, const char *port, const char *local_port,
+int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, size_t host_len, uint16_t port, uint16_t local_port,
 								   enum miso_protocol proto)
 {
 	int ret = (int)UISO_NETWORK_OK;
@@ -663,7 +663,7 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, con
 
 	if (ret >= 0)
 	{
-		ret = _network_connect(ctx, host, port, local_port, proto);
+		ret = _network_connect(ctx, host, host_len, port, local_port, proto);
 	}
 
 	if (ret >= 0)
@@ -725,7 +725,7 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 	return ret;
 }
 
-static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
 	int numBytes = -1;
 	int result = 0;
@@ -757,7 +757,7 @@ static int _read_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return numBytes;
 }
 
-static int _read_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+static int _read_tls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
 	int numBytes = -1;
 	int result = 0;
@@ -790,7 +790,7 @@ static int _read_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return numBytes;
 }
 
-int miso_network_read(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int miso_network_read(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 	int ret = ctx->read_fn(ctx, buffer, length);
@@ -799,7 +799,7 @@ int miso_network_read(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return ret;
 }
 
-int miso_network_send(miso_network_ctx_t ctx, const uint8_t *buffer, size_t length)
+int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length)
 {
 	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 	int ret = ctx->send_fn(ctx, buffer, length);
@@ -818,7 +818,7 @@ int miso_network_get_socket(miso_network_ctx_t ctx)
 	return ret;
 }
 
-int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length)
 {
 	int n_bytes_sent = 0;
 	int ret = (int)UISO_NETWORK_OK;
@@ -924,7 +924,7 @@ int _send_dtls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
 	return ret;
 }
 
-int _send_tls(miso_network_ctx_t ctx, uint8_t *buffer, size_t length)
+int _send_tls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length)
 {
 	int n_bytes_sent = 0;
 	int ret = (int)UISO_NETWORK_OK;

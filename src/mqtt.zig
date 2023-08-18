@@ -437,7 +437,9 @@ pub fn connect(self: *@This()) !void {
 
     self.connectionCounter += 1;
 
-    try self.connection.create("192.168.50.133", "8883", null, .tls_ip4, .psk);
+    var uri = try std.Uri.parse("mqtts://192.168.50.133:8883");
+
+    try self.connection.create(uri.host.?, uri.port.?, null, .tls_ip4, .psk);
     errdefer {
         self.connection.close() catch {};
     }

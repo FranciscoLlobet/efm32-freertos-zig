@@ -222,12 +222,14 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
 
 pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
+
+    var uri = try std.Uri.parse(url);
     errdefer {
         self.file.close() catch {};
         self.connection.close() catch {};
     }
 
-    try self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+    try self.connection.create(uri.host.?, uri.port.?, null, .tcp_ip4, null);
     defer {
         self.connection.close() catch {};
     }
@@ -279,7 +281,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, bloc
                 // Reconnect logic
                 try self.connection.close();
 
-                try self.connection.create("192.168.50.133", "80", null, .tcp_ip4, null);
+                try self.connection.create(uri.host.?, uri.port.?, null, .tcp_ip4, null);
             }
         }
     }

@@ -56,12 +56,16 @@ pub fn init(id: connection_id, auth_callback: ?mbedtls.auth_callback_fn) @This()
     return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(auth_callback) };
 }
 
-pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[]const u8, proto: protocol, mode: ?security_mode) !void {
-    var c_local_port: [*c]const u8 = undefined;
+pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol, mode: ?security_mode) !void {
+    _ = self;
+    _ = uri;
+    _ = local_port;
+    _ = proto;
+    _ = mode;
+}
+
+pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
     var ret: i32 = 0;
-    if (local_port) |l_port| {
-        c_local_port = @as([*c]const u8, @ptrCast(l_port));
-    }
 
     if (mode) |s_mode| {
         ret = self.ssl.init(proto, s_mode);
@@ -71,7 +75,7 @@ pub fn create(self: *@This(), host: []const u8, port: []const u8, local_port: ?[
     }
 
     if (ret == 0) {
-        ret = @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), @as([*c]const u8, @ptrCast(port)), c_local_port, @as(c.enum_miso_protocol, @intFromEnum(proto))));
+        ret = @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(proto))));
     }
 
     if (ret != 0) {
