@@ -27,6 +27,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+extern nvm3_Handle_t * miso_nvm3_handle;
+extern nvm3_Init_t  * miso_nvm3_init_handle;
+
 void BOARD_SysTick_Enable(void)
 {
 	SysTick_Config(SystemCoreClock / BOARD_SYSTICK_FREQUENCY);
@@ -70,6 +73,8 @@ void BOARD_Init(void)
 	sl_device_init_hfrco();
 	sl_device_init_lfxo();
 	sl_device_init_emu();
+
+	volatile Ecode_t rc =  nvm3_open(miso_nvm3_handle, miso_nvm3_init_handle);
 
 	NVIC_SetPriorityGrouping((uint32_t) 3);/* Set priority grouping to group 4*/
 
@@ -185,6 +190,8 @@ void BOARD_MCU_Reset(void)
 }
 
 #include <sys/time.h>
+// Gets called by time()
+
 extern int _gettimeofday(struct timeval* ptimeval, void * ptimezone);
 /* implementing system time */
 int _gettimeofday(struct timeval* ptimeval, void * ptimezone)

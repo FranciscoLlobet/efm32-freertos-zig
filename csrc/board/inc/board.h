@@ -44,6 +44,9 @@
 /* include usbexpress */
 #include "em_usbxpress.h"
 
+/* include NVM */
+#include "nvm3.h"
+
 #define BOARD_SYSTICK_FREQUENCY    (1000)
 
 /* LEDs */

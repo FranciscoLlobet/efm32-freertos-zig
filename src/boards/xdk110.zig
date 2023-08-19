@@ -1,8 +1,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
 pub const c = @cImport({
-    @cDefine("EFM32GG390F1024", "1");
-    @cDefine("__PROGRAM_START", "__main");
     @cInclude("board.h");
     @cInclude("simplelink.h");
 });

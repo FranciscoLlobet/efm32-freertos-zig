@@ -146,5 +146,5 @@ pub fn mount(volume: []const u8) frError!void {
 }
 
 pub fn unmount(volume: []const u8) frError!void {
-    try fRet.check(c.f_unmount(@ptrCast(volume)));
+    try fRet.check(c.f_unmount(@as([*c]const u8, @ptrCast(volume))));
 }

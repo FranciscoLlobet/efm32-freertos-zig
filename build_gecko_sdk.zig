@@ -85,6 +85,11 @@ const source_paths = [_][]const u8{
     "csrc/system/gecko_sdk/emdrv/spidrv/src/spidrv.c",
     "csrc/system/gecko_sdk/emdrv/uartdrv/src/uartdrv.c",
 
+    //"csrc/system/gecko_sdk/emdrv/nvm3/src/nvm3_default.c",
+    //"csrc/system/gecko_sdk/emdrv/nvm3/src/nvm3_default_common_linker.c",
+    "csrc/system/gecko_sdk/emdrv/nvm3/src/nvm3_hal_flash.c",
+    "csrc/system/gecko_sdk/emdrv/nvm3/src/nvm3_lock.c",
+
     "csrc/system/gecko_sdk/driver/button/src/sl_button.c",
     "csrc/system/gecko_sdk/driver/button/src/sl_simple_button.c",
     "csrc/system/gecko_sdk/driver/debug/src/sl_debug_swo.c",

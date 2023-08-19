@@ -47,6 +47,7 @@
         "error.h": "c",
         "threading.h": "c",
         "socket.h": "c",
-        "em_msc.h": "c"
+        "em_msc.h": "c",
+        "nvm3.h": "c"
     }
 }

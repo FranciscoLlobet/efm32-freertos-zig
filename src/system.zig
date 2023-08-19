@@ -2,6 +2,7 @@ const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const leds = @import("leds.zig");
+const fatfs = @import("fatfs.zig");
 
 fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = param2;
@@ -14,6 +15,7 @@ fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = board.c.sl_Stop(0xFFFF);
 
     // Add code to stop/close the FS
+    fatfs.unmount("SD") catch {};
 
     freertos.c.taskENTER_CRITICAL();
 

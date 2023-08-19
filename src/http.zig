@@ -278,6 +278,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
                     try self.file.lseek(parsed_response.range.?.start);
                 } else {
                     // Rewind to file start
+                    // This code will effectively rewind the file and restart the transfer.
                     try self.file.rewind();
                     try self.file.sync();
                     continue;

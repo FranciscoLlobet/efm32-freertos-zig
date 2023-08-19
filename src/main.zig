@@ -11,6 +11,7 @@ const usb = @import("usb.zig");
 const user = @import("user.zig");
 const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
+const nvm = @import("nvm.zig");
 
 const c_board = @cImport({
     @cInclude("board.h");
@@ -183,9 +184,11 @@ pub export fn system_reset() callconv(.C) void {
     system.reset();
 }
 
-pub export fn system_getFs() callconv(.C) [*c]fatfs.FATFS {
-    return &fatfs.fileSystem;
-}
+//pub export fn system_getFs() callconv(.C) [*c]fatfs.FATFS {
+//    return &fatfs.fileSystem;
+//}
+pub export const miso_nvm3_handle = &nvm.miso_nvm3;
+pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
 pub export fn miso_notify_event(event: c_board.miso_event) callconv(.C) void {
     _ = user.user_task.task.notify(event, .eSetBits);
@@ -196,13 +199,17 @@ pub export fn main() void {
 
     usb.usb.init();
 
+    _ = nvm.init() catch 0;
+
+    const appCounter = nvm.incrementAppCounter() catch 0;
+
     user.user_task.create();
 
     sensors.service.init() catch unreachable;
 
     network.start();
 
-    _ = c_board.printf("--- MISO starting FreeRTOS ---\n\r");
+    _ = c_board.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
 
     freertos.vTaskStartScheduler();
 
