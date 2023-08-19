@@ -1,5 +1,13 @@
-const std = @import("std");
-const freertos = @import("freertos.zig");
+/// Light FatFs http://elm-chan.org/fsw/ff/00index_e.html) facade for use in Zig
+///
+/// This facade wraps most, but not all of the functions provided by FatFs.
+/// For simplicity, it also does not go into the Hardware access interface (diskio.h)
+/// It is responsibility of the systems programmer to implement the corresponding adapting code.
+///
+/// Read http://elm-chan.org/fsw/ff/doc/appnote.html for the application notes.
+///
+/// Tested on FreeRTOS with a standard SD card
+///
 const c = @cImport({
     @cInclude("ff.h");
 });
@@ -64,6 +72,7 @@ const fRet = enum(c_uint) {
     }
 };
 
+// Global variable for FS
 pub export var fileSystem: c.FATFS = undefined;
 
 pub const file = struct {
@@ -132,14 +141,10 @@ pub const file = struct {
     }
 };
 
-pub fn mount() !bool {
-    try fRet.check(c.f_mount(&fileSystem, "SD", 1));
-
-    return true;
+pub fn mount(volume: []const u8) frError!void {
+    return fRet.check(c.f_mount(&fileSystem, @ptrCast(volume), 1));
 }
 
-pub fn unmount() bool {
-    try fRet.check(c.f_unmount("SD"));
-
-    return true;
+pub fn unmount(volume: []const u8) frError!void {
+    return fRet.check(c.f_unmount(@ptrCast(volume)));
 }

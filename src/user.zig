@@ -48,7 +48,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
-    _ = fatfs.mount() catch unreachable;
+    fatfs.mount("SD") catch unreachable;
 
     // file = fatfs.file.open("SD:/CONFIG.TXT", @intFromEnum(fatfs.fMode.read)) catch null;
 
