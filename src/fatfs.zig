@@ -1,7 +1,6 @@
 const std = @import("std");
 const freertos = @import("freertos.zig");
 const c = @cImport({
-    @cInclude("board.h");
     @cInclude("ff.h");
 });
 
@@ -9,9 +8,13 @@ const FSIZE_t = c.FSIZE_t;
 const UINT = c.UINT;
 const FR_OK = c.FR_OK;
 const FILINFO = c.FILINFO;
+const FRESULT = c.FRESULT;
+
 pub const FATFS = c.FATFS;
 
-pub const fRet = enum(usize) {
+pub const frError = error{ FR_DISK_ERR, FR_INT_ERR, FR_NOT_READY, FR_NO_FILE, FR_NO_PATH, FR_INVALID_NAME, FR_DENIED, FR_EXIST, FR_INVALID_OBJECT, FR_WRITE_PROTECTED, FR_INVALID_DRIVE, FR_NOT_ENABLED, FR_NO_FILESYSTEM, FR_MKFS_ABORTED, FR_TIMEOUT, FR_LOCKED, FR_NOT_ENOUGH_CORE, FR_TOO_MANY_OPEN_FILES, FR_INVALID_PARAMETER, generic_error };
+
+const fRet = enum(c_uint) {
     fr_ok = c.FR_OK,
     fr_disk_err = c.FR_DISK_ERR,
     fr_int_err = c.FR_INT_ERR,
@@ -32,11 +35,10 @@ pub const fRet = enum(usize) {
     fr_not_enough_core = c.FR_NOT_ENOUGH_CORE,
     fr_too_many_open_files = c.FR_TOO_MANY_OPEN_FILES,
     fr_invalid_parameter = c.FR_INVALID_PARAMETER,
+    generic_error,
 
-    const frError = error{ FR_DISK_ERR, FR_INT_ERR, FR_NOT_READY, FR_NO_FILE, FR_NO_PATH, FR_INVALID_NAME, FR_DENIED, FR_EXIST, FR_INVALID_OBJECT, FR_WRITE_PROTECTED, FR_INVALID_DRIVE, FR_NOT_ENABLED, FR_NO_FILESYSTEM, FR_MKFS_ABORTED, FR_TIMEOUT, FR_LOCKED, FR_NOT_ENOUGH_CORE, FR_TOO_MANY_OPEN_FILES, FR_INVALID_PARAMETER, generic_error };
-
-    fn checkRet(ret: fRet) !void {
-        return switch (ret) {
+    fn check(ret: FRESULT) frError!void {
+        return switch (@as(@This(), @enumFromInt(ret))) {
             .fr_ok => {},
             .fr_disk_err => frError.FR_DISK_ERR,
             .fr_int_err => frError.FR_INT_ERR,
@@ -77,53 +79,51 @@ pub const file = struct {
         open_append = c.FA_OPEN_APPEND,
     };
 
-    pub fn open(path: []const u8, mode: u8) !@This() {
+    pub fn open(path: []const u8, mode: u8) frError!@This() {
         var self: @This() = undefined;
-        return if (FR_OK == c.f_open(&self.handle, @ptrCast(path), mode)) self else fRet.frError.generic_error;
+
+        try fRet.check(c.f_open(&self.handle, @ptrCast(path), mode));
+
+        return self;
     }
 
-    pub fn close(self: *@This()) !void {
-        if (FR_OK != c.f_close(&self.handle)) {
-            return fRet.frError.generic_error;
-        }
+    pub fn close(self: *@This()) frError!void {
+        return fRet.check(c.f_close(&self.handle));
     }
 
-    pub fn read(self: *@This(), buf: []u8, bytesToRead: u32) !usize {
+    pub fn read(self: *@This(), buf: []u8, bytesToRead: u32) frError!usize {
         var bytesRead: usize = 0;
 
-        var ret = c.f_read(&self.handle, @ptrCast(buf), if (bytesToRead > buf.len) buf.len else bytesToRead, &bytesRead);
+        try fRet.check(c.f_read(&self.handle, @ptrCast(buf), if (bytesToRead > buf.len) buf.len else bytesToRead, &bytesRead));
 
-        return if (ret == FR_OK) bytesRead else fRet.frError.generic_error;
+        return bytesRead;
     }
 
-    pub fn write(self: *@This(), buf: []const u8, bytesToWrite: u32) !usize {
+    pub fn write(self: *@This(), buf: []const u8, bytesToWrite: u32) frError!usize {
         var bytesWritten: usize = 0;
 
-        var ret = c.f_write(&self.handle, @ptrCast(buf), if (bytesToWrite > buf.len) buf.len else bytesToWrite, &bytesWritten);
-        return if (ret == FR_OK) bytesWritten else fRet.frError.generic_error;
+        try fRet.check(c.f_write(&self.handle, @ptrCast(buf), if (bytesToWrite > buf.len) buf.len else bytesToWrite, &bytesWritten));
+
+        return bytesWritten;
     }
 
-    pub fn sync(self: *@This()) !void {
-        if (FR_OK != c.f_sync(&self.handle)) {
-            return fRet.frError.generic_error;
-        }
+    pub fn sync(self: *@This()) frError!void {
+        return fRet.check(c.f_sync(&self.handle));
     }
 
     pub fn size(self: *@This()) usize {
         return c.f_size(&self.handle);
     }
 
-    pub fn lseek(self: *@This(), offset: usize) !void {
-        if (FR_OK != c.f_lseek(&self.handle, offset)) {
-            return fRet.frError.generic_error;
-        }
+    pub fn lseek(self: *@This(), offset: usize) frError!void {
+        return fRet.check(c.f_lseek(&self.handle, offset));
     }
 
     pub fn tell(self: *@This()) usize {
         return c.f_tell(&self.handle);
     }
 
-    pub fn rewind(self: *@This()) !void {
+    pub fn rewind(self: *@This()) frError!void {
         return self.lseek(0);
     }
 
@@ -133,11 +133,13 @@ pub const file = struct {
 };
 
 pub fn mount() !bool {
-    var ret = c.f_mount(&fileSystem, "SD", 1);
+    try fRet.check(c.f_mount(&fileSystem, "SD", 1));
 
-    return (FR_OK == ret);
+    return true;
 }
 
 pub fn unmount() bool {
-    return (FR_OK == c.f_unmount("SD"));
+    try fRet.check(c.f_unmount("SD"));
+
+    return true;
 }
