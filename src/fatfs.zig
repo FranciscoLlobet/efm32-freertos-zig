@@ -97,7 +97,7 @@ pub const file = struct {
     }
 
     pub fn close(self: *@This()) frError!void {
-        return fRet.check(c.f_close(&self.handle));
+        try fRet.check(c.f_close(&self.handle));
     }
 
     pub fn read(self: *@This(), buf: []u8, bytesToRead: u32) frError!usize {
@@ -125,7 +125,7 @@ pub const file = struct {
     }
 
     pub fn lseek(self: *@This(), offset: usize) frError!void {
-        return fRet.check(c.f_lseek(&self.handle, offset));
+        try fRet.check(c.f_lseek(&self.handle, offset));
     }
 
     pub fn tell(self: *@This()) usize {
@@ -133,7 +133,7 @@ pub const file = struct {
     }
 
     pub fn rewind(self: *@This()) frError!void {
-        return self.lseek(0);
+        try self.lseek(0);
     }
 
     pub fn eof(self: *@This()) bool {
@@ -142,9 +142,9 @@ pub const file = struct {
 };
 
 pub fn mount(volume: []const u8) frError!void {
-    return fRet.check(c.f_mount(&fileSystem, @ptrCast(volume), 1));
+    try fRet.check(c.f_mount(&fileSystem, @ptrCast(volume), 1));
 }
 
 pub fn unmount(volume: []const u8) frError!void {
-    return fRet.check(c.f_unmount(@ptrCast(volume)));
+    try fRet.check(c.f_unmount(@ptrCast(volume)));
 }

@@ -220,7 +220,12 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = status };
 }
 
-pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, block_size: usize) !void {
+fn calcRequestEnd(file_size: usize, comptime block_size: usize, current_position: usize) usize {
+    var requestEnd = current_position + (block_size - 1);
+    return if (requestEnd > (file_size - 1)) (file_size - 1) else requestEnd;
+}
+
+pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
 
     var uri = try std.Uri.parse(url);
@@ -234,47 +239,75 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, bloc
         self.connection.close() catch {};
     }
 
-    var currentPosition: usize = 0;
-    var fileSize: usize = undefined;
+    //var currentPosition: usize = 0;
+    // var fileSize: usize = undefined;
 
     try self.sendHeadRequest(url);
 
     var rx = try self.recieveResponse();
 
     parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
-    if (!((parsed_response.status_code >= 200) and (parsed_response.status_code < 300))) {
-        return @"error".generic; //
+    if (!(parsed_response.status_code == 200)) {
+        return @"error".generic;
     }
 
-    fileSize = parsed_response.content_length.?;
-
+    const fileSize: usize = parsed_response.content_length.?;
     self.file = try file.open(file_name, @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
     defer {
         self.file.close() catch {};
     }
 
-    while (currentPosition < fileSize) {
-        var requestEnd = currentPosition + (block_size - 1);
-        try self.sendGetRangeRequest(url, currentPosition, if (requestEnd > (fileSize - 1)) (fileSize - 1) else requestEnd);
+    try self.file.sync(); // Perfom sync to reduce chances of critical errors
+
+    while (self.file.tell() < fileSize) {
+        var requestEnd = calcRequestEnd(fileSize, block_size, self.file.tell());
+        //var expected_request_len = requestEnd - currentPosition + 1;
+        try self.sendGetRangeRequest(url, self.file.tell(), requestEnd);
 
         rx = try self.recieveResponse();
 
         parsed_response.processHeaders(rx.headers, rx.payload, rx.status);
-        if ((parsed_response.status_code > 200) and (parsed_response.status_code < 300)) {
 
-            // If the positions do not match, then lseek to the response start position
-            if (currentPosition != parsed_response.range.?.start) {
-                try self.file.lseek(parsed_response.range.?.start);
+        // We expect a HTTP code 206 Partial Content.
+        if (parsed_response.status_code == 206) {
+
+            // Only rewinding is allowed to avoid holes in the file
+            if (self.file.tell() != parsed_response.range.?.start) {
+                if (self.file.tell() > parsed_response.range.?.start) {
+                    // Rewind to a previous position.
+                    try self.file.lseek(parsed_response.range.?.start);
+                } else {
+                    // Rewind to file start
+                    try self.file.rewind();
+                    try self.file.sync();
+                    continue;
+                }
             }
-            _ = try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len);
+
+            if (requestEnd != parsed_response.range.?.end) {
+                // Request end position does not match with the expected value
+            }
+
+            if (parsed_response.payload.?.len != try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len)) {
+                // Test if the bytes written match the payload.
+            }
 
             // Move current position to the current file pointer
-            currentPosition = self.file.tell();
+            // This is probably not necessary since the current position can be calculated from the block size.
+            // However three things can happen:
+            //   1. The response length is smaller than the requested block size.
+            //   2. The write function could not write the full block.
+            //   3. The response start position is not equal to requested start position.
+            //
+            //  Here the code avoids throwing a failure cases and performs a re-synchronisation of the current pointers.
+            //
+            // A case that is not taken into account is when the current position is no longer aligned with the block size.
+            // In this case, due to block misalignement the write operation might take longer than expected.
 
+            // Perform sync to reduce chances of critical errors
             try self.file.sync();
         } else {
-            return @"error".generic; //
-            //break;
+            return @"error".generic;
         }
         if (parsed_response.keep_alive) |kA| {
             if (kA == .close) {
