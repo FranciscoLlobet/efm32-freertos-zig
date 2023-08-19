@@ -46,6 +46,7 @@
         "lwm2m_security.h": "c",
         "error.h": "c",
         "threading.h": "c",
-        "socket.h": "c"
+        "socket.h": "c",
+        "em_msc.h": "c"
     }
 }
