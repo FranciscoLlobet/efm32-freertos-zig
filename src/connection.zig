@@ -39,6 +39,13 @@ pub const protocol = enum(u32) {
 
     dtls_ip6 = c.miso_protocol_dtls_ip6,
     tls_ip6 = c.miso_protocol_tls_ip6,
+
+    pub fn isSecure(self: @This()) bool {
+        return switch (self) {
+            .dtls_ip4, .tls_ip4, .dtls_ip6, .tls_ip6 => true,
+            else => false,
+        };
+    }
 };
 
 pub const security_mode = enum(u32) {
@@ -59,6 +66,10 @@ pub const schemes = enum {
 
     pub const stringmap = std.ComptimeStringMap(@This(), .{ .{ "ntp", .ntp }, .{ "http", .http }, .{ "https", .https }, .{ "mqtt", .mqtt }, .{ "mqtts", .mqtts }, .{ "coap", .coap }, .{ "coaps", .coaps } });
 
+    pub fn match(scheme: []const u8) ?@This() {
+        return stringmap.get(scheme);
+    }
+
     pub fn getProtocol(self: @This()) protocol {
         return switch (self) {
             .ntp, .coap => protocol.udp_ip4,
@@ -66,6 +77,13 @@ pub const schemes = enum {
             .http, .mqtt => protocol.tcp_ip4,
             .https, .mqtts => protocol.tls_ip4,
             //else => protocol.no_protocol,
+        };
+    }
+
+    pub fn isSecure(self: @This()) bool {
+        return switch (self) {
+            .coaps, .mqtts, .https => true,
+            else => false,
         };
     }
 };
@@ -89,10 +107,12 @@ pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol,
 pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
     var ret: i32 = 0;
 
-    if (mode) |s_mode| {
-        ret = self.ssl.init(proto, s_mode);
-        if (ret == 0) {
-            ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
+    if (proto.isSecure()) {
+        if (mode) |s_mode| {
+            ret = self.ssl.init(proto, s_mode);
+            if (ret == 0) {
+                ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
+            }
         }
     }
 

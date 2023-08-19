@@ -445,7 +445,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
 
     self.connectionCounter += 1;
 
-    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.stringmap.get(uri.scheme).?.getProtocol(), .psk);
+    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.match(uri.scheme).?.getProtocol(), .psk);
     errdefer {
         self.connection.close() catch {};
     }
