@@ -19,6 +19,7 @@ The current version of `MISO` boasts a set of features, including:
 - get a sNTP timestamp from an internet server,
 - provide a basic secured LWM2M service client with connection management,
 - provide a basic MQTT service client (QOS0 and QOS1 support),
+- provide a HTTP file download client for configuration and firmware updates
 - mbedTLS PSK and x509 certificate authentication tested with DTLS,
 - Watchdog
 

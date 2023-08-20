@@ -12,7 +12,7 @@ ctx: c.mbedtls_sha256_context,
 pub fn init() @This() {
     var self: @This() = undefined;
 
-    self.init_ctx();
+    self.initCtx();
 
     return self;
 }

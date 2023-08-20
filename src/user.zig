@@ -83,6 +83,10 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         var eventValue: u32 = 0;
 
         if (self.state == .verify_config) {
+            _ = config.open_config_file("SD:CONFIG.TXT") catch {
+                _ = c.printf("Failure!!\n\r");
+            };
+
             c.miso_load_config();
 
             // Next state

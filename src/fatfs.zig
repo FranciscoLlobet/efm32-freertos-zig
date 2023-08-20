@@ -137,7 +137,7 @@ pub const file = struct {
     }
 
     pub fn eof(self: *@This()) bool {
-        return (0 != self.f_eof(&self.handle));
+        return (0 != c.f_eof(&self.handle));
     }
 };
 

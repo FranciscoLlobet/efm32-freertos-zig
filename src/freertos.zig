@@ -186,8 +186,7 @@ pub const Semaphore = struct {
         }
     }
     pub fn take(self: *@This(), xTicksToWait: ?TickType_t) bool {
-        var ticks = xTicksToWait orelse portMAX_DELAY;
-        return (pdTRUE == c.xSemaphoreTake(self.handle, ticks));
+        return (pdTRUE == c.xSemaphoreTake(self.handle, xTicksToWait orelse portMAX_DELAY));
     }
     pub fn give(self: *@This()) bool {
         return (pdTRUE == c.xSemaphoreGive(self.handle));

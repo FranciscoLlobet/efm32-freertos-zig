@@ -48,6 +48,7 @@
         "threading.h": "c",
         "socket.h": "c",
         "em_msc.h": "c",
-        "nvm3.h": "c"
+        "nvm3.h": "c",
+        "miso_config.h": "c"
     }
 }

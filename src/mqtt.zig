@@ -107,7 +107,7 @@ fn processSendQueue(self: *@This()) !void {
     var ret: i32 = 1;
 
     while (ret > 0) {
-        var buf_len = packet.txQueue.receive(@ptrCast(&txBuffer[0]), txBuffer.len, 0);
+        var buf_len = self.packet.txQueue.receive(@ptrCast(&txBuffer[0]), txBuffer.len, 0);
         if (buf_len != 0) {
             ret = self.connection.send(&txBuffer[0], buf_len);
         } else {
@@ -120,13 +120,13 @@ fn processSendQueue(self: *@This()) !void {
     }
 }
 
+var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
+
 const packet = struct {
     transport: MQTTTransport,
     packetIdState: u16,
-
-    var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
-    var workBufferMutex: freertos.Semaphore = undefined;
-    var txQueue: freertos.MessageBuffer = undefined;
+    workBufferMutex: freertos.Semaphore,
+    txQueue: freertos.MessageBuffer = undefined,
 
     pub fn init(comptime packetId: u16) @This() {
         return @This(){ .transport = .{
@@ -136,15 +136,15 @@ const packet = struct {
             .rem_len = undefined,
             .len = undefined,
             .state = undefined,
-        }, .packetIdState = packetId };
+        }, .packetIdState = packetId, .workBufferMutex = undefined };
     }
 
     pub fn create(self: *@This(), conn: *connection) void {
         self.transport.sck = @ptrCast(conn);
 
-        workBufferMutex.createMutex() catch unreachable;
-        txQueue.create(1024); // Create message buffer
-        @memset(&workBuffer, 0);
+        self.workBufferMutex.createMutex() catch unreachable;
+
+        self.txQueue.create(1024); // Create message buffer
     }
 
     // Use XorShift Algorithm to generate the packet id
@@ -193,9 +193,9 @@ const packet = struct {
         return packetId;
     }
 
-    fn prepareConnectPacket(self: *@This(), clientID: [*:0]const u8, username: ?[*:0]const u8, password: ?[*:0]const u8) !u16 {
+    fn prepareConnectPacket(self: *@This(), clientID: []const u8, username: ?[*:0]const u8, password: ?[*:0]const u8) !u16 {
         var connectPacket = MQTTPacket_connectData_initializer;
-        connectPacket.clientID.cstring = @constCast(clientID);
+        connectPacket.clientID = MQTTString{ .cstring = null, .lenstring = .{ .data = @constCast(&clientID[0]), .len = @intCast(clientID.len) } };
 
         if (username != null) {
             connectPacket.username = MQTTString{ .cstring = @constCast(username), .lenstring = .{ .len = 0, .data = null } };
@@ -207,7 +207,7 @@ const packet = struct {
 
         connectPacket.keepAliveInterval = 400;
 
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_connect(@ptrCast(&workBuffer[0]), workBuffer.len, &connectPacket);
 
@@ -215,7 +215,7 @@ const packet = struct {
     }
 
     fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
 
@@ -223,7 +223,7 @@ const packet = struct {
     }
 
     fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
 
@@ -231,7 +231,7 @@ const packet = struct {
     }
 
     fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId);
 
@@ -239,7 +239,7 @@ const packet = struct {
     }
 
     fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetId = self.generatePacketId();
         var dup: u8 = 0;
@@ -250,7 +250,7 @@ const packet = struct {
     }
 
     fn preparePingPacket(self: *@This()) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len);
 
@@ -258,7 +258,7 @@ const packet = struct {
     }
 
     fn prepareDisconnectPacket(self: *@This()) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len);
 
@@ -266,7 +266,7 @@ const packet = struct {
     }
 
     pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
-        _ = workBufferMutex.take(null);
+        _ = self.workBufferMutex.take(null);
 
         var topic_name = MQTTString{ .cstring = @constCast(topic), .lenstring = .{ .len = 0, .data = null } };
         var dup: u8 = 0;
@@ -293,14 +293,12 @@ const packet = struct {
     }
 
     fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) !u16 {
-        _ = self;
-
         if (packetLen <= 0) {
             return mqtt_error.packetlen;
-        } else if (!(@as(usize, @intCast(packetLen)) == txQueue.send(@ptrCast(&workBuffer[0]), @intCast(packetLen), null))) {
+        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(&workBuffer[0]), @intCast(packetLen), null))) {
             return mqtt_error.enqueue_failed;
         }
-        _ = workBufferMutex.give();
+        _ = self.workBufferMutex.give();
 
         return @intCast(packetId orelse 0);
     }
@@ -386,7 +384,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
-    @memset(&packet.workBuffer, 0);
+    @memset(&workBuffer, 0);
 
     self.connectionCounter = 0;
     self.disconnectionCounter = 0;
@@ -450,7 +448,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         self.connection.close() catch {};
     }
 
-    _ = try self.packet.prepareConnectPacket(self.device_id, null, null);
+    _ = try self.packet.prepareConnectPacket(self.device_id[0..c.strlen(self.device_id)], null, null);
 
     try self.processSendQueue();
 
