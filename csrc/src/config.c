@@ -373,7 +373,6 @@ void miso_load_config(void)
 					strncpy(dest_ptr, src_ptr, src_len);
 				}
 			}
-
 		}
 	}
 

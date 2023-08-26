@@ -184,9 +184,6 @@ pub export fn system_reset() callconv(.C) void {
     system.reset();
 }
 
-//pub export fn system_getFs() callconv(.C) [*c]fatfs.FATFS {
-//    return &fatfs.fileSystem;
-//}
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
@@ -198,8 +195,6 @@ pub export fn main() void {
     board.init();
 
     usb.usb.init();
-
-    _ = nvm.init() catch 0;
 
     const appCounter = nvm.incrementAppCounter() catch 0;
 

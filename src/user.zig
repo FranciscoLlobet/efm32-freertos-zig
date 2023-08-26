@@ -12,6 +12,7 @@ const c = @cImport({
 const sha256 = @import("sha256.zig");
 const http = @import("http.zig");
 const mqtt = @import("mqtt.zig");
+const nvm = @import("nvm.zig");
 
 const state = enum(usize) {
     verify_config = 0,
@@ -48,24 +49,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
+    _ = nvm.init() catch 0;
+
     fatfs.mount("SD") catch unreachable;
-
-    // file = fatfs.file.open("SD:/CONFIG.TXT", @intFromEnum(fatfs.fMode.read)) catch null;
-
-    //  var rb: usize = 0;
-    //  const slice = allocator.alloc(u8, file.?.size()) catch unreachable;
-
-    //   var hash_value: [32]u8 = undefined;
-
-    //   hash.initCtx();
-
-    //  rb = file.?.read(slice, slice.len) catch unreachable;
-    //  _ = hash.start();
-    //   _ = hash.update(slice, slice.len);
-    //   _ = hash.finish(&hash_value);
-
-    //   _ = file.?.close() catch unreachable;
-    //   allocator.free(slice);
 
     self.timer.start(null) catch unreachable;
 
@@ -83,11 +69,15 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         var eventValue: u32 = 0;
 
         if (self.state == .verify_config) {
+            config.load_config_from_nvm() catch {
+                _ = c.printf("Failure!!\n\r");
+            };
+
             _ = config.open_config_file("SD:CONFIG.TXT") catch {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            c.miso_load_config();
+            config.store_config_in_nvm() catch {};
 
             // Next state
             self.state = .start_connectivity;

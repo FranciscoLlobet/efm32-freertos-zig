@@ -1,7 +1,7 @@
 const std = @import("std");
 const microzig = @import("deps/microzig/build.zig");
 
-const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-DEFM_DEBUG", "-fdata-sections", "-ffunction-sections" };
+const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-DEFM_DEBUG", "-DSL_RAMFUNC_DISABLE", "-fdata-sections", "-ffunction-sections" };
 
 const include_path = [_][]const u8{
     // Gecko-SDK Defines
