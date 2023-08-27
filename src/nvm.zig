@@ -12,8 +12,6 @@ pub const app_nvm_keys = enum(u32) {
     start_counter = 0x00000,
     reset_counter = 0x00001,
 
-    firmware_update_trigger,
-
     timestamp,
 
     device_uuid,
@@ -38,6 +36,9 @@ pub const app_nvm_keys = enum(u32) {
     http_psk_id,
     http_psk_key,
 
+    // Firmware download ETag
+    fw_etag, // Internal etag
+
     // LWM2M Default URI
     lwm2m_uri,
     lwm2m_psk_id,
@@ -47,6 +48,8 @@ pub const app_nvm_keys = enum(u32) {
     // Firmware update info
 
     // Firmware SHA256 hash checksum
+    firmware_update_trigger,
+    firmware_download_counter,
     firmware_sha256,
     firmware_update_state,
 
@@ -85,6 +88,8 @@ pub fn init() !u32 {
         try eraseAll();
         try writeCounter(.start_counter, 0);
         try writeCounter(.reset_counter, 0);
+        try writeCounter(.timestamp, 0);
+        try writeCounter(.firmware_download_counter, 0);
         try writeData(.device_uuid, &default_uuid[0], default_uuid.len);
         try writeData(.config_sha256, &default_sha256[0], default_sha256.len);
     }
@@ -150,5 +155,9 @@ fn incrementCounter(key: app_nvm_keys) !u32 {
 }
 
 pub fn incrementAppCounter() !u32 {
-    return try incrementCounter(app_nvm_keys.start_counter);
+    return try incrementCounter(.start_counter);
+}
+
+pub fn incrementResetCounter() !u32 {
+    return try incrementCounter(.reset_counter);
 }

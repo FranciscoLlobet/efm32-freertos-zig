@@ -93,7 +93,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             self.state = .perform_firmware_download;
         } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
-                http.service.filedownload("http://192.168.50.133:80/XDK110.bin", "SD:FW.BIN", 512) catch {};
+                // get eTag from the NVM
+
+                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], "SD:FW.BIN", 512, null) catch {};
             }
 
             _ = c.printf("Firmware download complete\r\n");

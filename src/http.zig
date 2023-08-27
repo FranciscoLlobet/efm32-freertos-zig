@@ -23,6 +23,8 @@ rx_mutex: freertos.Semaphore,
 tx_buffer: [256]u8 align(@alignOf(u32)),
 // RX Buffer
 rx_buffer: [1536]u8 align(@alignOf(u32)),
+// Etag
+etag: ?[64]u8,
 
 file: file,
 
@@ -80,7 +82,8 @@ const parsedResponse = struct {
     accept_ranges: ?acceptRanges,
     keep_alive: ?keepAlive,
 
-    payload: ?[]u8,
+    payload: ?[]const u8,
+    etag: ?[]const u8,
 
     // Function to process the HTTP response headers.
     fn processHeaders(self: *@This(), headers: []c.phr_header, payload: ?[]u8, status: i32) void {
@@ -92,6 +95,7 @@ const parsedResponse = struct {
         self.content_length = null;
         self.range = null;
         self.accept_ranges = null;
+        self.etag = null;
 
         // Process specific headers based on their type.
         for (headers) |header| {
@@ -109,7 +113,8 @@ const parsedResponse = struct {
                         self.content_length = std.fmt.parseInt(usize, header.value[0..header.value_len], 10) catch null;
                     },
                     .etag => {
-                        // TODO: Process ETag header value.
+                        // Convert ETag information into slice
+                        self.etag = header.value[0..header.value_len];
                     },
                     .connection => {
                         // TODO: Determine if the connection is 'keep-alive' or 'close'.
@@ -225,8 +230,10 @@ fn calcRequestEnd(file_size: usize, comptime block_size: usize, current_position
     return if (requestEnd > (file_size - 1)) (file_size - 1) else requestEnd;
 }
 
-pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize) !void {
+pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize, ETag: ?[]const u8) !void {
     var parsed_response: parsedResponse = undefined;
+
+    _ = ETag;
 
     var uri = try std.Uri.parse(url);
     errdefer {
@@ -239,9 +246,6 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
         self.connection.close() catch {};
     }
 
-    //var currentPosition: usize = 0;
-    // var fileSize: usize = undefined;
-
     try self.sendHeadRequest(url);
 
     var rx = try self.recieveResponse();
@@ -251,7 +255,23 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
         return @"error".generic;
     }
 
+    if (parsed_response.etag) |etag| {
+        if (self.etag == null) {
+            const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
+
+            @memcpy(self.etag.?[0..len], etag[0..len]);
+        } else {
+            // There is already a etag stored
+            // Compare ETags
+            // If both ETags are the same, then abort the download
+        }
+    } else {
+        // nullfy the ETag header
+        self.etag = null;
+    }
+
     const fileSize: usize = parsed_response.content_length.?;
+
     self.file = try file.open(file_name, @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
     defer {
         self.file.close() catch {};
@@ -261,7 +281,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
 
     while (self.file.tell() < fileSize) {
         var requestEnd = calcRequestEnd(fileSize, block_size, self.file.tell());
-        //var expected_request_len = requestEnd - currentPosition + 1;
+
         try self.sendGetRangeRequest(url, self.file.tell(), requestEnd);
 
         rx = try self.recieveResponse();
@@ -346,16 +366,16 @@ const httpHeaderIndexes = enum(i32) {
 };
 
 const responseHeaders = enum(usize) {
-    contentType = 0,
-    contentLength = 1,
-    contentRange = 2,
-    connection = 3,
-    contentLocation = 4,
-    contentEncoding = 5,
-    acceptRanges = 6,
-    etag = 7,
+    contentType,
+    contentLength,
+    contentRange,
+    connection,
+    contentLocation,
+    contentEncoding,
+    acceptRanges,
+    etag,
 
-    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "Content-Type", .contentType }, .{ "Content-Length", .contentLength }, .{ "Content-Range", .contentRange }, .{ "Connection", .connection }, .{ "Content-Location", .contentLocation }, .{ "Content-Encoding", .contentEncoding }, .{ "Accept-Ranges", .acceptRanges }, .{ "Etag", .etag } });
+    const stringMap = std.ComptimeStringMap(@This(), .{ .{ "Content-Type", .contentType }, .{ "Content-Length", .contentLength }, .{ "Content-Range", .contentRange }, .{ "Connection", .connection }, .{ "Content-Location", .contentLocation }, .{ "Content-Encoding", .contentEncoding }, .{ "Accept-Ranges", .acceptRanges }, .{ "ETag", .etag } });
 
     fn getResponseType(header: c.phr_header) ?@This() {
         return stringMap.get(header.name[0..(header.name_len)]);

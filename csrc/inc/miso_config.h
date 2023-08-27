@@ -21,5 +21,6 @@ char * config_get_mqtt_url(void);
 
 char * config_get_mqtt_psk_id(void);
 char * config_get_mqtt_psk_key(void);
+char * const config_get_http_uri(void);
 
 #endif /* UISO_CONFIG_H_ */

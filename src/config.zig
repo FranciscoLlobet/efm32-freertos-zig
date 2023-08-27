@@ -160,6 +160,9 @@ pub fn store_config_in_nvm() !void {
     try nvm.writeDataCString(.mqtt_psk_id, c.config_get_mqtt_psk_id());
     try nvm.writeDataCString(.mqtt_psk_key, c.config_get_mqtt_psk_key());
     try nvm.writeDataCString(.mqtt_device_id, c.config_get_mqtt_device_id());
+
+    // HTTP
+    try nvm.writeDataCString(.http_uri, c.config_get_http_uri());
 }
 
 pub fn load_config_from_nvm() !void {
@@ -168,12 +171,17 @@ pub fn load_config_from_nvm() !void {
     nvm.readCString(.wifi_ssid, c.config_get_wifi_ssid()) catch {};
     nvm.readCString(.wifi_psk, c.config_get_wifi_key()) catch {};
 
+    // LWM2M
     nvm.readCString(.lwm2m_uri, c.config_get_lwm2m_uri()) catch {};
     nvm.readCString(.lwm2m_psk_id, c.config_get_lwm2m_psk_id()) catch {};
     nvm.readCString(.lwm2m_psk_key, c.config_get_lwm2m_psk_key()) catch {};
 
+    // MQTT
     nvm.readCString(.mqtt_uri, c.config_get_mqtt_url()) catch {};
     nvm.readCString(.mqtt_psk_id, c.config_get_mqtt_psk_id()) catch {};
     nvm.readCString(.mqtt_psk_key, c.config_get_mqtt_psk_key()) catch {};
     nvm.readCString(.mqtt_device_id, c.config_get_mqtt_device_id()) catch {};
+
+    // HTTP
+    nvm.readCString(.http_uri, c.config_get_http_uri()) catch {};
 }

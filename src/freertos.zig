@@ -74,8 +74,8 @@ pub fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
     }
 }
 
-pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: TickType_t) bool {
-    return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait));
+pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: ?TickType_t) bool {
+    return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY));
 }
 
 pub fn getAndCastTimerID(comptime T: type, xTimer: TimerHandle_t) *T {
