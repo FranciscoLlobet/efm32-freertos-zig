@@ -8,8 +8,12 @@ const c = @cImport({
 });
 const main = @import("main.zig");
 
+/// NVM Keys used in the App
 pub const app_nvm_keys = enum(u32) {
+    /// APP Start Counter
     start_counter = 0x00000,
+
+    /// APP Reset Counter
     reset_counter = 0x00001,
 
     timestamp,
@@ -25,19 +29,22 @@ pub const app_nvm_keys = enum(u32) {
 
     ntp_uri,
 
-    // MQTT URI
+    /// MQTT URI in format: mqtt(s)://host:port
     mqtt_uri,
+
+    /// PSK ID
     mqtt_psk_id,
+
+    /// PSK Key
     mqtt_psk_key,
+
+    /// Device ID
     mqtt_device_id,
 
     // Firmware download URI
     http_uri,
     http_psk_id,
     http_psk_key,
-
-    // Firmware download ETag
-    fw_etag, // Internal etag
 
     // LWM2M Default URI
     lwm2m_uri,
@@ -48,9 +55,10 @@ pub const app_nvm_keys = enum(u32) {
     // Firmware update info
 
     // Firmware SHA256 hash checksum
+    firmware_etag,
     firmware_update_trigger,
     firmware_download_counter,
-    firmware_sha256,
+
     firmware_update_state,
 
     max_key = 0x0FFFF,
@@ -135,18 +143,22 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
     try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
+/// Write data into NVM
 pub fn writeData(key: app_nvm_keys, value: *const anyopaque, len: usize) !void {
     try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
+/// Write a C-String into NVM
 pub fn writeDataCString(key: app_nvm_keys, value: [*c]u8) !void {
     try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, c.strlen(value) + @as(usize, 1)));
 }
 
+/// Write a 32-Bit counter value
 fn writeCounter(key: app_nvm_keys, value: u32) !void {
     try ret.check(c.nvm3_writeCounter(&miso_nvm3, @intFromEnum(key), value));
 }
 
+/// Increment counter value
 fn incrementCounter(key: app_nvm_keys) !u32 {
     var newValue: u32 = 0;
     try ret.check(c.nvm3_incrementCounter(&miso_nvm3, @intFromEnum(key), &newValue));
@@ -154,10 +166,12 @@ fn incrementCounter(key: app_nvm_keys) !u32 {
     return newValue;
 }
 
+/// Increment the APP start counter
 pub fn incrementAppCounter() !u32 {
     return try incrementCounter(.start_counter);
 }
 
+/// Increment the reset counter
 pub fn incrementResetCounter() !u32 {
     return try incrementCounter(.reset_counter);
 }

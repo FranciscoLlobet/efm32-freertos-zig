@@ -230,10 +230,12 @@ fn calcRequestEnd(file_size: usize, comptime block_size: usize, current_position
     return if (requestEnd > (file_size - 1)) (file_size - 1) else requestEnd;
 }
 
-pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize, ETag: ?[]const u8) !void {
+pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
 
-    _ = ETag;
+    //if (ETag) |etag| {
+    //    @memcpy(self.etag.?[0..etag.len], etag);
+    //}
 
     var uri = try std.Uri.parse(url);
     errdefer {
@@ -264,6 +266,11 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
             // There is already a etag stored
             // Compare ETags
             // If both ETags are the same, then abort the download
+            const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
+
+            if (std.mem.eql(u8, self.etag.?[0..len], etag[0..len])) {
+                return;
+            }
         }
     } else {
         // nullfy the ETag header

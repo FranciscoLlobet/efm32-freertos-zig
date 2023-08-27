@@ -50,6 +50,7 @@ pub const miso_version_minor: u8 = 0;
 pub const miso_version_patch: u8 = 1;
 pub const miso_version: u32 = (miso_version_mayor << 16) | (miso_version_minor << 8) | (miso_version_patch);
 
+/// Open file and calculate SHA256 hash
 fn calculate_config_hash(path: []const u8, hash: *[32]u8) !void {
     const allocator = freertos.allocator;
 
@@ -72,6 +73,7 @@ fn calculate_config_hash(path: []const u8, hash: *[32]u8) !void {
     _ = sha256_ctx.finish(hash);
 }
 
+/// Load a public key im PEM format into PK context
 fn load_public_key_from_file(path: []const u8, pk_ctx: *pk) !void {
     const allocator = freertos.allocator;
 
