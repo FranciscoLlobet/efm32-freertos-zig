@@ -41,7 +41,7 @@ fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     var self = freertos.getAndCastTimerID(@This(), xTimer);
     var test_var: u32 = 0xAA55;
 
-    _ = self.queue.send(@as(*void, @ptrCast(&test_var)), 0); // This is causing a deadlock (!)
+    _ = self.task.notify(test_var, .eSetBits);
 }
 
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -52,8 +52,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     _ = nvm.init() catch 0;
 
     fatfs.mount("SD") catch unreachable;
-
-    self.timer.start(null) catch unreachable;
 
     while (true) {
 
@@ -105,11 +103,15 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         } else if (self.state == .start_mqtt) {
             mqtt.service.resumeTask();
 
+            self.timer.start(null) catch unreachable;
+
             self.state = .working;
         } else if (self.state == .working) {
             var test_var: u32 = 0;
 
-            if (self.queue.receive(@as(*void, @ptrCast(&test_var)), null)) {
+            // recieve
+
+            if (self.task.waitForNotify(0x0, 0xFFFFFFFF, &test_var, null)) {
                 leds.yellow.toggle();
                 _ = c.printf("UserTask: %d\r\n", self.task.getStackHighWaterMark());
             }
@@ -119,7 +121,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
 pub fn create(self: *@This()) void {
     self.task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, self, config.rtos_prio_user_task) catch unreachable;
-    self.queue.create(4, 1) catch unreachable;
     self.timer.create("user_timer", 2000, freertos.pdTRUE, self, myTimerFunction) catch unreachable;
 }
 

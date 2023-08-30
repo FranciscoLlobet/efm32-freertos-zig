@@ -90,7 +90,7 @@ fn load_public_key_from_file(path: []const u8, pk_ctx: *pk) !void {
     _ = pk_ctx.parse(key);
 }
 
-// open the configuration file, calculate the hash value and compare it with the nvm reference.
+/// Open the configuration file, calculate the hash value and compare it with the nvm reference.
 pub fn open_config_file(path: []const u8) !bool {
     var config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     const allocator = freertos.allocator;

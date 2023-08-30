@@ -74,7 +74,7 @@ void BOARD_Init(void)
 	sl_device_init_lfxo();
 	sl_device_init_emu();
 
-	volatile Ecode_t rc =  nvm3_open(miso_nvm3_handle, miso_nvm3_init_handle);
+	(void)nvm3_open(miso_nvm3_handle, miso_nvm3_init_handle);
 
 	NVIC_SetPriorityGrouping((uint32_t) 3);/* Set priority grouping to group 4*/
 
