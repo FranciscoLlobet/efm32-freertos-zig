@@ -41,7 +41,7 @@ fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     var self = freertos.getAndCastTimerID(@This(), xTimer);
     var test_var: u32 = 0xAA55;
 
-    _ = self.task.notify(test_var, .eSetBits);
+    self.task.notify(test_var, .eSetBits) catch {};
 }
 
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -84,8 +84,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             // Change this to wait for connectivity
             wifi_task.resumeTask();
 
+            //eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null);
             while ((eventValue & c.miso_connectivity_on) != c.miso_connectivity_on) {
-                _ = self.task.waitForNotify(0, 0xFFFFFFFF, &eventValue, null);
+                eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null).?;
             }
 
             self.state = .perform_firmware_download;
@@ -107,11 +108,10 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
             self.state = .working;
         } else if (self.state == .working) {
-            var test_var: u32 = 0;
-
             // recieve
 
-            if (self.task.waitForNotify(0x0, 0xFFFFFFFF, &test_var, null)) {
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, null)) |_| {
+                //_ = val;
                 leds.yellow.toggle();
                 _ = c.printf("UserTask: %d\r\n", self.task.getStackHighWaterMark());
             }

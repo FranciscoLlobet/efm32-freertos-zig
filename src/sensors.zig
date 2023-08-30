@@ -16,7 +16,7 @@ task: freertos.Task = undefined,
 timer: freertos.Timer = undefined,
 
 fn _tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    _ = freertos.getAndCastTimerID(freertos.Task, xTimer).notify(1, .eSetBits);
+    freertos.getAndCastTimerID(freertos.Task, xTimer).notify(1, .eSetBits) catch {};
 }
 
 fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
@@ -27,9 +27,8 @@ fn _sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
 
     while (true) {
         var temp_data: bme280.bme280_data = undefined;
-        var notification_value: u32 = 0;
 
-        if (self.task.waitForNotify(0, 0xFFFFFFFF, &notification_value, freertos.portMAX_DELAY)) {
+        if (self.task.waitForNotify(0, 0xFFFFFFFF, freertos.portMAX_DELAY)) |notification_value| {
             if (notification_value == 1) {
                 bme280.sensor.readInForcedMode(&temp_data) catch unreachable;
                 // Notify to event system

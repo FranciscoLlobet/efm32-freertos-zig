@@ -13,7 +13,7 @@ const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
 
-const c_board = @cImport({
+const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
     @cInclude("sl_simple_led.h");
@@ -29,7 +29,7 @@ export fn vApplicationIdleHook() void {
 }
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    _ = c_board.printf("--- FreeRTOS Scheduler Started ---\n\r");
+    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\r");
 
     leds.red.on();
 
@@ -71,28 +71,28 @@ export fn vApplicationTickHook() void {
 pub const microzig_options = struct {
     pub const interrupts = struct {
         pub fn GPIO_EVEN() void {
-            c_board.GPIO_EVEN_IRQHandler();
+            c.GPIO_EVEN_IRQHandler();
         }
         pub fn GPIO_ODD() void {
-            c_board.GPIO_ODD_IRQHandler();
+            c.GPIO_ODD_IRQHandler();
         }
         pub fn RTC() void {
-            c_board.RTC_IRQHandler();
+            c.RTC_IRQHandler();
         }
         pub fn DMA() void {
-            c_board.DMA_IRQHandler();
+            c.DMA_IRQHandler();
         }
         pub fn I2C0() void {
-            c_board.I2C0_IRQHandler();
+            c.I2C0_IRQHandler();
         }
         pub fn USB() void {
-            c_board.USB_IRQHandler();
+            c.USB_IRQHandler();
         }
         pub fn TIMER0() void {
-            c_board.TIMER0_IRQHandler();
+            c.TIMER0_IRQHandler();
         }
         pub fn SysTick() void {
-            if (freertos.c.taskSCHEDULER_NOT_STARTED != freertos.c.xTaskGetSchedulerState()) {
+            if (.taskSCHEDULER_NOT_STARTED != freertos.xTaskGetSchedulerState()) {
                 xPortSysTickHandler();
             }
         }
@@ -187,8 +187,8 @@ pub export fn system_reset() callconv(.C) void {
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-pub export fn miso_notify_event(event: c_board.miso_event) callconv(.C) void {
-    _ = user.user_task.task.notify(event, .eSetBits);
+pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
+    user.user_task.task.notify(event, .eSetBits) catch {};
 }
 
 pub export fn main() void {
@@ -204,7 +204,7 @@ pub export fn main() void {
 
     network.start();
 
-    _ = c_board.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
+    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
 
     freertos.vTaskStartScheduler();
 

@@ -27,14 +27,24 @@ pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
 // Common FreeRTOS constants
 pub const pdPASS = c.pdPASS;
 pub const pdFAIL = c.pdFAIL;
+
 pub const pdTRUE = c.pdTRUE;
 pub const pdFALSE = c.pdFALSE;
 
+// Scheduler State
+const eTaskSchedulerState = enum(BaseType_t) { taskSCHEDULER_NOT_STARTED = c.taskSCHEDULER_NOT_STARTED, taskSCHEDULER_SUSPENDED = c.taskSCHEDULER_SUSPENDED, taskSCHEDULER_RUNNING = c.taskSCHEDULER_RUNNING };
+
 const FreeRtosError = error{
     pdFAIL,
+
     TaskCreationFailed,
     TaskHandleAlreadyExists,
+    TaskNotifyFailed,
+
     QueueCreationFailed,
+    QueueSendFailed,
+    QueueReceiveFailed,
+
     SemaphoreCreationFailed,
     TimerCreationFailed,
 
@@ -47,6 +57,10 @@ const FreeRtosError = error{
 pub fn vTaskStartScheduler() noreturn {
     c.vTaskStartScheduler();
     unreachable;
+}
+
+pub fn xTaskGetSchedulerState() eTaskSchedulerState {
+    return @enumFromInt(c.xTaskGetSchedulerState());
 }
 
 pub fn vPortMalloc(xSize: usize) ?*anyopaque {
@@ -124,15 +138,18 @@ pub const Task = struct {
     pub fn resumeTaskFromIsr(self: *Task) BaseType_t {
         return c.xTaskResumeFromISR(self.handle);
     }
-    pub fn notify(self: *Task, ulValue: u32, eAction: eNotifyAction) bool {
-        return (pdPASS == c.xTaskGenericNotify(self.handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null));
+
+    // Notify Task with given value
+    pub fn notify(self: *Task, ulValue: u32, eAction: eNotifyAction) FreeRtosError!void {
+        return if (pdPASS == c.xTaskGenericNotify(self.handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null)) return FreeRtosError.TaskNotifyFailed;
     }
     pub fn notifyFromISR(self: *Task, ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
-    pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, pulNotificationValue: *u32, xTicksToWait: ?TickType_t) bool {
+    pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) ?u32 {
         _ = self;
-        return (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, pulNotificationValue, xTicksToWait orelse portMAX_DELAY));
+        var pulNotificationValue: u32 = undefined;
+        return if (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, &pulNotificationValue, xTicksToWait orelse portMAX_DELAY)) pulNotificationValue else null;
     }
     pub fn getStackHighWaterMark(self: *Task) u32 {
         return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
@@ -202,34 +219,34 @@ pub const Semaphore = struct {
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
-    pub fn create(self: *Timer, pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !void {
+    pub fn create(self: *@This(), pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !void {
         self.handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction);
         if (self.handle == null) {
             return FreeRtosError.TimerCreationFailed;
         }
     }
-    pub fn start(self: *Timer, xTicksToWait: ?TickType_t) !void {
+    pub fn start(self: *@This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStartFailed;
         }
     }
-    pub fn stop(self: *Timer, xTicksToWait: ?TickType_t) !void {
+    pub fn stop(self: *@This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(TickType_t, 0), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStopFailed;
         }
     }
-    pub fn changePeriod(self: *Timer, xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
+    pub fn changePeriod(self: *@This(), xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_CHANGE_PERIOD, xNewPeriod, null, xBlockTime orelse portMAX_DELAY)) {
             return FreeRtosError.TimerChangePeriodFailed;
         }
     }
-    pub fn delete(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
+    pub fn delete(self: *@This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerDelete(self.handle, xTicksToWait);
     }
-    pub fn reset(self: *Timer, xTicksToWait: TickType_t) BaseType_t {
+    pub fn reset(self: *@This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerReset(self.handle, xTicksToWait);
     }
-    pub fn getId(self: *Timer) ?*anyopaque {
+    pub fn getId(self: *@This()) ?*anyopaque {
         return c.pvTimerGetTimerID(self.handle);
     }
     pub fn initFromHandle(handle: TimerHandle_t) @This() {
@@ -246,8 +263,7 @@ pub const MessageBuffer = struct {
         return c.xMessageBufferSend(self.handle, pvTxData, xDataLengthBytes, xTicksToWait orelse portMAX_DELAY);
     }
     pub fn receive(self: *@This(), pvRxData: ?*anyopaque, xDataLengthBytes: usize, ticks_to_wait: ?TickType_t) usize {
-        var ticks = ticks_to_wait orelse portMAX_DELAY;
-        return c.xMessageBufferReceive(self.handle, pvRxData, xDataLengthBytes, ticks);
+        return c.xMessageBufferReceive(self.handle, pvRxData, xDataLengthBytes, ticks_to_wait orelse portMAX_DELAY);
     }
 };
 
