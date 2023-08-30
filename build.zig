@@ -23,26 +23,29 @@ pub fn build(b: *std.build.Builder) void {
     const include_path_array = [_][]const u8{
         // Configuration Files for miso
         "csrc/config",
+
         // C-Bootstraps
         "csrc/system/cmsis",
+
         // Board package
         "csrc/board/inc",
+
+        // Core C-source includes
         "csrc/inc",
 
+        // JSMN header lib
         "csrc/utils/jsmn",
-        "csrc/inc",
     };
     const src_paths = [_][]const u8{
+        // Newlib adapter
         "csrc/system/newlib/assert.c",
         "csrc/system/newlib/exit.c",
         "csrc/system/newlib/sbrk.c",
         "csrc/system/newlib/syscalls.c",
 
-        "csrc/src/config.c",
-
         // Board (support) package
-        "csrc/board/src/board.c",
         "csrc/board/src/system_efm32gg.c",
+        "csrc/board/src/board.c",
         "csrc/board/src/board_leds.c",
         "csrc/board/src/board_buttons.c",
         "csrc/board/src/board_watchdog.c",
@@ -58,6 +61,8 @@ pub fn build(b: *std.build.Builder) void {
         "csrc/board/src/board_em9301.c",
         "csrc/board/src/board_usb.c",
 
+        // Core C-source
+        "csrc/src/config.c",
         "csrc/src/miso_ntp.c",
         "csrc/src/sntp_packet.c",
         "csrc/src/network.c",
