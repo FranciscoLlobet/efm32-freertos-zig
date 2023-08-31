@@ -35,17 +35,18 @@ const state = enum(usize) {
 task: freertos.Task,
 timer: freertos.Timer,
 queue: freertos.Queue,
+//typedQueue: freertos.TypedQueue,
 state: state,
 
 fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    var self = freertos.getAndCastTimerID(@This(), xTimer);
+    const self = freertos.getAndCastTimerID(@This(), xTimer);
     var test_var: u32 = 0xAA55;
 
     self.task.notify(test_var, .eSetBits) catch {};
 }
 
 fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
@@ -120,8 +121,8 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, self, config.rtos_prio_user_task) catch unreachable;
-    self.timer.create("user_timer", 2000, freertos.pdTRUE, self, myTimerFunction) catch unreachable;
+    self.task = freertos.Task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, @constCast(self), config.rtos_prio_user_task) catch unreachable;
+    self.timer = freertos.Timer.create("user_timer", 2000, freertos.pdTRUE, @constCast(self), myTimerFunction) catch unreachable;
 }
 
-pub var user_task: @This() = undefined;
+pub var user_task: @This() = .{ .timer = undefined, .queue = undefined, .state = undefined, .task = undefined };

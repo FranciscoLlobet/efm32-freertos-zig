@@ -125,7 +125,7 @@ var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 const packet = struct {
     transport: MQTTTransport,
     packetIdState: u16,
-    workBufferMutex: freertos.Semaphore,
+    workBufferMutex: freertos.Mutex,
     txQueue: freertos.MessageBuffer = undefined,
 
     pub fn init(comptime packetId: u16) @This() {
@@ -142,7 +142,7 @@ const packet = struct {
     pub fn create(self: *@This(), conn: *connection) void {
         self.transport.sck = @ptrCast(conn);
 
-        self.workBufferMutex.createMutex() catch unreachable;
+        self.workBufferMutex = freertos.Mutex.create() catch unreachable;
 
         self.txQueue.create(1024); // Create message buffer
     }
@@ -207,7 +207,7 @@ const packet = struct {
 
         connectPacket.keepAliveInterval = 400;
 
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_connect(@ptrCast(&workBuffer[0]), workBuffer.len, &connectPacket);
 
@@ -215,7 +215,7 @@ const packet = struct {
     }
 
     fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
 
@@ -223,7 +223,7 @@ const packet = struct {
     }
 
     fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
 
@@ -231,7 +231,7 @@ const packet = struct {
     }
 
     fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId);
 
@@ -239,7 +239,7 @@ const packet = struct {
     }
 
     fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetId = self.generatePacketId();
         var dup: u8 = 0;
@@ -250,7 +250,7 @@ const packet = struct {
     }
 
     fn preparePingPacket(self: *@This()) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len);
 
@@ -258,7 +258,7 @@ const packet = struct {
     }
 
     fn prepareDisconnectPacket(self: *@This()) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var packetLen: isize = c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len);
 
@@ -266,7 +266,7 @@ const packet = struct {
     }
 
     pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
-        _ = self.workBufferMutex.take(null);
+        _ = try self.workBufferMutex.take(null);
 
         var topic_name = MQTTString{ .cstring = @constCast(topic), .lenstring = .{ .len = 0, .data = null } };
         var dup: u8 = 0;
@@ -298,7 +298,7 @@ const packet = struct {
         } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(&workBuffer[0]), @intCast(packetLen), null))) {
             return mqtt_error.enqueue_failed;
         }
-        _ = self.workBufferMutex.give();
+        try self.workBufferMutex.give();
 
         return @intCast(packetId orelse 0);
     }
@@ -380,7 +380,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 }
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
@@ -405,7 +405,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     while (true) {
         self.task.suspendTask();
@@ -413,24 +413,24 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    var self = freertos.getAndCastTimerID(@This(), xTimer);
+    const self = freertos.getAndCastTimerID(@This(), xTimer);
 
     _ = self.packet.preparePingPacket() catch {};
 }
 
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    var self = freertos.getAndCastTimerID(@This(), xTimer);
+    const self = freertos.getAndCastTimerID(@This(), xTimer);
     const payload = "test";
     _ = self.packet.preparePublishPacket("zig/pub", payload, payload.len, 1) catch {};
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
+    self.task = freertos.Task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.connection = connection.init(.mqtt, authCallback);
-        self.pingTimer.create("mqttPing", 60000, freertos.pdTRUE, self, pingTimer) catch unreachable;
-        self.pubTimer.create("pubTimer", 10000, freertos.pdTRUE, self, pubTimer) catch unreachable;
+        self.pingTimer = freertos.Timer.create("mqttPing", 60000, freertos.pdTRUE, self, pingTimer) catch unreachable;
+        self.pubTimer = freertos.Timer.create("pubTimer", 10000, freertos.pdTRUE, self, pubTimer) catch unreachable;
         self.packet.create(&self.connection);
     }
 }

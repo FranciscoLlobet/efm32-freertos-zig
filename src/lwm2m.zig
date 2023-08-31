@@ -18,7 +18,7 @@ reg_update: freertos.Timer,
 timer_update: freertos.Timer,
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
     var ret: i32 = 0;
 
     self.reg_update.start(null) catch unreachable;
@@ -27,13 +27,13 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (ret == 0) {
         ret = c.lwm2m_client_task_runner(self);
 
-        board.msDelay(60 * 1000); // Retry in 60 seconds
+        self.task.delayTask(60 * 1000);
     }
     system.reset();
 }
 
 fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    var self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
 
     while (true) {
         self.task.suspendTask();
@@ -49,7 +49,7 @@ fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", config.rtos_stack_depth_lwm2m, self, config.rtos_prio_lwm2m) catch unreachable;
+    self.task = freertos.Task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", config.rtos_stack_depth_lwm2m, self, config.rtos_prio_lwm2m) catch unreachable;
 
     self.task.suspendTask();
 

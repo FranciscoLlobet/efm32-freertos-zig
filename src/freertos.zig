@@ -1,7 +1,6 @@
 const std = @import("std");
 const cpu = @import("microzig").cpu;
 pub const c = @cImport({
-    @cInclude("board.h");
     @cInclude("FreeRTOS.h");
     @cInclude("task.h");
     @cInclude("timers.h");
@@ -54,7 +53,7 @@ const FreeRtosError = error{
 };
 
 // Kernel function
-pub fn vTaskStartScheduler() noreturn {
+pub inline fn vTaskStartScheduler() noreturn {
     c.vTaskStartScheduler();
     unreachable;
 }
@@ -79,7 +78,7 @@ pub fn xTaskGetTickCount() TickType_t {
     return c.xTaskGetTickCount();
 }
 
-pub fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
+pub inline fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
     if (xSwitchRequired != pdFALSE) {
         cpu.regs.ICSR.modify(.{ .PENDSVSET = 1 });
 
@@ -92,11 +91,13 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
     return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY));
 }
 
-pub fn getAndCastTimerID(comptime T: type, xTimer: TimerHandle_t) *T {
+/// Helper function that can be used to cast a timerID pointer to a reference
+pub inline fn getAndCastTimerID(comptime T: type, xTimer: TimerHandle_t) *T {
     return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
 }
 
-pub fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
+/// Helper function that can be used to cast the pvParameters pointer to a reference
+pub inline fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
     return @as(*T, @ptrCast(@alignCast(pvParameters)));
 }
 
@@ -114,47 +115,51 @@ pub const Task = struct {
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
         return @This(){ .handle = task_handle };
     }
-    pub fn create(self: *Task, pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
-        if (c.pdPASS != c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, &self.handle)) {
+    pub fn create(pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
+        var self: @This() = undefined;
+
+        if (c.pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) {
+            return self;
+        } else {
             return FreeRtosError.TaskCreationFailed;
         }
     }
-    pub fn setHandle(self: *Task, handle: TaskHandle_t) !void {
+    pub fn setHandle(self: *const @This(), handle: TaskHandle_t) !void {
         if (self.handle != undefined) {
             self.handle = handle;
         } else {
             return FreeRtosError.TaskHandleAlreadyExists;
         }
     }
-    pub fn getHandle(self: *Task) TaskHandle_t {
+    pub fn getHandle(self: *const @This()) TaskHandle_t {
         return self.handle;
     }
-    pub fn resumeTask(self: *Task) void {
+    pub fn resumeTask(self: *const @This()) void {
         c.vTaskResume(self.handle);
     }
-    pub fn suspendTask(self: *Task) void {
+    pub fn suspendTask(self: *const @This()) void {
         c.vTaskSuspend(self.handle);
     }
-    pub fn resumeTaskFromIsr(self: *Task) BaseType_t {
+    pub inline fn resumeTaskFromIsr(self: *const @This()) BaseType_t {
         return c.xTaskResumeFromISR(self.handle);
     }
 
     // Notify Task with given value
-    pub fn notify(self: *Task, ulValue: u32, eAction: eNotifyAction) FreeRtosError!void {
+    pub fn notify(self: *const @This(), ulValue: u32, eAction: eNotifyAction) FreeRtosError!void {
         return if (pdPASS == c.xTaskGenericNotify(self.handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null)) return FreeRtosError.TaskNotifyFailed;
     }
-    pub fn notifyFromISR(self: *Task, ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
+    pub inline fn notifyFromISR(self: *const @This(), ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
-    pub fn waitForNotify(self: *Task, ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) ?u32 {
+    pub fn waitForNotify(self: *const @This(), ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) ?u32 {
         _ = self;
         var pulNotificationValue: u32 = undefined;
         return if (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, &pulNotificationValue, xTicksToWait orelse portMAX_DELAY)) pulNotificationValue else null;
     }
-    pub fn getStackHighWaterMark(self: *Task) u32 {
+    pub fn getStackHighWaterMark(self: *const @This()) u32 {
         return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
     }
-    pub fn delayTask(self: *Task, xTicksToDelay: TickType_t) void {
+    pub fn delayTask(self: *const @This(), xTicksToDelay: TickType_t) void {
         _ = self;
         c.vTaskDelay(xTicksToDelay);
     }
@@ -163,21 +168,75 @@ pub const Task = struct {
 pub const Queue = struct {
     handle: QueueHandle_t = undefined,
 
-    pub fn create(self: *@This(), item_size: UBaseType_t, queue_length: UBaseType_t) !void {
-        self.handle = c.xQueueCreate(item_size, queue_length);
+    pub fn create(comptime T: type, len: usize) !@This() {
+        var self: @This() = .{ .handle = c.xQueueCreate(@sizeOf(T), len) };
         if (self.handle == null) {
             return FreeRtosError.QueueCreationFailed;
         }
+        return self;
     }
-    pub fn send(self: *@This(), item_to_queue: *const void, comptime ticks_to_wait: ?UBaseType_t) bool {
-        return (pdTRUE == c.xQueueSend(self.handle, item_to_queue, ticks_to_wait orelse portMAX_DELAY));
+    pub fn send(self: *@This(), comptime T: type, item: *const T, comptime ticks_to_wait: ?TickType_t) bool {
+        return (pdTRUE == c.xQueueSend(self.handle, @ptrCast(@constCast(item)), ticks_to_wait orelse portMAX_DELAY));
     }
-    pub fn receive(self: *@This(), buffer: *void, comptime ticks_to_wait: ?UBaseType_t) bool {
-        return (pdTRUE == c.xQueueReceive(self.handle, buffer, ticks_to_wait orelse portMAX_DELAY));
+    pub fn receive(self: *@This(), comptime T: type, item: *const T, comptime ticks_to_wait: ?TickType_t) bool {
+        return (pdTRUE == c.xQueueReceive(self.handle, @ptrCast(@as(*T, @alignCast(item))), ticks_to_wait orelse portMAX_DELAY));
     }
     pub fn delete(self: *@This()) void {
         c.xQueueDelete(self.handle);
         self.handle = undefined;
+    }
+};
+
+pub const TypedQueue = struct {
+    handle: QueueHandle_t,
+    T: type,
+
+    pub fn create(comptime T: type) @This() {
+        var self: @This() = .{ .handle = undefined, .T = T };
+
+        return self;
+    }
+    pub fn init(self: *@This(), len: usize) !void {
+        self.handle = .xQueueCreate(@sizeOf(self.T), len);
+        if (self.handle == null) {
+            return FreeRtosError.QueueCreationFailed;
+        }
+    }
+
+    pub fn send(self: *@This(), comptime item: *const self.T, comptime ticks_to_wait: ?TickType_t) bool {
+        return (pdTRUE == c.xQueueSend(self.handle, @ptrCast(@constCast(item)), ticks_to_wait orelse portMAX_DELAY));
+    }
+    pub fn receive(self: *@This(), comptime item: *const self.T, comptime ticks_to_wait: ?TickType_t) bool {
+        return (pdTRUE == c.xQueueReceive(self.handle, @ptrCast(@as(*self.T, @alignCast(item))), ticks_to_wait orelse portMAX_DELAY));
+    }
+    pub fn delete(self: *@This()) void {
+        c.xQueueDelete(self.handle);
+        self.handle = undefined;
+    }
+};
+
+pub const Mutex = struct {
+    handle: SemaphoreHandle_t = undefined,
+
+    pub fn create() !@This() {
+        var self = @This(){ .handle = c.xSemaphoreCreateMutex() };
+
+        if (self.handle == null) {
+            return FreeRtosError.SemaphoreCreationFailed;
+        }
+        return self;
+    }
+
+    pub fn take(self: *@This(), xTicksToWait: ?TickType_t) !bool {
+        return if (pdTRUE == c.xSemaphoreTake(self.handle, xTicksToWait orelse portMAX_DELAY)) true else FreeRtosError.pdFAIL;
+    }
+
+    pub fn give(self: *@This()) !void {
+        return if (pdTRUE == c.xSemaphoreGive(self.handle)) {} else FreeRtosError.pdFAIL;
+    }
+
+    pub inline fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
+        return if (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken)) {} else FreeRtosError.pdFAIL;
     }
 };
 
@@ -186,12 +245,6 @@ pub const Semaphore = struct {
 
     pub fn createBinary(self: *@This()) !void {
         self.handle = c.xSemaphoreCreateBinary();
-        if (self.handle == null) {
-            return FreeRtosError.SemaphoreCreationFailed;
-        }
-    }
-    pub fn createMutex(self: *@This()) !void {
-        self.handle = c.xSemaphoreCreateMutex();
         if (self.handle == null) {
             return FreeRtosError.SemaphoreCreationFailed;
         }
@@ -208,7 +261,7 @@ pub const Semaphore = struct {
     pub fn give(self: *@This()) bool {
         return (pdTRUE == c.xSemaphoreGive(self.handle));
     }
-    pub fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) bool {
+    pub inline fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken));
     }
     pub fn initFromHandle(handle: SemaphoreHandle_t) @This() {
@@ -219,34 +272,35 @@ pub const Semaphore = struct {
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
-    pub fn create(self: *@This(), pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !void {
-        self.handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction);
+    pub fn create(pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
+        var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction) };
         if (self.handle == null) {
             return FreeRtosError.TimerCreationFailed;
         }
+        return self;
     }
-    pub fn start(self: *@This(), xTicksToWait: ?TickType_t) !void {
+    pub fn start(self: *const @This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStartFailed;
         }
     }
-    pub fn stop(self: *@This(), xTicksToWait: ?TickType_t) !void {
+    pub fn stop(self: *const @This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(TickType_t, 0), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStopFailed;
         }
     }
-    pub fn changePeriod(self: *@This(), xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
+    pub fn changePeriod(self: *const @This(), xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_CHANGE_PERIOD, xNewPeriod, null, xBlockTime orelse portMAX_DELAY)) {
             return FreeRtosError.TimerChangePeriodFailed;
         }
     }
-    pub fn delete(self: *@This(), xTicksToWait: TickType_t) BaseType_t {
+    pub fn delete(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerDelete(self.handle, xTicksToWait);
     }
-    pub fn reset(self: *@This(), xTicksToWait: TickType_t) BaseType_t {
+    pub fn reset(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerReset(self.handle, xTicksToWait);
     }
-    pub fn getId(self: *@This()) ?*anyopaque {
+    pub fn getId(self: *const @This()) ?*anyopaque {
         return c.pvTimerGetTimerID(self.handle);
     }
     pub fn initFromHandle(handle: TimerHandle_t) @This() {

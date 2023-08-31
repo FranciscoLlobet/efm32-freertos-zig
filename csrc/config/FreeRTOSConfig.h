@@ -31,7 +31,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#include "board.h"
 #include "em_device.h"
 /*-----------------------------------------------------------
  * Application specific definitions.

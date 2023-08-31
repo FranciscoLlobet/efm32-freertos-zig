@@ -11,19 +11,19 @@ export fn callback() callconv(.C) void {
     var pxHigherPriorityTaskWoken = freertos.pdFALSE;
 
     if (source == c.USBX_TX_COMPLETE) {
-        _ = usb.tx_semaphore.giveFromIsr(&pxHigherPriorityTaskWoken);
+        usb.tx_semaphore.giveFromIsr(&pxHigherPriorityTaskWoken) catch {};
     }
 
     freertos.portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
 const Usb = struct {
-    tx_semaphore: freertos.Semaphore,
-    rx_semaphore: freertos.Semaphore,
+    tx_semaphore: freertos.Mutex,
+    rx_semaphore: freertos.Mutex,
 
     pub fn init(self: *@This()) void {
-        self.tx_semaphore.createMutex() catch unreachable;
-        self.rx_semaphore.createMutex() catch unreachable;
+        self.tx_semaphore = freertos.Mutex.create() catch unreachable;
+        self.rx_semaphore = freertos.Mutex.create() catch unreachable;
 
         c.USBX_apiCallbackEnable(callback);
     }

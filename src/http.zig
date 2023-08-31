@@ -16,9 +16,9 @@ connection: connection,
 // Array to store parsed header information
 headers: [24]c.phr_header,
 // TX Buffer mutex
-tx_mutex: freertos.Semaphore,
+tx_mutex: freertos.Mutex,
 // Rx Buffer mutex
-rx_mutex: freertos.Semaphore,
+rx_mutex: freertos.Mutex,
 // TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
 // RX Buffer
@@ -151,10 +151,10 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
     var ret: i32 = -1;
     var uri = try std.Uri.parse(url);
 
-    if (self.tx_mutex.take(null)) {
+    if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
         ret = self.connection.send(@ptrCast(request), request.len);
-        _ = self.tx_mutex.give();
+        _ = try self.tx_mutex.give();
     }
 
     if (ret < 0) {
@@ -168,10 +168,10 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
     var ret: i32 = -1;
     var uri = try std.Uri.parse(url);
 
-    if (self.tx_mutex.take(null)) {
+    if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
         ret = self.connection.send(@ptrCast(request), request.len);
-        _ = self.tx_mutex.give();
+        try self.tx_mutex.give();
     }
 
     if (ret < 0) {
@@ -192,7 +192,7 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
     var num_headers: usize = 24;
     var payload_len: usize = undefined;
     var payload: ?[]u8 = undefined;
-    if (self.rx_mutex.take(null)) {
+    if (try self.rx_mutex.take(null)) {
         @memset(&self.rx_buffer, 0);
 
         while (pret == -2) {
@@ -216,10 +216,10 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
             payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
         } else {
             // error
-            _ = self.rx_mutex.give();
+            try self.rx_mutex.give();
             return @"error".rx_error;
         }
-        _ = self.rx_mutex.give();
+        try self.rx_mutex.give();
     }
 
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = status };
@@ -355,8 +355,8 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
         self.connection = connection.init(.http, authCallback);
-        self.tx_mutex.createMutex() catch unreachable;
-        self.rx_mutex.createMutex() catch unreachable;
+        self.tx_mutex = freertos.Mutex.create() catch unreachable;
+        self.rx_mutex = freertos.Mutex.create() catch unreachable;
     }
 }
 
