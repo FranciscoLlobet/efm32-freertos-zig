@@ -61,11 +61,15 @@ pub const app_nvm_keys = enum(u20) {
 
     firmware_update_state,
 
+    // Config uri
+    config_uri,
+
     max_key = 0x0FFFF,
 };
 
 const nvmError = error{
     generic_error,
+    buffer_size_error,
     invalid_object_type,
 };
 
@@ -147,8 +151,20 @@ pub fn countObjects() usize {
     return c.nvm3_countObjects(&miso_nvm3);
 }
 
-pub fn readData(key: app_nvm_keys, value: [*c]u8, len: usize) !void {
-    try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), value, len));
+/// Read data from NVM into a Zig slice
+pub fn readData(key: app_nvm_keys, buffer: []u8) ![]u8 {
+    var len: usize = 0;
+    var object_type: u32 = undefined;
+
+    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, @intFromEnum(key), &object_type, &len));
+    if (len > buffer.len) {
+        return nvmError.buffer_size_error;
+    } else if (object_type != @intFromEnum(objectType.data)) {
+        return nvmError.invalid_object_type;
+    }
+
+    try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), buffer.ptr, len));
+    return buffer[0..len];
 }
 
 pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
@@ -163,7 +179,8 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
     try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
-/// Write data into NVM
+/// Write data into NVM using Zig slices
+///
 pub fn writeData(key: app_nvm_keys, value: []const u8) !void {
     try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), @ptrCast(value), value.len));
 }

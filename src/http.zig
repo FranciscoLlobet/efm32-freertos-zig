@@ -233,10 +233,6 @@ fn calcRequestEnd(file_size: usize, comptime block_size: usize, current_position
 pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
 
-    //if (ETag) |etag| {
-    //    @memcpy(self.etag.?[0..etag.len], etag);
-    //}
-
     var uri = try std.Uri.parse(url);
     errdefer {
         self.file.close() catch {};
@@ -257,26 +253,6 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
         return @"error".generic;
     }
 
-    //    if (parsed_response.etag) |etag| {
-    //       if (self.etag == null) {
-    //          const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
-
-    //          @memcpy(self.etag.?[0..len], etag[0..len]);
-    //      } else {
-    // There is already a etag stored
-    // Compare ETags
-    // If both ETags are the same, then abort the download
-    //         const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
-
-    //           if (std.mem.eql(u8, self.etag.?[0..len], etag[0..len])) {
-    //              return;
-    //          }
-    //     }
-    //   } else {
-    //      // nullfy the ETag header
-    //self.etag = null;
-    //   }
-
     const fileSize: usize = parsed_response.content_length.?;
 
     self.file = try file.open(file_name, @intFromEnum(file.fMode.create_always) | @intFromEnum(file.fMode.write));
@@ -287,9 +263,12 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
     try self.file.sync(); // Perfom sync to reduce chances of critical errors
 
     while (self.file.tell() < fileSize) {
-        var requestEnd = calcRequestEnd(fileSize, block_size, self.file.tell());
+        var current_position = self.file.tell();
 
-        try self.sendGetRangeRequest(url, self.file.tell(), requestEnd);
+        // Calculate the end position of the request
+        var requestEnd = calcRequestEnd(fileSize, block_size, current_position);
+
+        try self.sendGetRangeRequest(url, current_position, requestEnd);
 
         rx = try self.recieveResponse();
 
@@ -316,6 +295,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
                 // Request end position does not match with the expected value
             }
 
+            // Write the payload to the file
             if (parsed_response.payload.?.len != try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len)) {
                 // Test if the bytes written match the payload.
             }

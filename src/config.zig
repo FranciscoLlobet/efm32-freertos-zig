@@ -93,12 +93,11 @@ fn load_public_key_from_file(path: []const u8, pk_ctx: *pk) !void {
 /// Open the configuration file, calculate the hash value and compare it with the nvm reference.
 pub fn open_config_file(path: []const u8) !bool {
     var config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
+    var ref_config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     const allocator = freertos.allocator;
 
-    var ref_config_sha256: [32]u8 = undefined;
-
     // Read hash from NVM
-    nvm.readData(.config_sha256, &ref_config_sha256[0], ref_config_sha256.len) catch {
+    _ = nvm.readData(.config_sha256, &ref_config_sha256) catch {
         @memset(&ref_config_sha256, 0);
     };
 

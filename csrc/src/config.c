@@ -37,53 +37,110 @@ char config_mqtt_psk_id[128] __attribute__ ((aligned (4)))  = {0};
 char config_mqtt_psk_key[64] __attribute__ ((aligned (4))) = {0};
 
 char config_http_uri[128] __attribute__ ((aligned (4))) = {0};
+char config_config_uri[128] __attribute__ ((aligned (4))) = {0};
 
-char *config_get_wifi_ssid(void)
+void config_set_wifi_ssid(char *ssid) {
+    strncpy(config_wifi_ssid, ssid, sizeof(config_wifi_ssid));
+}
+
+void config_set_wifi_key(char *key) {
+    strncpy(config_wifi_key, key, sizeof(config_wifi_key));
+}
+
+void config_set_lwm2m_endpoint(char *endpoint) {
+    strncpy(config_lwm2m_endpoint, endpoint, sizeof(config_lwm2m_endpoint));
+}
+
+void config_set_lwm2m_uri(char *uri) {
+    strncpy(config_lwm2m_uri, uri, sizeof(config_lwm2m_uri));
+}
+
+void config_set_lwm2m_psk_id(char *psk_id) {
+    strncpy(config_lwm2m_psk_id, psk_id, sizeof(config_lwm2m_psk_id));
+}
+
+void config_set_lwm2m_psk_key(char *psk_key) {
+    strncpy(config_lwm2m_psk_key, psk_key, sizeof(config_lwm2m_psk_key));
+}
+
+void config_set_ntp_url(char *url) {
+    strncpy(config_ntp_url, url, sizeof(config_ntp_url));
+}
+
+void config_set_sha256(unsigned char *sha256) {
+    memcpy(config_sha256, sha256, sizeof(config_sha256));
+}
+
+void config_set_mqtt_uri(char *uri) {
+    strncpy(config_mqtt_uri, uri, sizeof(config_mqtt_uri));
+}
+
+void config_set_mqtt_device_id(char *device_id) {
+    strncpy(config_mqtt_device_id, device_id, sizeof(config_mqtt_device_id));
+}
+
+void config_set_mqtt_psk_id(char *psk_id) {
+    strncpy(config_mqtt_psk_id, psk_id, sizeof(config_mqtt_psk_id));
+}
+
+void config_set_mqtt_psk_key(char *psk_key) {
+    strncpy(config_mqtt_psk_key, psk_key, sizeof(config_mqtt_psk_key));
+}
+
+void config_set_http_uri(char *uri) {
+    strncpy(config_http_uri, uri, sizeof(config_http_uri));
+}
+
+void config_set_config_uri(char *uri) {
+    strncpy(config_config_uri, uri, sizeof(config_config_uri));
+}
+
+char * const config_get_wifi_ssid(void)
 {
 	return (char *)&config_wifi_ssid[0];
 }
 
-char *config_get_wifi_key(void)
+char * const config_get_wifi_key(void)
 {
 	return (char *)&config_wifi_key[0];
 }
 
-char *config_get_lwm2m_uri(void)
+char * const config_get_lwm2m_uri(void)
 {
 	return (char *)&config_lwm2m_uri[0];
 }
 
-char *config_get_lwm2m_psk_id(void)
+char * const config_get_lwm2m_psk_id(void)
 {
 	return (char *)&config_lwm2m_psk_id[0];
 }
 
-char *config_get_lwm2m_psk_key(void)
+char * const config_get_lwm2m_psk_key(void)
 {
 	return (char *)&config_lwm2m_psk_key[0];
 }
 
-char *config_get_mqtt_url(void)
+char * const config_get_mqtt_url(void)
 {
 	return (char *)&config_mqtt_uri[0];
 }
 
-char *config_get_mqtt_device_id(void)
+char * const config_get_mqtt_device_id(void)
 {
 	return (char *)&config_mqtt_device_id[0];
 }
 
-char *config_get_lwm2m_endpoint(void)
+char * const config_get_lwm2m_endpoint(void)
 {
 	return (char *)&config_lwm2m_endpoint[0];
 }
 
-char *config_get_mqtt_psk_id(void)
+char * const config_get_mqtt_psk_id(void)
 {
 	return (char *)&config_mqtt_psk_id[0];
 }
 
-char *config_get_mqtt_psk_key(void)
+char * const config_get_mqtt_psk_key(void)
 {
 	return (char *)&config_mqtt_psk_key[0];
 }
@@ -91,6 +148,11 @@ char *config_get_mqtt_psk_key(void)
 char *const config_get_http_uri(void)
 {
 	return (char *)&config_http_uri[0];
+}
+
+char * const config_get_config_uri(void)
+{
+	return (char *)&config_config_uri[0];
 }
 
 void miso_load_config(void)
@@ -157,6 +219,7 @@ void miso_load_config(void)
 		int mqtt_psk_key = INT8_MIN;
 		int mqtt_cert_key = INT8_MIN;
 		int http_key = INT8_MIN;
+		int config_key = INT8_MIN;
 
 		for (int i = 0; i < parse_result; i++)
 		{
@@ -182,6 +245,10 @@ void miso_load_config(void)
 				else if (0 == strncmp(json_key, "http", strlen("http")))
 				{
 					http_key = i;
+				}
+				else if(0 == strncmp(json_key, "config", strlen("config")))
+				{
+					config_key = i;
 				}
 			}
 			/* Access the wifi configuration */
@@ -211,6 +278,7 @@ void miso_load_config(void)
 					strncpy(dest_ptr, src_ptr, src_len);
 				}
 			}
+			// Access the lwm2m configuration
 			else if (((lwm2m_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
 			{
 				char *dest_ptr = NULL;
@@ -249,6 +317,7 @@ void miso_load_config(void)
 					strncpy(dest_ptr, src_ptr, src_len);
 				}
 			}
+			// Access the ntp configuration
 			else if (((ntp_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
 			{
 				if (0 == strncmp(json_key, "url", strlen("url")))
@@ -266,6 +335,7 @@ void miso_load_config(void)
 				size_t src_len = json_tokens[i].end - json_tokens[i].start;
 				strncpy(&config_ntp_url[0], (char *)read_buffer + json_tokens[i].start, src_len);
 			}
+			// Access the mqtt configuration
 			else if (((mqtt_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
 			{
 				char *dest_ptr = NULL;
@@ -361,6 +431,7 @@ void miso_load_config(void)
 					strncpy(dest_ptr, src_ptr, src_len);
 				}
 			}
+			// Access the http (firmware) configuration
 			else if (((http_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
 			{
 				char *dest_ptr = NULL;
@@ -370,6 +441,40 @@ void miso_load_config(void)
 				{
 					dest_ptr = &config_http_uri[0];
 					dest_len = sizeof(config_http_uri);
+				}
+				else if (0 == strncmp(json_key, "psk", strlen("psk")))
+				{
+
+				}
+				else if (0 == strncmp(json_key, "cert", strlen("cert")))
+				{
+
+				}
+				else if ((0 == strncmp(json_key, "endpoint", strlen("endpoint"))) || (0 == strncmp(json_key, "device", strlen("device"))))
+				{
+
+				}
+
+				if ((JSMN_STRING == json_tokens[i + 1].type) && (dest_ptr != NULL))
+				{
+					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
+					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
+					if (src_len > dest_len)
+						src_len = dest_len;
+
+					strncpy(dest_ptr, src_ptr, src_len);
+				}
+			}
+			// access the config 
+			else if(((config_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
+			{
+				char *dest_ptr = NULL;
+				size_t dest_len = 0;
+
+				if ((0 == strncmp(json_key, "uri", strlen("uri"))) || (0 == strncmp(json_key, "url", strlen("url"))))
+				{
+					dest_ptr = &config_config_uri[0];
+					dest_len = sizeof(config_config_uri);
 				}
 				else if (0 == strncmp(json_key, "psk", strlen("psk")))
 				{
