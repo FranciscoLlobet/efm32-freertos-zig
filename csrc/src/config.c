@@ -19,24 +19,24 @@
 #define JSMN_PARENT_LINKS 1
 #include "jsmn.h"
 
-char config_wifi_ssid[32] = {0};
-char config_wifi_key[32] = {0};
+char config_wifi_ssid[32]  __attribute__ ((aligned (4))) = {0};
+char config_wifi_key[32]  __attribute__ ((aligned (4))) = {0};
 
-char config_lwm2m_endpoint[128] = {0};
-char config_lwm2m_uri[128] = {0};
-char config_lwm2m_psk_id[128] = {0};
-char config_lwm2m_psk_key[64] = {0};
+char config_lwm2m_endpoint[128] __attribute__ ((aligned (4))) = {0};
+char config_lwm2m_uri[128] __attribute__ ((aligned (4))) = {0};
+char config_lwm2m_psk_id[128] __attribute__ ((aligned (4))) = {0};
+char config_lwm2m_psk_key[64] __attribute__ ((aligned (4))) = {0};
 
-char config_ntp_url[64] = {0};
-unsigned char config_sha256[32] = {0};
+char config_ntp_url[64] __attribute__ ((aligned (4))) = {0};
+unsigned char config_sha256[32] __attribute__ ((aligned (4))) = {0};
 
-char config_mqtt_uri[128] = {0};
-char config_mqtt_device_id[128] = {0};
+char config_mqtt_uri[128] __attribute__ ((aligned (4))) = {0};
+char config_mqtt_device_id[128] __attribute__ ((aligned (4))) = {0};
 
-char config_mqtt_psk_id[128] = {0};
-char config_mqtt_psk_key[64] = {0};
+char config_mqtt_psk_id[128] __attribute__ ((aligned (4)))  = {0};
+char config_mqtt_psk_key[64] __attribute__ ((aligned (4))) = {0};
 
-char config_http_uri[128] = {0};
+char config_http_uri[128] __attribute__ ((aligned (4))) = {0};
 
 char *config_get_wifi_ssid(void)
 {
