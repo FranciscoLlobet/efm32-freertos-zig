@@ -125,16 +125,14 @@ pub fn open_config_file(path: []const u8) !bool {
 
         };
 
-        var x = pk_ctx.verify(&config_sha256, sig);
-
-        if (x == true) {
+        if (true == pk_ctx.verify(&config_sha256, sig)) {
             _ = c.printf("CONFIG signature verified successfully\r\n");
 
             c.miso_load_config(); // Process the config
 
             try store_config_in_nvm();
 
-            try nvm.writeData(.config_sha256, &config_sha256[0], config_sha256.len);
+            try nvm.writeData(.config_sha256, &config_sha256);
 
             return true;
         } else {
@@ -142,9 +140,6 @@ pub fn open_config_file(path: []const u8) !bool {
             return false;
         }
     }
-    // if both are equal, then there is no need to reload the configuration
-
-    // if not, then read the configuration file signature
 
     return true;
 }

@@ -1,12 +1,10 @@
 const std = @import("std");
-const freertos = @import("freertos.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("nvm3.h");
     @cInclude("nvm3_hal_flash.h");
     @cInclude("string.h");
 });
-const main = @import("main.zig");
 
 /// NVM Keys used in the App
 /// NVM keys are 20-Bit unsigned integers
@@ -101,6 +99,7 @@ const nvm_initial_address: c.nvm3_HalPtr_t = @ptrFromInt(0x000F0000); // 1024*10
 /// NVM3 initial configuration
 pub const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = nvm_initial_address, .nvmSize = nvm_size_in_bytes, .cachePtr = &cache, .cacheEntryCount = cache.len, .maxObjectSize = max_object_size, .repackHeadroom = 0, .halHandle = &c.nvm3_halFlashHandle };
 
+/// NVM3 cache
 var cache: [cache_len]c.nvm3_CacheEntry_t align(@alignOf(u32)) = undefined;
 
 pub fn init() !u32 {
@@ -109,14 +108,14 @@ pub fn init() !u32 {
 
     var num_objects: usize = countObjects();
 
-    if (num_objects < 4) {
+    if (num_objects < 6) {
         try eraseAll();
         try writeCounter(.start_counter, 0);
         try writeCounter(.reset_counter, 0);
         try writeCounter(.timestamp, 0);
         try writeCounter(.firmware_download_counter, 0);
-        try writeData(.device_uuid, &default_uuid[0], default_uuid.len);
-        try writeData(.config_sha256, &default_sha256[0], default_sha256.len);
+        try writeData(.device_uuid, &default_uuid);
+        try writeData(.config_sha256, &default_sha256);
     }
 
     return 0;
@@ -165,8 +164,8 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
 }
 
 /// Write data into NVM
-pub fn writeData(key: app_nvm_keys, value: [*c]const u8, len: usize) !void {
-    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, len));
+pub fn writeData(key: app_nvm_keys, value: []const u8) !void {
+    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), @ptrCast(value), value.len));
 }
 
 /// Write a C-String into NVM
