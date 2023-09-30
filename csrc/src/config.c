@@ -325,7 +325,6 @@ void miso_load_config(void)
 					dest_ptr = &config_lwm2m_psk_key[0];
 					dest_len = sizeof(config_lwm2m_psk_key);
 				}
-
 				if ((JSMN_STRING == json_tokens[i + 1].type) && (dest_ptr != NULL))
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
@@ -374,16 +373,15 @@ void miso_load_config(void)
 				}
 				else if (0 == strncmp(json_key, "psk", strlen("psk")))
 				{
-					// lwm2m_psk_key = i;
+
 				}
 				else if (0 == strncmp(json_key, "cert", strlen("cert")))
 				{
-					// lwm2m_cert_key = i;
+
 				}
 				else if ((0 == strncmp(json_key, "endpoint", strlen("endpoint"))) || (0 == strncmp(json_key, "device", strlen("device"))))
 				{
-					// dest_ptr = &config_lwm2m_endpoint[0];
-					// dest_len = sizeof(config_lwm2m_endpoint);
+
 				}
 
 				if ((JSMN_STRING == json_tokens[i + 1].type) && (dest_ptr != NULL))

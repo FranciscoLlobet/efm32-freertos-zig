@@ -9,7 +9,7 @@ const c = @cImport({
 const main = @import("main.zig");
 
 /// NVM Keys used in the App
-pub const app_nvm_keys = enum(u32) {
+pub const app_nvm_keys = enum(u20) {
     /// APP Start Counter
     start_counter = 0x00000,
 
@@ -50,7 +50,7 @@ pub const app_nvm_keys = enum(u32) {
     lwm2m_uri,
     lwm2m_psk_id,
     lwm2m_psk_key,
-    l2m2m_device_id,
+    lwm2m_device_id,
 
     // Firmware update info
 
@@ -78,10 +78,10 @@ const ret = enum(u32) {
 
 //const page_size_alignment: usize = 4096;
 const max_object_size: usize = 256;
-const cache_len: usize = 24;
+const cache_len: usize = 48;
 
 pub var miso_nvm3: c.nvm3_Handle_t = undefined;
-pub const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = @ptrCast(@as([*c]u8, @ptrFromInt(0x000F4000))), .nvmSize = 12 * 4096, .cachePtr = &cache, .cacheEntryCount = cache.len, .maxObjectSize = max_object_size, .repackHeadroom = 0, .halHandle = &c.nvm3_halFlashHandle };
+pub const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = @ptrCast(@as([*c]u8, @ptrFromInt(0x000F0000))), .nvmSize = 16 * 4096, .cachePtr = &cache, .cacheEntryCount = cache.len, .maxObjectSize = max_object_size, .repackHeadroom = 0, .halHandle = &c.nvm3_halFlashHandle };
 
 //export const nvm3Storage: [nvm_storage_size]u8 align(page_size_alignment) linksection(".NVM") = .{0xFF} ** (nvm_storage_size);
 var cache: [cache_len]c.nvm3_CacheEntry_t align(@alignOf(u32)) = undefined;
@@ -131,7 +131,7 @@ pub fn countObjects() usize {
     return c.nvm3_countObjects(&miso_nvm3);
 }
 
-pub fn readData(key: app_nvm_keys, value: *anyopaque, len: usize) !void {
+pub fn readData(key: app_nvm_keys, value: [*c]u8, len: usize) !void {
     try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
@@ -144,13 +144,14 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
 }
 
 /// Write data into NVM
-pub fn writeData(key: app_nvm_keys, value: *const anyopaque, len: usize) !void {
+pub fn writeData(key: app_nvm_keys, value: [*c]const u8, len: usize) !void {
     try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
 /// Write a C-String into NVM
-pub fn writeDataCString(key: app_nvm_keys, value: [*c]u8) !void {
-    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, c.strlen(value) + @as(usize, 1)));
+pub fn writeDataCString(key: app_nvm_keys, value: [*c]const u8) !void {
+    const len: usize = c.strlen(value) + @as(usize, 1);
+    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, len));
 }
 
 /// Write a 32-Bit counter value

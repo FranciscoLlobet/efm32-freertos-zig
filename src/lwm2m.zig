@@ -41,11 +41,11 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn reg_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    _ = freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_registration, .eSetBits);
+    freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_registration, .eSetBits) catch unreachable;
 }
 
 fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    _ = freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_timestamp, .eSetBits);
+    freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
@@ -54,15 +54,15 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
-        self.reg_update.create("lwm2m_reg_update", (5 * 60 * 1000), freertos.pdTRUE, self, reg_update_function) catch unreachable;
-        self.timer_update.create("lwm2m_timer_update", (60 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
+        self.reg_update = freertos.Timer.create("lwm2m_reg_update", (5 * 60 * 1000), freertos.pdTRUE, self, reg_update_function) catch unreachable;
+        self.timer_update = freertos.Timer.create("lwm2m_timer_update", (60 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
     }
 }
 
 pub fn updateTemperature(self: *@This(), temperature_in_celsius: f32) void {
     if (config.enable_lwm2m) {
         write_temperature(temperature_in_celsius);
-        _ = self.task.notify(c.lwm2m_notify_temperature, .eSetBits);
+        self.task.notify(c.lwm2m_notify_temperature, .eSetBits) catch {};
     }
 }
 

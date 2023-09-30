@@ -12,12 +12,15 @@ const c = @cImport({
 const sha256 = @import("sha256.zig");
 const http = @import("http.zig");
 const mqtt = @import("mqtt.zig");
+const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
+const board = @import("microzig").board;
 
 const state = enum(usize) {
     verify_config = 0,
     start_connectivity,
     start_mqtt,
+    start_lwm2m,
     perform_firmware_download,
     verify_firmware_download,
 
@@ -72,11 +75,12 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 _ = c.printf("Failure!!\n\r");
             };
 
+            //board.watchdogFeed();
             _ = config.open_config_file("SD:CONFIG.TXT") catch {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            config.store_config_in_nvm() catch {};
+            //config.store_config_in_nvm() catch {};
 
             // Next state
             self.state = .start_connectivity;
@@ -100,12 +104,21 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
             _ = c.printf("Firmware download complete\r\n");
             // perform HTTP download
-
-            self.state = .start_mqtt;
+            if (comptime config.enable_lwm2m) {
+                self.state = .start_lwm2m;
+            } else if (comptime config.enable_mqtt) {
+                self.state = .start_mqtt;
+            } else {
+                self.state = .working;
+            }
         } else if (self.state == .start_mqtt) {
             mqtt.service.resumeTask();
 
             self.timer.start(null) catch unreachable;
+
+            self.state = .working;
+        } else if (self.state == .start_lwm2m) {
+            lwm2m.service.task.resumeTask();
 
             self.state = .working;
         } else if (self.state == .working) {

@@ -115,7 +115,7 @@ pub const Task = struct {
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
         return @This(){ .handle = task_handle };
     }
-    pub fn create(pxTaskCode: TaskFunction_t, pcName: [*c]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
+    pub fn create(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
         var self: @This() = undefined;
 
         if (c.pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) {
@@ -272,7 +272,7 @@ pub const Semaphore = struct {
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
-    pub fn create(pcTimerName: [*c]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
+    pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
         var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction) };
         if (self.handle == null) {
             return FreeRtosError.TimerCreationFailed;

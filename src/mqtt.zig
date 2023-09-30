@@ -79,11 +79,15 @@ pubTimer: freertos.Timer, // delete this!
 task: freertos.Task,
 state: state,
 packet: @This().packet,
-uri_string: [*c]u8,
-device_id: [*c]u8,
+uri_string: [*:0]u8,
+device_id: [*:0]u8,
 
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
+
+inline fn initMQTTString(data: []u8) MQTTString {
+    return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(data.len), .data = &data[0] } };
+}
 
 fn init() @This() {
     return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555), .uri_string = undefined, .device_id = undefined };
@@ -193,16 +197,16 @@ const packet = struct {
         return packetId;
     }
 
-    fn prepareConnectPacket(self: *@This(), clientID: []const u8, username: ?[*:0]const u8, password: ?[*:0]const u8) !u16 {
+    fn prepareConnectPacket(self: *@This(), clientID: []const u8, username: ?[]const u8, password: ?[]const u8) !u16 {
         var connectPacket = MQTTPacket_connectData_initializer;
-        connectPacket.clientID = MQTTString{ .cstring = null, .lenstring = .{ .data = @constCast(&clientID[0]), .len = @intCast(clientID.len) } };
+        connectPacket.clientID = initMQTTString(@constCast(clientID));
 
-        if (username != null) {
-            connectPacket.username = MQTTString{ .cstring = @constCast(username), .lenstring = .{ .len = 0, .data = null } };
+        if (username) |un| {
+            connectPacket.username = initMQTTString(@constCast(un));
         }
 
-        if (password != null) {
-            connectPacket.password = MQTTString{ .cstring = @constCast(password), .lenstring = .{ .len = 0, .data = null } };
+        if (password) |pw| {
+            connectPacket.password = initMQTTString(@constCast(pw));
         }
 
         connectPacket.keepAliveInterval = 400;
@@ -265,10 +269,10 @@ const packet = struct {
         return self.sendtoTxQueue(packetLen, null);
     }
 
-    pub fn preparePublishPacket(self: *@This(), topic: [*:0]const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
+    pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var topic_name = MQTTString{ .cstring = @constCast(topic), .lenstring = .{ .len = 0, .data = null } };
+        var topic_name = initMQTTString(@constCast(topic));
         var dup: u8 = 0;
         var retain: u8 = 0;
         var packetId = self.generatePacketId();
@@ -461,7 +465,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         }
     }
 
-    var subTopic = MQTTString{ .cstring = @constCast("zig/test"), .lenstring = .{ .len = 0, .data = null } };
+    var subTopic = initMQTTString(@constCast("zig/fw"));
     var qos: c_int = 1;
     packetId = try self.packet.prepareSubscribePacket(1, &subTopic, &qos);
 
@@ -502,7 +506,7 @@ pub fn disconnect(self: *@This()) !void {
     }
 }
 
-pub fn resumeTask(self: *@This()) void {
+pub inline fn resumeTask(self: *@This()) void {
     self.task.resumeTask();
 }
 

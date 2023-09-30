@@ -42,7 +42,7 @@ pub const rtos_prio_http = @intFromEnum(task_priorities.rtos_prio_normal);
 pub const rtos_stack_depth_http: u16 = if (enable_http) 2000 else min_task_stack_depth;
 
 pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_user_task: u16 = 2000;
+pub const rtos_stack_depth_user_task: u16 = 2500;
 
 // version
 pub const miso_version_mayor: u8 = 0;
@@ -132,6 +132,8 @@ pub fn open_config_file(path: []const u8) !bool {
 
             c.miso_load_config(); // Process the config
 
+            try store_config_in_nvm();
+
             try nvm.writeData(.config_sha256, &config_sha256[0], config_sha256.len);
 
             return true;
@@ -154,6 +156,7 @@ pub fn store_config_in_nvm() !void {
 
     // LWM2M
     try nvm.writeDataCString(.lwm2m_uri, c.config_get_lwm2m_uri());
+    try nvm.writeDataCString(.lwm2m_device_id, c.config_get_lwm2m_endpoint());
     try nvm.writeDataCString(.lwm2m_psk_id, c.config_get_lwm2m_psk_id());
     try nvm.writeDataCString(.lwm2m_psk_key, c.config_get_lwm2m_psk_key());
 
@@ -175,6 +178,7 @@ pub fn load_config_from_nvm() !void {
 
     // LWM2M
     nvm.readCString(.lwm2m_uri, c.config_get_lwm2m_uri()) catch {};
+    nvm.readCString(.lwm2m_device_id, c.config_get_lwm2m_endpoint()) catch {};
     nvm.readCString(.lwm2m_psk_id, c.config_get_lwm2m_psk_id()) catch {};
     nvm.readCString(.lwm2m_psk_key, c.config_get_lwm2m_psk_key()) catch {};
 

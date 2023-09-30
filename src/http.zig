@@ -257,25 +257,25 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comp
         return @"error".generic;
     }
 
-    if (parsed_response.etag) |etag| {
-        if (self.etag == null) {
-            const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
+    //    if (parsed_response.etag) |etag| {
+    //       if (self.etag == null) {
+    //          const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
 
-            @memcpy(self.etag.?[0..len], etag[0..len]);
-        } else {
-            // There is already a etag stored
-            // Compare ETags
-            // If both ETags are the same, then abort the download
-            const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
+    //          @memcpy(self.etag.?[0..len], etag[0..len]);
+    //      } else {
+    // There is already a etag stored
+    // Compare ETags
+    // If both ETags are the same, then abort the download
+    //         const len = if (@sizeOf(@TypeOf(self.etag.?)) > etag.len) etag.len else @sizeOf(@TypeOf(self.etag.?));
 
-            if (std.mem.eql(u8, self.etag.?[0..len], etag[0..len])) {
-                return;
-            }
-        }
-    } else {
-        // nullfy the ETag header
-        self.etag = null;
-    }
+    //           if (std.mem.eql(u8, self.etag.?[0..len], etag[0..len])) {
+    //              return;
+    //          }
+    //     }
+    //   } else {
+    //      // nullfy the ETag header
+    //self.etag = null;
+    //   }
 
     const fileSize: usize = parsed_response.content_length.?;
 
