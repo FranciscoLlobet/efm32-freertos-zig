@@ -14,6 +14,8 @@ const c = @cImport({
 const connection_error = error{
     create_error,
     close_error,
+    send_error,
+    recieve_error,
 };
 
 const network_ctx = c.miso_network_ctx_t;
@@ -130,11 +132,19 @@ pub fn close(self: *@This()) !void {
         return connection_error.close_error;
     }
 }
-pub fn send(self: *@This(), buffer: *const u8, length: usize) i32 {
-    return c.miso_network_send(self.ctx, @as([*c]const u8, @ptrCast(buffer)), length);
+
+// Send Function
+// TODO: Add error handling
+pub fn send(self: *@This(), buffer: []const u8) i32 {
+    return c.miso_network_send(self.ctx, @as([*c]const u8, buffer.ptr), buffer.len);
 }
-pub fn recieve(self: *@This(), buffer: *u8, length: usize) i32 {
-    return c.miso_network_read(self.ctx, buffer, length);
+// Recieve Function
+pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
+    const len: isize = c.miso_network_read(self.ctx, buffer.ptr, buffer.len);
+    if (len <= 0) {
+        return connection_error.recieve_error;
+    }
+    return buffer[0..@intCast(len)];
 }
 pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
     return c.wait_rx(self.ctx, timeout_s);

@@ -88,10 +88,10 @@ pub const file = struct {
         open_append = c.FA_OPEN_APPEND,
     };
 
-    pub fn open(path: []const u8, mode: u8) frError!@This() {
+    pub fn open(path: [*:0]const u8, mode: u8) frError!@This() {
         var self: @This() = undefined;
 
-        try fRet.check(c.f_open(&self.handle, @ptrCast(path), mode));
+        try fRet.check(c.f_open(&self.handle, path, mode));
 
         return self;
     }
@@ -103,7 +103,7 @@ pub const file = struct {
     pub fn read(self: *@This(), buf: []u8, bytesToRead: u32) frError!usize {
         var bytesRead: usize = 0;
 
-        try fRet.check(c.f_read(&self.handle, @ptrCast(buf), if (bytesToRead > buf.len) buf.len else bytesToRead, &bytesRead));
+        try fRet.check(c.f_read(&self.handle, buf.ptr, if (bytesToRead > buf.len) buf.len else bytesToRead, &bytesRead));
 
         return bytesRead;
     }
@@ -111,7 +111,7 @@ pub const file = struct {
     pub fn write(self: *@This(), buf: []const u8, bytesToWrite: u32) frError!usize {
         var bytesWritten: usize = 0;
 
-        try fRet.check(c.f_write(&self.handle, @ptrCast(buf), if (bytesToWrite > buf.len) buf.len else bytesToWrite, &bytesWritten));
+        try fRet.check(c.f_write(&self.handle, buf.ptr, if (bytesToWrite > buf.len) buf.len else bytesToWrite, &bytesWritten));
 
         return bytesWritten;
     }
@@ -141,10 +141,10 @@ pub const file = struct {
     }
 };
 
-pub fn mount(volume: []const u8) frError!void {
-    try fRet.check(c.f_mount(&fileSystem, @ptrCast(volume), 1));
+pub fn mount(volume: [*:0]const u8) frError!void {
+    try fRet.check(c.f_mount(&fileSystem, volume, 1));
 }
 
-pub fn unmount(volume: []const u8) frError!void {
-    try fRet.check(c.f_unmount(@as([*c]const u8, @ptrCast(volume))));
+pub fn unmount(volume: [*:0]const u8) frError!void {
+    try fRet.check(c.f_unmount(volume));
 }

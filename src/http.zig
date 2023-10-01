@@ -153,7 +153,7 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
 
     if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
-        ret = self.connection.send(@ptrCast(request), request.len);
+        ret = self.connection.send(request);
         _ = try self.tx_mutex.give();
     }
 
@@ -170,7 +170,7 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
 
     if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
-        ret = self.connection.send(@ptrCast(request), request.len);
+        ret = self.connection.send(request);
         try self.tx_mutex.give();
     }
 
@@ -197,15 +197,11 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
 
         while (pret == -2) {
             if (0 == self.connection.waitRx(5)) {
-                ret = self.connection.recieve(&self.rx_buffer[rx_count], self.rx_buffer.len - rx_count);
-                if (ret > 0) {
-                    pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], @intCast(ret), &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
-                    prevbuflen = rx_count;
-                    rx_count += @intCast(ret);
-                }
-                if ((pret == -1) or (ret <= 0)) {
-                    break;
-                }
+                var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len - rx_count)]);
+
+                pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
+                prevbuflen = rx_count;
+                rx_count += rec.len;
             } else {
                 // rx Timeout
             }
@@ -230,7 +226,7 @@ fn calcRequestEnd(file_size: usize, comptime block_size: usize, current_position
     return if (requestEnd > (file_size - 1)) (file_size - 1) else requestEnd;
 }
 
-pub fn filedownload(self: *@This(), url: []const u8, file_name: []const u8, comptime block_size: usize) !void {
+pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, comptime block_size: usize) !void {
     var parsed_response: parsedResponse = undefined;
 
     var uri = try std.Uri.parse(url);

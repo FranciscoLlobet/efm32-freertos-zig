@@ -85,8 +85,8 @@ device_id: [*:0]u8,
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
 
-inline fn initMQTTString(data: []u8) MQTTString {
-    return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(data.len), .data = &data[0] } };
+inline fn initMQTTString(data: []const u8) MQTTString {
+    return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(data.len), .data = @constCast(data.ptr) } };
 }
 
 fn init() @This() {
@@ -113,7 +113,7 @@ fn processSendQueue(self: *@This()) !void {
     while (ret > 0) {
         var buf_len = self.packet.txQueue.receive(@ptrCast(&txBuffer[0]), txBuffer.len, 0);
         if (buf_len != 0) {
-            ret = self.connection.send(&txBuffer[0], buf_len);
+            ret = self.connection.send(txBuffer[0..buf_len]);
         } else {
             ret = 0;
         }
@@ -167,10 +167,11 @@ const packet = struct {
     fn getFn(ptr: ?*anyopaque, buf: [*c]u8, buf_len: c_int) callconv(.C) c_int {
         var self = @as(*connection, @ptrCast(@alignCast(ptr)));
 
-        var ret = self.recieve(buf, @intCast(buf_len));
-        if (ret < 0) ret = @intFromEnum(msgTypes.err_msg);
+        var ret = self.recieve(buf[0..@intCast(buf_len)]) catch {
+            return @intFromEnum(msgTypes.err_msg);
+        };
 
-        return ret;
+        return @intCast(ret.len);
     }
 
     fn read(self: *@This(), buffer: []u8) msgTypes {
@@ -299,7 +300,7 @@ const packet = struct {
     fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) !u16 {
         if (packetLen <= 0) {
             return mqtt_error.packetlen;
-        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(&workBuffer[0]), @intCast(packetLen), null))) {
+        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(workBuffer[0..@intCast(packetLen)].ptr), @intCast(packetLen), null))) {
             return mqtt_error.enqueue_failed;
         }
         try self.workBufferMutex.give();
@@ -340,6 +341,9 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     };
 
                     _ = packetId;
+
+                    // Process publish message
+
                     _ = c.printf("publish recieved\r\n");
                 } else {
                     break; // error state
@@ -422,6 +426,8 @@ fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     _ = self.packet.preparePingPacket() catch {};
 }
 
+const fw_update_topic = "zig/fw";
+
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.getAndCastTimerID(@This(), xTimer);
     const payload = "test";
@@ -465,9 +471,9 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         }
     }
 
-    var subTopic = initMQTTString(@constCast("zig/fw"));
+    const subTopic = comptime initMQTTString(fw_update_topic);
     var qos: c_int = 1;
-    packetId = try self.packet.prepareSubscribePacket(1, &subTopic, &qos);
+    packetId = try self.packet.prepareSubscribePacket(1, @constCast(&subTopic), &qos);
 
     try self.processSendQueue();
 

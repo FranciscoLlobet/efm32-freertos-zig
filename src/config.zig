@@ -51,7 +51,7 @@ pub const miso_version_patch: u8 = 1;
 pub const miso_version: u32 = (miso_version_mayor << 16) | (miso_version_minor << 8) | (miso_version_patch);
 
 /// Open file and calculate SHA256 hash
-fn calculate_config_hash(path: []const u8, hash: *[32]u8) !void {
+fn calculate_config_hash(path: [*:0]const u8, hash: *[32]u8) !void {
     const allocator = freertos.allocator;
 
     var file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
@@ -74,7 +74,7 @@ fn calculate_config_hash(path: []const u8, hash: *[32]u8) !void {
 }
 
 /// Load a public key im PEM format into PK context
-fn load_public_key_from_file(path: []const u8, pk_ctx: *pk) !void {
+fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) !void {
     const allocator = freertos.allocator;
 
     var key_file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
@@ -91,7 +91,7 @@ fn load_public_key_from_file(path: []const u8, pk_ctx: *pk) !void {
 }
 
 /// Open the configuration file, calculate the hash value and compare it with the nvm reference.
-pub fn open_config_file(path: []const u8) !bool {
+pub fn open_config_file(path: [*:0]const u8) !bool {
     var config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     var ref_config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     const allocator = freertos.allocator;

@@ -21,6 +21,7 @@ const state = enum(usize) {
     start_connectivity,
     start_mqtt,
     start_lwm2m,
+    get_config,
     perform_firmware_download,
     verify_firmware_download,
 
