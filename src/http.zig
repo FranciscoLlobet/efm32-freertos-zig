@@ -183,7 +183,6 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
     var rx_count: usize = 0;
     var pret: i32 = -2; // Incomplete request
     var prevbuflen: usize = 0;
-    var ret: i32 = 0;
 
     var minor_version: i32 = undefined;
     var status: i32 = undefined;
@@ -199,7 +198,8 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
             if (0 == self.connection.waitRx(5)) {
                 var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len - rx_count)]);
 
-                pret = c.phr_parse_response(&self.rx_buffer[prevbuflen], rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
+                //pret = c.phr_parse_response(self.rx_buffer[prevbuflen..rec.len].ptr, rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
+                pret = c.phr_parse_response(rec.ptr, rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
                 prevbuflen = rx_count;
                 rx_count += rec.len;
             } else {
@@ -207,7 +207,7 @@ fn recieveResponse(self: *@This()) !struct { payload: ?[]u8, headers: []c.phr_he
             }
         }
 
-        if ((pret) > 0 and (ret >= 0)) {
+        if (pret > 0) {
             payload_len = rx_count - @as(usize, @intCast(pret));
             payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
         } else {
