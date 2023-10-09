@@ -12,6 +12,11 @@ const c = @cImport({
 
 ctx: c.mbedtls_pk_context,
 
+pub const pk_error = error{
+    parse_key_error,
+    verify_error,
+};
+
 pub fn init() @This() {
     var self: @This() = undefined;
 
@@ -24,12 +29,12 @@ pub fn initCtx(self: *@This()) void {
     c.mbedtls_pk_init(&self.ctx);
 }
 
-pub fn parse(self: *@This(), in: []const u8) bool {
-    return (0 == c.mbedtls_pk_parse_public_key(&self.ctx, @ptrCast(&in[0]), in.len));
+pub fn parse(self: *@This(), in: []const u8) !void {
+    return if (0 != c.mbedtls_pk_parse_public_key(&self.ctx, in.ptr, in.len)) pk_error.parse_key_error else {};
 }
 
-pub fn verify(self: *@This(), hash: []u8, sig: []const u8) bool {
-    return (0 == c.mbedtls_pk_verify(&self.ctx, c.MBEDTLS_MD_SHA256, &hash[0], hash.len, &sig[0], sig.len));
+pub fn verify(self: *@This(), hash: []u8, sig: []const u8) !void {
+    return if (0 == c.mbedtls_pk_verify(&self.ctx, c.MBEDTLS_MD_SHA256, hash.ptr, hash.len, sig.ptr, sig.len)) pk_error.verify_error else {};
 }
 
 pub fn free(self: *@This()) void {

@@ -35,7 +35,17 @@ const sig_algorithms: [2]u16 = .{
 const groups: [2]u16 =
     .{ c.MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, c.MBEDTLS_SSL_IANA_TLS_GROUP_NONE };
 
-pub const auth_callback_fn = *const fn (*@This(), connection.security_mode) i32;
+pub const auth_error = error{
+    no_callback,
+    default_callback,
+    generic_error,
+    unsuported_mode,
+};
+
+pub const init_error = error{};
+
+pub const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
+pub const custom_init_callback_fn = *const fn (*@This(), protocol: connection.protocol, mode: connection.security_mode) init_error!void;
 
 /// Security mode
 mode: connection.security_mode,
@@ -60,7 +70,10 @@ psk: [64]u8, // probably no longer needed
 psk_len: usize,
 
 /// Authentication callback
-auth_callback: ?auth_callback_fn,
+auth_callback: ?credential_callback_fn = defaultAuth,
+
+/// Custom init callback
+custom_init_callback: ?custom_init_callback_fn = null,
 
 const tls_read_timeout: u32 = 5000;
 
@@ -72,11 +85,11 @@ pub fn deinit(self: *@This()) i32 {
     return ret;
 }
 
-fn defaultAuth(self: *@This(), security_mode: connection.security_mode) i32 {
+fn defaultAuth(self: *@This(), security_mode: connection.security_mode) auth_error!void {
     _ = self;
     _ = security_mode;
 
-    return -1;
+    return auth_error.default_callback;
 }
 
 pub fn cleanup(self: *@This()) void {
@@ -87,79 +100,90 @@ pub fn cleanup(self: *@This()) void {
     c.mbedtls_ssl_config_free(&self.config);
 }
 
-pub fn create(auth_callback: ?auth_callback_fn) @This() {
-    return @This(){ .auth_callback = (auth_callback orelse defaultAuth), .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+fn get_ctx(self: *@This()) *c.mbedtls_ssl_context {
+    return &self.context;
 }
 
-pub fn init(self: *@This(), protocol: connection.protocol, mode: connection.security_mode) i32 {
+pub fn create(auth_callback: ?credential_callback_fn, custom_init: ?custom_init_callback_fn) @This() {
+    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+}
+
+/// Helper function to get the credential callback function in custom init
+pub fn getCredentialCallbackFn(self: *@This()) ?credential_callback_fn {
+    return self.auth_callback;
+}
+
+pub fn init(self: *@This(), connection_ctx: *connection, protocol: connection.protocol, mode: connection.security_mode) !i32 {
     var ret: i32 = -1;
 
-    ret = switch (protocol) {
-        .dtls_ip4, .dtls_ip6, .tls_ip4, .tls_ip6 => 0,
-        else => -1,
-    };
-
-    if (ret != 0) return -1; // Insupported protocol
+    if (!connection.protocol.isSecure(protocol))
+        return -1;
 
     self.mode = mode;
 
-    c.miso_mbedtls_init_timer(&self.timer);
-    c.mbedtls_ssl_init(&self.context);
-    c.mbedtls_ssl_config_init(&self.config);
-    c.mbedtls_ctr_drbg_init(&self.drbg);
-    c.mbedtls_entropy_init(&self.entropy);
+    // custom init callback
+    if (self.custom_init_callback) |custom| {
+        try custom(self, protocol, mode);
+    } else {
+        c.miso_mbedtls_init_timer(&self.timer);
+        c.mbedtls_ssl_init(&self.context);
+        c.mbedtls_ssl_config_init(&self.config);
+        c.mbedtls_ctr_drbg_init(&self.drbg);
+        c.mbedtls_entropy_init(&self.entropy);
 
-    var transport: c_int = switch (protocol) {
-        .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
-        else => c.MBEDTLS_SSL_TRANSPORT_STREAM,
-    };
-
-    ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
-    if (ret == 0) {
-        ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
-    }
-    if (ret == 0) {
-        c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
-        c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
-        c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
-        //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
-        ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
-        if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = 0;
-    }
-
-    if (ret == 0) {
-        switch (mode) {
-            .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
-            .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
-            else => {},
-        }
-    }
-    if (ret == 0) {
-        c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
-        c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
-
-        // In case of DTLS
-        ret = switch (protocol) {
-            .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
-            else => 0,
+        const transport: c_int = switch (protocol) {
+            .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
+            else => c.MBEDTLS_SSL_TRANSPORT_STREAM,
         };
-    }
 
-    // This should be done by a callback
-    if (ret == 0) {
-        if (self.auth_callback) |_| {
-            ret = self.auth_callback.?(self, self.mode);
-        } else {
-            ret = self.defaultAuth(self.mode);
+        ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
+        if (ret == 0) {
+            ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
+        }
+        if (ret == 0) {
+            c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
+            c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
+            c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
+            //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
+            ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
+            if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = 0;
+        }
+
+        if (ret == 0) {
+            switch (mode) {
+                .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
+                .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
+                else => {},
+            }
+        }
+        if (ret == 0) {
+            c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
+            c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
+
+            // In case of DTLS
+            ret = switch (protocol) {
+                .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
+                else => 0,
+            };
+        }
+
+        // Run the auth credentials callback
+        if (ret == 0) {
+            try self.auth_callback.?(self, self.mode);
+        }
+
+        if (ret == 0) {
+            ret = c.mbedtls_ssl_setup(&self.context, &self.config);
+        }
+
+        if (ret == 0) {
+            c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
         }
     }
 
+    // End the ssl initialization
     if (ret == 0) {
-        ret = c.mbedtls_ssl_setup(&self.context, &self.config);
-    }
-
-    if (ret == 0) {
-        c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
+        ret = c.miso_network_register_ssl_context(@as(*c.struct_miso_sockets_s, @ptrCast(connection_ctx.ctx)), &self.context);
     }
 
     return ret;

@@ -9,6 +9,12 @@ const c = @cImport({
 
 ctx: c.mbedtls_sha256_context,
 
+pub const sha256_error = error{
+    start_error,
+    update_error,
+    finish_error,
+};
+
 pub fn init() @This() {
     var self: @This() = undefined;
 
@@ -21,16 +27,16 @@ pub fn initCtx(self: *@This()) void {
     c.mbedtls_sha256_init(&self.ctx);
 }
 
-pub fn start(self: *@This()) bool {
-    return (0 == c.mbedtls_sha256_starts(&self.ctx, 0));
+pub fn start(self: *@This()) !void {
+    return if (0 != c.mbedtls_sha256_starts(&self.ctx, 0)) sha256_error.start_error else {};
 }
 
-pub fn update(self: *@This(), buffer: []u8, len: usize) bool {
-    return (0 == c.mbedtls_sha256_update(&self.ctx, @ptrCast(buffer), len));
+pub fn update(self: *@This(), buffer: []u8) !void {
+    return if (0 != c.mbedtls_sha256_update(&self.ctx, buffer.ptr, buffer.len)) sha256_error.update_error else {};
 }
 
-pub fn finish(self: *@This(), output: *[32]u8) bool {
-    return (0 == c.mbedtls_sha256_finish(&self.ctx, output));
+pub fn finish(self: *@This(), output: *[32]u8) !void {
+    return if (0 != c.mbedtls_sha256_finish(&self.ctx, output)) sha256_error.finish_error else {};
 }
 
 pub fn free(self: *@This()) void {

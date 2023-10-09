@@ -50,6 +50,8 @@ const FreeRtosError = error{
     TimerStartFailed,
     TimerStopFailed,
     TimerChangePeriodFailed,
+
+    MessageBufferReceiveFailed,
 };
 
 // Kernel function
@@ -91,16 +93,6 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
     return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY));
 }
 
-/// Helper function that can be used to cast a timerID pointer to a reference
-pub inline fn getAndCastTimerID(comptime T: type, xTimer: TimerHandle_t) *T {
-    return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
-}
-
-/// Helper function that can be used to cast the pvParameters pointer to a reference
-pub inline fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
-    return @as(*T, @ptrCast(@alignCast(pvParameters)));
-}
-
 pub const Task = struct {
     pub const eNotifyAction = enum(u32) {
         eSetBits = c.eSetBits,
@@ -118,11 +110,7 @@ pub const Task = struct {
     pub fn create(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
         var self: @This() = undefined;
 
-        if (c.pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) {
-            return self;
-        } else {
-            return FreeRtosError.TaskCreationFailed;
-        }
+        return if (pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) self else FreeRtosError.TaskCreationFailed;
     }
     pub fn setHandle(self: *const @This(), handle: TaskHandle_t) !void {
         if (self.handle != undefined) {
@@ -131,6 +119,11 @@ pub const Task = struct {
             return FreeRtosError.TaskHandleAlreadyExists;
         }
     }
+    /// Helper function that can be used to cast the pvParameters pointer to a reference
+    pub inline fn getAndCastPvParameters(comptime T: type, pvParameters: ?*anyopaque) *T {
+        return @as(*T, @ptrCast(@alignCast(pvParameters)));
+    }
+
     pub fn getHandle(self: *const @This()) TaskHandle_t {
         return self.handle;
     }
@@ -157,7 +150,7 @@ pub const Task = struct {
         return if (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, &pulNotificationValue, xTicksToWait orelse portMAX_DELAY)) pulNotificationValue else null;
     }
     pub fn getStackHighWaterMark(self: *const @This()) u32 {
-        return @as(u32, c.uxTaskGetStackHighWaterMark(self.handle));
+        return @intCast(c.uxTaskGetStackHighWaterMark(self.handle));
     }
     pub fn delayTask(self: *const @This(), xTicksToDelay: TickType_t) void {
         _ = self;
@@ -170,10 +163,7 @@ pub const Queue = struct {
 
     pub fn create(comptime T: type, len: usize) !@This() {
         var self: @This() = .{ .handle = c.xQueueCreate(@sizeOf(T), len) };
-        if (self.handle == null) {
-            return FreeRtosError.QueueCreationFailed;
-        }
-        return self;
+        return if (self.handle == null) FreeRtosError.QueueCreationFailed else self;
     }
     pub fn send(self: *@This(), comptime T: type, item: *const T, comptime ticks_to_wait: ?TickType_t) bool {
         return (pdTRUE == c.xQueueSend(self.handle, @ptrCast(@constCast(item)), ticks_to_wait orelse portMAX_DELAY));
@@ -187,44 +177,13 @@ pub const Queue = struct {
     }
 };
 
-pub const TypedQueue = struct {
-    handle: QueueHandle_t,
-    T: type,
-
-    pub fn create(comptime T: type) @This() {
-        var self: @This() = .{ .handle = undefined, .T = T };
-
-        return self;
-    }
-    pub fn init(self: *@This(), len: usize) !void {
-        self.handle = .xQueueCreate(@sizeOf(self.T), len);
-        if (self.handle == null) {
-            return FreeRtosError.QueueCreationFailed;
-        }
-    }
-
-    pub fn send(self: *@This(), comptime item: *const self.T, comptime ticks_to_wait: ?TickType_t) bool {
-        return (pdTRUE == c.xQueueSend(self.handle, @ptrCast(@constCast(item)), ticks_to_wait orelse portMAX_DELAY));
-    }
-    pub fn receive(self: *@This(), comptime item: *const self.T, comptime ticks_to_wait: ?TickType_t) bool {
-        return (pdTRUE == c.xQueueReceive(self.handle, @ptrCast(@as(*self.T, @alignCast(item))), ticks_to_wait orelse portMAX_DELAY));
-    }
-    pub fn delete(self: *@This()) void {
-        c.xQueueDelete(self.handle);
-        self.handle = undefined;
-    }
-};
-
 pub const Mutex = struct {
     handle: SemaphoreHandle_t = undefined,
 
     pub fn create() !@This() {
-        var self = @This(){ .handle = c.xSemaphoreCreateMutex() };
+        const self = @This(){ .handle = c.xSemaphoreCreateMutex() };
 
-        if (self.handle == null) {
-            return FreeRtosError.SemaphoreCreationFailed;
-        }
-        return self;
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
 
     pub fn take(self: *@This(), xTicksToWait: ?TickType_t) !bool {
@@ -243,8 +202,8 @@ pub const Mutex = struct {
 pub const Semaphore = struct {
     handle: SemaphoreHandle_t = undefined,
 
-    pub fn createBinary(self: *@This()) !void {
-        self.handle = c.xSemaphoreCreateBinary();
+    pub fn createBinary() !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateBinary() };
         if (self.handle == null) {
             return FreeRtosError.SemaphoreCreationFailed;
         }
@@ -269,15 +228,18 @@ pub const Semaphore = struct {
     }
 };
 
+const typedCreation = true;
+
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
-    pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, xAutoReload: BaseType_t, pvTimerID: ?*anyopaque, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
-        var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, xAutoReload, pvTimerID, pxCallbackFunction) };
-        if (self.handle == null) {
-            return FreeRtosError.TimerCreationFailed;
-        }
-        return self;
+    pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
+        var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction) };
+
+        return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
+    }
+    pub fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
+        return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
     }
     pub fn start(self: *const @This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), null, xTicksToWait orelse portMAX_DELAY)) {
@@ -300,8 +262,8 @@ pub const Timer = struct {
     pub fn reset(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerReset(self.handle, xTicksToWait);
     }
-    pub fn getId(self: *const @This()) ?*anyopaque {
-        return c.pvTimerGetTimerID(self.handle);
+    pub fn getId(self: *const @This(), comptime T: type) ?*T {
+        return @as(?*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(self.timer))));
     }
     pub fn initFromHandle(handle: TimerHandle_t) @This() {
         return @This(){ .handle = handle };
@@ -313,11 +275,13 @@ pub const MessageBuffer = struct {
     pub fn create(self: *@This(), xBufferSizeBytes: usize) void {
         self.handle = c.xStreamBufferGenericCreate(xBufferSizeBytes, 0, pdTRUE, null, null);
     }
-    pub fn send(self: *@This(), pvTxData: ?*const anyopaque, xDataLengthBytes: usize, comptime xTicksToWait: ?TickType_t) usize {
-        return c.xMessageBufferSend(self.handle, pvTxData, xDataLengthBytes, xTicksToWait orelse portMAX_DELAY);
+    pub fn send(self: *@This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
+        return c.xMessageBufferSend(self.handle, txData.ptr, txData.len, xTicksToWait orelse portMAX_DELAY);
     }
-    pub fn receive(self: *@This(), pvRxData: ?*anyopaque, xDataLengthBytes: usize, ticks_to_wait: ?TickType_t) usize {
-        return c.xMessageBufferReceive(self.handle, pvRxData, xDataLengthBytes, ticks_to_wait orelse portMAX_DELAY);
+    pub fn receive(self: *@This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
+        var rx_len: usize = c.xMessageBufferReceive(self.handle, @constCast(rxData.ptr), rxData.len, ticks_to_wait orelse portMAX_DELAY);
+
+        return if (rx_len != 0) @constCast(rxData)[0..rx_len] else null;
     }
 };
 

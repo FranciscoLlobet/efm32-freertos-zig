@@ -40,11 +40,9 @@ const @"error" = error{
 
 // Authentication callback function.
 // Used during the connection phase for providing PSK credentials
-fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
+fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
     _ = self;
     _ = security_mode;
-
-    return 0;
 }
 
 // Structure representing a parsed Content-Range response header.
@@ -148,34 +146,24 @@ pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
 // Function to send an HTTP GET request with a specific byte range.
 // The range is specified by the 'start' and 'end' parameters.
 pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: usize) !void {
-    var ret: i32 = -1;
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
-        ret = self.connection.send(request);
+        _ = try self.connection.send(request);
         _ = try self.tx_mutex.give();
-    }
-
-    if (ret < 0) {
-        return @"error".tx_error;
     }
 }
 
 // Function to send an HTTP HEAD request to a specified URL.
 // HEAD requests retrieve the headers without the message body.
 pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
-    var ret: i32 = -1;
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
         const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
-        ret = self.connection.send(request);
+        _ = try self.connection.send(request);
         try self.tx_mutex.give();
-    }
-
-    if (ret < 0) {
-        return @"error".tx_error;
     }
 }
 
@@ -259,12 +247,10 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
     try self.file.sync(); // Perfom sync to reduce chances of critical errors
 
     while (self.file.tell() < fileSize) {
-        var current_position = self.file.tell();
-
         // Calculate the end position of the request
-        var requestEnd = calcRequestEnd(fileSize, block_size, current_position);
+        const requestEnd = calcRequestEnd(fileSize, block_size, self.file.tell());
 
-        try self.sendGetRangeRequest(url, current_position, requestEnd);
+        try self.sendGetRangeRequest(url, self.file.tell(), requestEnd);
 
         rx = try self.recieveResponse();
 
@@ -273,7 +259,9 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
         // We expect a HTTP code 206 Partial Content.
         if (parsed_response.status_code == 206) {
 
-            // Only rewinding is allowed to avoid holes in the file
+            // We compare the start position of the response with current file pointer position
+            // If they do not match, we need to rewind the file a previous position
+            // If the start position is smaller than the current position, we need to rewind to the start of the file in order to avoid holes and file corruption.
             if (self.file.tell() != parsed_response.range.?.start) {
                 if (self.file.tell() > parsed_response.range.?.start) {
                     // Rewind to a previous position.
@@ -289,11 +277,17 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
 
             if (requestEnd != parsed_response.range.?.end) {
                 // Request end position does not match with the expected value
+                // Not so tragic...
             }
 
             // Write the payload to the file
-            if (parsed_response.payload.?.len != try self.file.write(parsed_response.payload.?, parsed_response.payload.?.len)) {
+            // We store the current file position.
+            // If the amount of bytes written into the file does not match with the expected length, we rewind to the previous position.
+            const current_position = self.file.tell();
+            if (parsed_response.payload.?.len != try self.file.write(parsed_response.payload.?)) {
                 // Test if the bytes written match the payload.
+                // current error handling will rewind to previous position
+                try self.file.lseek(current_position);
             }
 
             // Move current position to the current file pointer
@@ -330,7 +324,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
 
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
-        self.connection = connection.init(.http, authCallback);
+        self.connection = connection.init(.http, authCallback, null);
         self.tx_mutex = freertos.Mutex.create() catch unreachable;
         self.rx_mutex = freertos.Mutex.create() catch unreachable;
     }

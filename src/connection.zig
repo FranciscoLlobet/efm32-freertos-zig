@@ -16,10 +16,14 @@ const connection_error = error{
     close_error,
     send_error,
     recieve_error,
+    buffer_owerflow,
 };
 
 const network_ctx = c.miso_network_ctx_t;
 
+/// Connections are based on a fixed connection pool
+///
+/// Each connection has an id mapped to the protocol used
 pub const connection_id = enum(usize) {
     ntp = c.wifi_service_ntp_socket,
     lwm2m = c.wifi_service_lwm2m_socket,
@@ -51,42 +55,43 @@ pub const protocol = enum(u32) {
 };
 
 pub const security_mode = enum(u32) {
-    no_sec,
-    psk,
+    no_sec = 0,
+    psk = 1,
     certificate_ec,
     certificate_rsa,
 };
 
-pub const schemes = enum {
-    ntp,
-    http,
-    https,
-    mqtt,
-    mqtts,
-    coap,
-    coaps,
+pub const schemes = enum(u32) {
+    no_scheme = 0,
+    ntp = 1,
+    http = 2,
+    mqtt = 3,
+    coap = 4,
+    https = 2 + 16,
+    mqtts = 3 + 16,
+    coaps = 4 + 16,
 
-    pub const stringmap = std.ComptimeStringMap(@This(), .{ .{ "ntp", .ntp }, .{ "http", .http }, .{ "https", .https }, .{ "mqtt", .mqtt }, .{ "mqtts", .mqtts }, .{ "coap", .coap }, .{ "coaps", .coaps } });
+    const stringmap = std.ComptimeStringMap(@This(), .{ .{ "ntp", .ntp }, .{ "http", .http }, .{ "https", .https }, .{ "mqtt", .mqtt }, .{ "mqtts", .mqtts }, .{ "coap", .coap }, .{ "coaps", .coaps } });
 
     pub fn match(scheme: []const u8) ?@This() {
         return stringmap.get(scheme);
     }
 
+    /// Get the underlying protocol for the proposed scheme
     pub fn getProtocol(self: @This()) protocol {
         return switch (self) {
             .ntp, .coap => protocol.udp_ip4,
             .coaps => protocol.dtls_ip4,
             .http, .mqtt => protocol.tcp_ip4,
             .https, .mqtts => protocol.tls_ip4,
-            //else => protocol.no_protocol,
+            else => protocol.no_protocol,
         };
     }
 
+    /// Test if the scheme is secure
+    /// Note: This function is currently not used
     pub fn isSecure(self: @This()) bool {
-        return switch (self) {
-            .coaps, .mqtts, .https => true,
-            else => false,
-        };
+        return self.getProtocol().isSecure();
     }
 };
 
@@ -94,8 +99,9 @@ ctx: network_ctx,
 id: connection_id,
 ssl: mbedtls,
 
-pub fn init(id: connection_id, auth_callback: ?mbedtls.auth_callback_fn) @This() {
-    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(auth_callback) };
+pub fn init(id: connection_id, credential_callback: ?mbedtls.credential_callback_fn, custom_ssl_init: ?mbedtls.custom_init_callback_fn) @This() {
+    // Think about how to rewrite this for non-ssl connections
+    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(credential_callback, custom_ssl_init) };
 }
 
 pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol, mode: ?security_mode) !void {
@@ -106,23 +112,13 @@ pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol,
     _ = mode;
 }
 
+/// Create a connection to a host
 pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
-    var ret: i32 = 0;
-
     if (proto.isSecure()) {
-        if (mode) |s_mode| {
-            ret = self.ssl.init(proto, s_mode);
-            if (ret == 0) {
-                ret = c.miso_network_register_ssl_context(self.ctx, @as(*c.mbedtls_ssl_context, @ptrCast(&self.ssl.context)));
-            }
-        }
+        _ = try self.ssl.init(self, proto, mode.?);
     }
 
-    if (ret == 0) {
-        ret = @as(i32, c.miso_create_network_connection(self.ctx, @as([*c]const u8, @ptrCast(host)), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(proto))));
-    }
-
-    if (ret != 0) {
+    if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(proto)))) {
         return connection_error.create_error;
     }
 }
@@ -133,19 +129,22 @@ pub fn close(self: *@This()) !void {
     }
 }
 
-// Send Function
-// TODO: Add error handling
-pub fn send(self: *@This(), buffer: []const u8) i32 {
-    return c.miso_network_send(self.ctx, @as([*c]const u8, buffer.ptr), buffer.len);
+/// Send Function
+pub fn send(self: *@This(), buffer: []const u8) !isize {
+    const len: isize = c.miso_network_send(self.ctx, @as([*c]const u8, buffer.ptr), buffer.len);
+    return if (len <= 0) connection_error.send_error else len;
 }
-// Recieve Function
+/// Recieve Function
 pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
     const len: isize = c.miso_network_read(self.ctx, buffer.ptr, buffer.len);
-    if (len <= 0) {
-        return connection_error.recieve_error;
-    }
-    return buffer[0..@intCast(len)];
+    return if (len <= 0)
+        connection_error.recieve_error
+    else if (@as(usize, @intCast(len)) > buffer.len)
+        connection_error.buffer_owerflow
+    else
+        buffer[0..@intCast(len)];
 }
+
 pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
     return c.wait_rx(self.ctx, timeout_s);
 }

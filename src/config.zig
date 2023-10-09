@@ -63,14 +63,14 @@ fn calculate_config_hash(path: [*:0]const u8, hash: *[32]u8) !void {
     var sha256_ctx = sha256.init();
     defer sha256_ctx.free();
 
-    _ = sha256_ctx.start();
+    try sha256_ctx.start();
 
     while (!file.eof()) {
-        var br = try file.read(mem_block, mem_block.len);
-        _ = sha256_ctx.update(mem_block, br);
+        var br = try file.read(mem_block);
+        try sha256_ctx.update(br);
     }
 
-    _ = sha256_ctx.finish(hash);
+    try sha256_ctx.finish(hash);
 }
 
 /// Load a public key im PEM format into PK context
@@ -85,13 +85,13 @@ fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) !void {
 
     @memset(key, 0);
 
-    _ = try key_file.read(key, key.len);
+    _ = try key_file.read(key);
 
-    _ = pk_ctx.parse(key);
+    try pk_ctx.parse(key);
 }
 
 /// Open the configuration file, calculate the hash value and compare it with the nvm reference.
-pub fn open_config_file(path: [*:0]const u8) !bool {
+pub fn open_config_file(path: [*:0]const u8) !void {
     var config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     var ref_config_sha256: [32]u8 align(@alignOf(u32)) = undefined;
     const allocator = freertos.allocator;
@@ -103,16 +103,14 @@ pub fn open_config_file(path: [*:0]const u8) !bool {
 
     try calculate_config_hash(path, &config_sha256); // open config file and calculate the hash
 
-    if (std.mem.eql(u8, &ref_config_sha256, &config_sha256)) {
-        return true;
-    } else {
+    if (!std.mem.eql(u8, &ref_config_sha256, &config_sha256)) {
         var sig_file = try fatfs.file.open("SD:CONFIG.SIG", @intFromEnum(fatfs.file.fMode.read));
         errdefer sig_file.close() catch {};
 
         const sig = try allocator.alloc(u8, sig_file.size());
         defer allocator.free(sig);
 
-        _ = try sig_file.read(sig, sig.len);
+        _ = try sig_file.read(sig);
 
         try sig_file.close();
 
@@ -120,27 +118,23 @@ pub fn open_config_file(path: [*:0]const u8) !bool {
         var pk_ctx = pk.init();
         defer pk_ctx.free();
 
-        load_public_key_from_file("SD:CONFIG.PUB", &pk_ctx) catch { // Load from NVM};
+        load_public_key_from_file("SD:CONFIG.PUB", &pk_ctx) catch {};
 
+        pk_ctx.verify(&config_sha256, sig) catch |err| {
+            _ = c.printf("CONFIG signature verification failed\r\n");
+            return err;
         };
 
-        if (true == pk_ctx.verify(&config_sha256, sig)) {
-            _ = c.printf("CONFIG signature verified successfully\r\n");
+        _ = c.printf("CONFIG signature verified successfully\r\n");
 
-            c.miso_load_config(); // Process the config
+        c.miso_load_config(); // Process the config
 
-            try store_config_in_nvm();
+        try store_config_in_nvm();
 
-            try nvm.writeData(.config_sha256, &config_sha256);
-
-            return true;
-        } else {
-            _ = c.printf("CONFIG signature verification failed\r\n");
-            return false;
-        }
+        try nvm.writeData(.config_sha256, &config_sha256);
+    } else {
+        _ = c.printf("CONFIG Hash as in NVM\r\n");
     }
-
-    return true;
 }
 
 pub fn store_config_in_nvm() !void {

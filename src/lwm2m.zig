@@ -33,7 +33,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
 
     while (true) {
         self.task.suspendTask();

@@ -20,7 +20,7 @@ const FRESULT = c.FRESULT;
 
 pub const FATFS = c.FATFS;
 
-pub const frError = error{ FR_DISK_ERR, FR_INT_ERR, FR_NOT_READY, FR_NO_FILE, FR_NO_PATH, FR_INVALID_NAME, FR_DENIED, FR_EXIST, FR_INVALID_OBJECT, FR_WRITE_PROTECTED, FR_INVALID_DRIVE, FR_NOT_ENABLED, FR_NO_FILESYSTEM, FR_MKFS_ABORTED, FR_TIMEOUT, FR_LOCKED, FR_NOT_ENOUGH_CORE, FR_TOO_MANY_OPEN_FILES, FR_INVALID_PARAMETER, generic_error };
+pub const frError = error{ FR_DISK_ERR, FR_INT_ERR, FR_NOT_READY, FR_NO_FILE, FR_NO_PATH, FR_INVALID_NAME, FR_DENIED, FR_EXIST, FR_INVALID_OBJECT, FR_WRITE_PROTECTED, FR_INVALID_DRIVE, FR_NOT_ENABLED, FR_NO_FILESYSTEM, FR_MKFS_ABORTED, FR_TIMEOUT, FR_LOCKED, FR_NOT_ENOUGH_CORE, FR_TOO_MANY_OPEN_FILES, FR_INVALID_PARAMETER, generic_error, buffer_overflow };
 
 const fRet = enum(c_uint) {
     fr_ok = c.FR_OK,
@@ -100,18 +100,18 @@ pub const file = struct {
         try fRet.check(c.f_close(&self.handle));
     }
 
-    pub fn read(self: *@This(), buf: []u8, bytesToRead: u32) frError!usize {
+    pub fn read(self: *@This(), buf: []u8) frError![]u8 {
         var bytesRead: usize = 0;
 
-        try fRet.check(c.f_read(&self.handle, buf.ptr, if (bytesToRead > buf.len) buf.len else bytesToRead, &bytesRead));
+        try fRet.check(c.f_read(&self.handle, buf.ptr, buf.len, &bytesRead));
 
-        return bytesRead;
+        return if (bytesRead > buf.len) frError.buffer_overflow else buf[0..bytesRead];
     }
 
-    pub fn write(self: *@This(), buf: []const u8, bytesToWrite: u32) frError!usize {
+    pub fn write(self: *@This(), buf: []const u8) frError!usize {
         var bytesWritten: usize = 0;
 
-        try fRet.check(c.f_write(&self.handle, buf.ptr, if (bytesToWrite > buf.len) buf.len else bytesToWrite, &bytesWritten));
+        try fRet.check(c.f_write(&self.handle, buf.ptr, buf.len, &bytesWritten));
 
         return bytesWritten;
     }

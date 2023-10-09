@@ -93,7 +93,7 @@ fn init() @This() {
     return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555), .uri_string = undefined, .device_id = undefined };
 }
 
-fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) i32 {
+fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
     var ret: i32 = 0;
 
     if (security_mode == .psk) {
@@ -102,25 +102,17 @@ fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mo
         if (ret == 0) {
             ret = connection.mbedtls.c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, config.c.config_get_mqtt_psk_id(), config.c.strlen(config.c.config_get_mqtt_psk_id()));
         }
+        if (ret != 0) {
+            return connection.mbedtls.auth_error.generic_error; // psk retrieval failed
+        }
+    } else {
+        return connection.mbedtls.auth_error.unsuported_mode;
     }
-
-    return 0;
 }
 
 fn processSendQueue(self: *@This()) !void {
-    var ret: i32 = 1;
-
-    while (ret > 0) {
-        var buf_len = self.packet.txQueue.receive(@ptrCast(&txBuffer[0]), txBuffer.len, 0);
-        if (buf_len != 0) {
-            ret = self.connection.send(txBuffer[0..buf_len]);
-        } else {
-            ret = 0;
-        }
-    }
-
-    if (0 > ret) {
-        return mqtt_error.send_failed;
+    while (self.packet.txQueue.receive(&txBuffer, 0)) |buf| {
+        _ = try self.connection.send(buf);
     }
 }
 
@@ -184,7 +176,7 @@ const packet = struct {
         var packetId: u16 = undefined;
 
         if (1 != c.MQTTDeserialize_ack(packetType, dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
-            // return
+            return mqtt_error.parse_failed;
         }
         return packetId;
     }
@@ -214,7 +206,7 @@ const packet = struct {
 
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_connect(@ptrCast(&workBuffer[0]), workBuffer.len, &connectPacket);
+        var packetLen: isize = c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket);
 
         return self.sendtoTxQueue(packetLen, null);
     }
@@ -270,7 +262,7 @@ const packet = struct {
         return self.sendtoTxQueue(packetLen, null);
     }
 
-    pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: [*:0]const u8, payload_len: usize, qos: u8) !u16 {
+    pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: u8) !u16 {
         _ = try self.workBufferMutex.take(null);
 
         var topic_name = initMQTTString(@constCast(topic));
@@ -278,7 +270,7 @@ const packet = struct {
         var retain: u8 = 0;
         var packetId = self.generatePacketId();
 
-        var packetLen: isize = c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @ptrCast(@constCast(payload)), @intCast(payload_len));
+        var packetLen: isize = c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len));
 
         return self.sendtoTxQueue(packetLen, packetId);
     }
@@ -300,7 +292,7 @@ const packet = struct {
     fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) !u16 {
         if (packetLen <= 0) {
             return mqtt_error.packetlen;
-        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(@ptrCast(workBuffer[0..@intCast(packetLen)].ptr), @intCast(packetLen), null))) {
+        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(workBuffer[0..@intCast(packetLen)], null))) {
             return mqtt_error.enqueue_failed;
         }
         try self.workBufferMutex.give();
@@ -354,9 +346,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                 var dup: u8 = undefined;
                 var rx_packetId: u16 = undefined;
 
-                rx_packetId = self.packet.deserializeAck(&rxBuffer, &packetType, &dup) catch {
-                    1;
-                };
+                rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
             } else if (readRet == msgTypes.pubrec) {
                 break;
             } else if (readRet == msgTypes.pubrel) {
@@ -388,7 +378,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 }
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
+    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
 
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
@@ -421,7 +411,7 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    const self = freertos.getAndCastTimerID(@This(), xTimer);
+    const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
 
     _ = self.packet.preparePingPacket() catch {};
 }
@@ -429,18 +419,18 @@ fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 const fw_update_topic = "zig/fw";
 
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    const self = freertos.getAndCastTimerID(@This(), xTimer);
+    const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
     const payload = "test";
-    _ = self.packet.preparePublishPacket("zig/pub", payload, payload.len, 1) catch {};
+    _ = self.packet.preparePublishPacket("zig/pub", payload, 1) catch {};
 }
 
 pub fn create(self: *@This()) void {
     self.task = freertos.Task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
     if (config.enable_mqtt) {
-        self.connection = connection.init(.mqtt, authCallback);
-        self.pingTimer = freertos.Timer.create("mqttPing", 60000, freertos.pdTRUE, self, pingTimer) catch unreachable;
-        self.pubTimer = freertos.Timer.create("pubTimer", 10000, freertos.pdTRUE, self, pubTimer) catch unreachable;
+        self.connection = connection.init(.mqtt, authCallback, null);
+        self.pingTimer = freertos.Timer.create("mqttPing", 60000, true, @This(), self, pingTimer) catch unreachable;
+        self.pubTimer = freertos.Timer.create("pubTimer", 10000, true, @This(), self, pubTimer) catch unreachable;
         self.packet.create(&self.connection);
     }
 }
@@ -448,7 +438,6 @@ pub fn create(self: *@This()) void {
 /// Add
 pub fn connect(self: *@This(), uri: std.Uri) !void {
     self.state = .connecting;
-    //var connRet: i32 = 0;
     var packetId: u16 = 0;
 
     self.connectionCounter += 1;
