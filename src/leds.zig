@@ -29,3 +29,11 @@ pub fn off(self: *const @This()) void {
 pub fn toggle(self: *const @This()) void {
     c.sl_led_toggle(self.handle);
 }
+
+pub fn set(self: *const @This(), state: bool) void {
+    if (state) {
+        self.on();
+    } else {
+        self.off();
+    }
+}

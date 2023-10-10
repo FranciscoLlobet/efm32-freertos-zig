@@ -163,20 +163,31 @@ pub const microzig_options = struct {
 
 // Button On-Change Callback
 pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
-    var instance = buttons.getInstance(handle);
-
-    if (instance == &buttons.button1) {
-        if (.pressed == instance.getState()) {
-            leds.red.on();
-        } else {
-            leds.red.off();
-        }
-    } else if (instance == &buttons.button2) {
-        if (.pressed == instance.getState()) {
-            leds.orange.on();
-        } else {
-            leds.orange.off();
-        }
+    const instance = buttons.getInstance(handle);
+    const state = instance.getState();
+    switch (instance.getName()) {
+        .button1 => {
+            switch (state) {
+                .pressed => {
+                    leds.red.on();
+                },
+                .released => {
+                    leds.red.off();
+                },
+                else => {},
+            }
+        },
+        .button2 => {
+            switch (state) {
+                .pressed => {
+                    leds.orange.on();
+                },
+                .released => {
+                    leds.orange.off();
+                },
+                else => {},
+            }
+        },
     }
 }
 

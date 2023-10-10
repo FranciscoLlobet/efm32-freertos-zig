@@ -4,7 +4,6 @@ const c = @cImport({
     @cInclude("board.h");
     @cInclude("sl_simple_button.h");
 });
-const leds = @import("leds");
 
 pub const button_handle = [*c]const c.sl_button_t;
 
@@ -13,6 +12,8 @@ pub const button_error = error{
 };
 
 handle: button_handle,
+
+pub const name = enum { button1, button2 };
 
 pub const state = enum(u32) {
     disabled = c.SL_SIMPLE_BUTTON_DISABLED,
@@ -32,6 +33,16 @@ pub fn getInstance(handle: button_handle) *const @This() {
         return &button1;
     } else if (handle == button2.handle) {
         return &button2;
+    } else {
+        return undefined;
+    }
+}
+
+pub fn getName(self: *const @This()) name {
+    if (&button1 == self) {
+        return name.button1;
+    } else if (&button2 == self) {
+        return name.button2;
     } else {
         return undefined;
     }

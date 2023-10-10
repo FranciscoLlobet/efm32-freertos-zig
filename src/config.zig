@@ -51,13 +51,13 @@ pub const miso_version_patch: u8 = 1;
 pub const miso_version: u32 = (miso_version_mayor << 16) | (miso_version_minor << 8) | (miso_version_patch);
 
 /// Open file and calculate SHA256 hash
-fn calculate_config_hash(path: [*:0]const u8, hash: *[32]u8) !void {
-    const allocator = freertos.allocator;
+fn calculate_config_hash(path: [*:0]const u8, hash: *[32]u8) (fatfs.frError || sha256.sha256_error || std.mem.Allocator.Error)!void {
+    const allocator = comptime freertos.allocator;
 
     var file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
     defer file.close() catch {};
 
-    const mem_block = try allocator.alloc(u8, 512);
+    const mem_block = try allocator.alloc(u8, if (file.size() >= 512) 512 else file.size());
     defer allocator.free(mem_block);
 
     var sha256_ctx = sha256.init();
@@ -65,8 +65,7 @@ fn calculate_config_hash(path: [*:0]const u8, hash: *[32]u8) !void {
 
     try sha256_ctx.start();
 
-    while (!file.eof()) {
-        var br = try file.read(mem_block);
+    while (try file.readEof(mem_block)) |br| {
         try sha256_ctx.update(br);
     }
 

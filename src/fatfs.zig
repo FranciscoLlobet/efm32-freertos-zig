@@ -17,9 +17,12 @@ const UINT = c.UINT;
 const FR_OK = c.FR_OK;
 const FILINFO = c.FILINFO;
 const FRESULT = c.FRESULT;
-
 pub const FATFS = c.FATFS;
+const FF_FS_MINIMIZE: u32 = c.FF_FS_MINIMIZE;
+const FF_USE_STRFUNC: u32 = c.FF_USE_STRFUNC;
+const FF_FS_READONLY: u32 = c.FF_FS_READONLY;
 
+/// Possible errors returned by FatFs
 pub const frError = error{ FR_DISK_ERR, FR_INT_ERR, FR_NOT_READY, FR_NO_FILE, FR_NO_PATH, FR_INVALID_NAME, FR_DENIED, FR_EXIST, FR_INVALID_OBJECT, FR_WRITE_PROTECTED, FR_INVALID_DRIVE, FR_NOT_ENABLED, FR_NO_FILESYSTEM, FR_MKFS_ABORTED, FR_TIMEOUT, FR_LOCKED, FR_NOT_ENOUGH_CORE, FR_TOO_MANY_OPEN_FILES, FR_INVALID_PARAMETER, generic_error, buffer_overflow };
 
 const fRet = enum(c_uint) {
@@ -45,6 +48,7 @@ const fRet = enum(c_uint) {
     fr_invalid_parameter = c.FR_INVALID_PARAMETER,
     generic_error,
 
+    /// Check the return value of a FatFs function and map the corresponding error
     fn check(ret: FRESULT) frError!void {
         return switch (@as(@This(), @enumFromInt(ret))) {
             .fr_ok => {},
@@ -75,6 +79,30 @@ const fRet = enum(c_uint) {
 // Global variable for FS
 pub export var fileSystem: c.FATFS = undefined;
 
+pub const dir = struct {
+    handle: c.DIR,
+
+    pub fn rename(old_name: [*:0]const u8, new_name: [*:0]const u8) frError!void {
+        return fRet.check(c.f_rename(old_name, new_name));
+    }
+
+    pub fn unlink(path: [*:0]const u8) frError!void {
+        return fRet.check(c.f_unlink(path));
+    }
+
+    pub fn open(path: [*:0]const u8) frError!@This() {
+        var self: @This() = undefined;
+
+        try fRet.check(c.f_opendir(&self.handle, path));
+
+        return self;
+    }
+
+    pub fn close(self: *@This()) frError!void {
+        try fRet.check(c.f_closedir(&self.handle));
+    }
+};
+
 pub const file = struct {
     handle: c.FIL,
 
@@ -88,6 +116,7 @@ pub const file = struct {
         open_append = c.FA_OPEN_APPEND,
     };
 
+    /// Open a file in given path and with the given mode
     pub fn open(path: [*:0]const u8, mode: u8) frError!@This() {
         var self: @This() = undefined;
 
@@ -96,10 +125,12 @@ pub const file = struct {
         return self;
     }
 
+    /// Close the current file
     pub fn close(self: *@This()) frError!void {
         try fRet.check(c.f_close(&self.handle));
     }
 
+    /// Read a slice of bytes from the current file
     pub fn read(self: *@This(), buf: []u8) frError![]u8 {
         var bytesRead: usize = 0;
 
@@ -108,6 +139,19 @@ pub const file = struct {
         return if (bytesRead > buf.len) frError.buffer_overflow else buf[0..bytesRead];
     }
 
+    pub fn readEof(self: *@This(), buf: []u8) frError!?[]u8 {
+        var bytesRead: usize = 0;
+
+        if (0 != c.f_eof(&self.handle)) {
+            return null;
+        } else {
+            try fRet.check(c.f_read(&self.handle, buf.ptr, buf.len, &bytesRead));
+
+            return if (bytesRead > buf.len) frError.buffer_overflow else if (bytesRead == 0) null else buf[0..bytesRead];
+        }
+    }
+
+    /// Write a slice of bytes to the current file
     pub fn write(self: *@This(), buf: []const u8) frError!usize {
         var bytesWritten: usize = 0;
 
@@ -116,28 +160,42 @@ pub const file = struct {
         return bytesWritten;
     }
 
+    /// Perform sync on the current file
+    /// Flush cached data
     pub fn sync(self: *@This()) frError!void {
         return fRet.check(c.f_sync(&self.handle));
     }
 
+    /// Get the size of the file
     pub fn size(self: *@This()) usize {
         return c.f_size(&self.handle);
     }
 
+    /// Change the file pointer position
     pub fn lseek(self: *@This(), offset: usize) frError!void {
         try fRet.check(c.f_lseek(&self.handle, offset));
     }
 
+    /// Tell the current file pointer position
     pub fn tell(self: *@This()) usize {
         return c.f_tell(&self.handle);
     }
 
+    /// Rewind the file pointer to the beginning
     pub fn rewind(self: *@This()) frError!void {
         try self.lseek(0);
     }
 
+    /// Test for end-of-file
+    /// Returns true if the file pointer is at the end of the file
+    /// This behaviour is
     pub fn eof(self: *@This()) bool {
         return (0 != c.f_eof(&self.handle));
+    }
+
+    /// Truncate the file to the current file pointer position
+    pub fn truncate(self: *@This()) frError!void {
+        try fRet.check(c.f_truncate(&self.handle));
     }
 };
 

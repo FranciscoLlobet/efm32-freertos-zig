@@ -16,6 +16,9 @@ const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
 
+const fw_file_name = "SD:FW.BIN";
+const config_file_name = "SD:CONFIG.TXT";
+
 const state = enum(usize) {
     verify_config = 0,
     start_connectivity,
@@ -38,8 +41,6 @@ const state = enum(usize) {
 };
 task: freertos.Task,
 timer: freertos.Timer,
-queue: freertos.Queue,
-//typedQueue: freertos.TypedQueue,
 state: state,
 
 fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
@@ -59,16 +60,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     fatfs.mount("SD") catch unreachable;
 
     while (true) {
-
-        //var eventValue: u32 = undefined;
-        //if (self.task.waitForNotify(0, 0xFFFFFFFF, &eventValue, 0)) {
-        //    if ((eventValue & c.miso_connectivity_on) == c.miso_connectivity_on) {
-        //        //
-        //    }
-        //    if ((eventValue & c.miso_connectivity_off) == c.miso_connectivity_off) {
-        //
-        //    }
-        //}
         var eventValue: u32 = 0;
 
         if (self.state == .verify_config) {
@@ -77,7 +68,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             };
 
             //board.watchdogFeed();
-            _ = config.open_config_file("SD:CONFIG.TXT") catch {
+            _ = config.open_config_file(config_file_name) catch {
                 _ = c.printf("Failure!!\n\r");
             };
 
@@ -100,7 +91,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             if (config.enable_http) {
                 // get eTag from the NVM
 
-                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], "SD:FW.BIN", 512) catch {};
+                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], fw_file_name, 512) catch {};
             }
 
             _ = c.printf("Firmware download complete\r\n");
@@ -135,8 +126,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
+    self.state = state.verify_config;
     self.task = freertos.Task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, @constCast(self), config.rtos_prio_user_task) catch unreachable;
     self.timer = freertos.Timer.create("user_timer", 2000, true, @This(), self, myTimerFunction) catch unreachable;
 }
 
-pub var user_task: @This() = .{ .timer = undefined, .queue = undefined, .state = undefined, .task = undefined };
+pub var user_task: @This() = .{ .timer = undefined, .state = undefined, .task = undefined };
