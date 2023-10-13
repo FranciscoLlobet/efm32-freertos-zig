@@ -91,7 +91,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             if (config.enable_http) {
                 // get eTag from the NVM
 
-                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], fw_file_name, 512) catch {};
+                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], fw_file_name, 512) catch |err| {
+                    _ = c.printf("Failure to download!!: %s\n\r", @errorName(err).ptr);
+                };
             }
 
             _ = c.printf("Firmware download complete\r\n");
