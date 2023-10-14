@@ -12,6 +12,10 @@ pub fn mcuReset() noreturn {
     unreachable;
 }
 
+pub fn getResetCause() u32 {
+    return c.BOARD_MCU_GetResetCause();
+}
+
 pub fn init() void {
     c.BOARD_Init();
 }

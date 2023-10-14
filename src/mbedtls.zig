@@ -14,26 +14,25 @@ pub const c = @cImport({
     @cInclude("mbedtls/entropy.h");
 }); // pub in order to be able to import from client modules
 
-const ciphersuites_psk: [4]c_int = .{
+const ciphersuites_psk = [_]c_int{
     c.MBEDTLS_TLS_PSK_WITH_AES_128_GCM_SHA256,
     c.MBEDTLS_TLS_PSK_WITH_AES_128_CCM_8,
     c.MBEDTLS_TLS_PSK_WITH_AES_128_CCM,
     0,
 };
 
-const ciphersuites_ec: [3]c_int = .{
+const ciphersuites_ec = [_]c_int{
     c.MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
     c.MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM,
     0,
 };
 
-const sig_algorithms: [2]u16 = .{
+const sig_algorithms = [_]u16{
     c.MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
     c.MBEDTLS_TLS1_3_SIG_NONE,
 };
 
-const groups: [2]u16 =
-    .{ c.MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, c.MBEDTLS_SSL_IANA_TLS_GROUP_NONE };
+const groups = [_]u16{ c.MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, c.MBEDTLS_SSL_IANA_TLS_GROUP_NONE };
 
 pub const auth_error = error{
     no_callback,
@@ -42,10 +41,15 @@ pub const auth_error = error{
     unsuported_mode,
 };
 
+pub const mbedtls_error = error{
+    psk_conf_error,
+    generic_error,
+};
+
 pub const init_error = error{};
 
 pub const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
-pub const custom_init_callback_fn = *const fn (*@This(), protocol: connection.protocol, mode: connection.security_mode) init_error!void;
+pub const custom_init_callback_fn = *const fn (*@This(), connection.protocol, connection.security_mode) init_error!void;
 
 /// Security mode
 mode: connection.security_mode,
@@ -62,12 +66,6 @@ timer: c.miso_mbedtls_timing_delay_t,
 
 /// Entropy Seed
 entropy_seed: u32,
-
-/// PSK buffer
-psk: [64]u8, // probably no longer needed
-
-/// PSK Length
-psk_len: usize,
 
 /// Authentication callback
 auth_callback: ?credential_callback_fn = defaultAuth,
@@ -105,7 +103,7 @@ fn get_ctx(self: *@This()) *c.mbedtls_ssl_context {
 }
 
 pub fn create(auth_callback: ?credential_callback_fn, custom_init: ?custom_init_callback_fn) @This() {
-    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .psk = undefined, .psk_len = 0, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
 }
 
 /// Helper function to get the credential callback function in custom init
@@ -187,4 +185,18 @@ pub fn init(self: *@This(), connection_ctx: *connection, protocol: connection.pr
     }
 
     return ret;
+}
+
+pub fn confPsk(self: *@This(), psk: []u8, psk_id: [*:0]u8) !void {
+    return if (0 != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
+}
+
+pub fn base64Decode(input: [*:0]u8, output: []u8) ![]u8 {
+    var len: usize = 0;
+
+    if (0 == c.mbedtls_base64_decode(output.ptr, output.len, &len, &input[0], c.strlen(input))) {
+        return if (output.len >= len) output[0..len] else mbedtls_error.generic_error;
+    }
+
+    return mbedtls_error.generic_error;
 }

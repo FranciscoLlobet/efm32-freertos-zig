@@ -51,6 +51,7 @@ const FreeRtosError = error{
     TimerStopFailed,
     TimerChangePeriodFailed,
 
+    MessageBufferCreationFailed,
     MessageBufferReceiveFailed,
 };
 
@@ -272,8 +273,12 @@ pub const Timer = struct {
 
 pub const MessageBuffer = struct {
     handle: MessageBufferHandle_t = undefined,
-    pub fn create(self: *@This(), xBufferSizeBytes: usize) void {
+    pub fn create(xBufferSizeBytes: usize) !@This() {
+        var self: @This() = undefined;
+
         self.handle = c.xStreamBufferGenericCreate(xBufferSizeBytes, 0, pdTRUE, null, null);
+
+        return if (self.handle != null) self else FreeRtosError.MessageBufferCreationFailed;
     }
     pub fn send(self: *@This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
         return c.xMessageBufferSend(self.handle, txData.ptr, txData.len, xTicksToWait orelse portMAX_DELAY);

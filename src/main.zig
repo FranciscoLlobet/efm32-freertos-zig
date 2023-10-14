@@ -29,7 +29,7 @@ export fn vApplicationIdleHook() void {
 }
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\r");
+    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
 
     leds.red.on();
 

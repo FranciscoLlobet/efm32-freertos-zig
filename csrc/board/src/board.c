@@ -30,6 +30,8 @@
 extern nvm3_Handle_t * miso_nvm3_handle;
 extern nvm3_Init_t  * miso_nvm3_init_handle;
 
+volatile uint32_t reset_cause = (uint32_t)0;
+
 void BOARD_SysTick_Enable(void)
 {
 	SysTick_Config(SystemCoreClock / BOARD_SYSTICK_FREQUENCY);
@@ -94,6 +96,7 @@ void BOARD_Init(void)
 
 	CMU_ClockEnable(cmuClock_GPIO, true);
 
+	reset_cause = RMU_ResetCauseGet();
 
 	/* ENABLE SWO */
 	sl_debug_swo_init();
@@ -170,6 +173,8 @@ void BOARD_Init(void)
 
 	(void)sl_sleeptimer_set_datetime(&date);
 
+	RMU_ResetCauseClear();
+
 	BOARD_USB_Init();
 }
 
@@ -187,6 +192,11 @@ void BOARD_MCU_Reset(void)
 
 	/* Perform Chip Reset*/
 	CHIP_Reset();
+}
+
+uint32_t BOARD_MCU_GetResetCause(void)
+{
+	return reset_cause;
 }
 
 #include <sys/time.h>

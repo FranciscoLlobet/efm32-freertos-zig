@@ -1,3 +1,9 @@
+/// Basic MQTT Client implementation in Zig using FreeRTOS as OS
+/// This is a work in progress and is not ready for production use
+///
+/// Not all aspects of the MQTT state machine were implemented
+/// QoS 2 is partially supported
+///
 const std = @import("std");
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
@@ -84,9 +90,17 @@ device_id: [*:0]u8,
 
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
+var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 
+/// Init a MQTT String using slice.
+/// Has been tested in comptime
 inline fn initMQTTString(data: []const u8) MQTTString {
     return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(data.len), .data = @constCast(data.ptr) } };
+}
+
+/// Init a MQTT String using a pointer and asuming a 0-terminated C-String
+inline fn initMQTTCstring(data: [*:0]u8) MQTTString {
+    return MQTTString{ .cstring = @ptrCast(data), .lenstring = .{ .len = 0, .data = null } };
 }
 
 fn init() @This() {
@@ -94,17 +108,13 @@ fn init() @This() {
 }
 
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
-    var ret: i32 = 0;
-
     if (security_mode == .psk) {
-        @memset(&self.psk, 0);
-        ret = connection.mbedtls.c.mbedtls_base64_decode(&self.psk, self.psk.len, &self.psk_len, config.c.config_get_mqtt_psk_key(), config.c.strlen(config.c.config_get_mqtt_psk_key()));
-        if (ret == 0) {
-            ret = connection.mbedtls.c.mbedtls_ssl_conf_psk(&self.config, &self.psk, self.psk_len, config.c.config_get_mqtt_psk_id(), config.c.strlen(config.c.config_get_mqtt_psk_id()));
-        }
-        if (ret != 0) {
-            return connection.mbedtls.auth_error.generic_error; // psk retrieval failed
-        }
+        var psk_buf: [64]u8 = undefined; // Request 64 Bytes for Base64 decoder
+
+        const psk = connection.mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return connection.mbedtls.auth_error.generic_error;
+        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return connection.mbedtls.auth_error.generic_error;
+
+        @memset(&psk_buf, 0); // Sanitize the buffer to avoid the decoded psk to remain in stack
     } else {
         return connection.mbedtls.auth_error.unsuported_mode;
     }
@@ -115,8 +125,6 @@ fn processSendQueue(self: *@This()) !void {
         _ = try self.connection.send(buf);
     }
 }
-
-var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 
 const packet = struct {
     transport: MQTTTransport,
@@ -140,7 +148,7 @@ const packet = struct {
 
         self.workBufferMutex = freertos.Mutex.create() catch unreachable;
 
-        self.txQueue.create(1024); // Create message buffer
+        self.txQueue = freertos.MessageBuffer.create(1024) catch unreachable; // Create message buffer
     }
 
     // Use XorShift Algorithm to generate the packet id
@@ -157,9 +165,9 @@ const packet = struct {
     }
 
     fn getFn(ptr: ?*anyopaque, buf: [*c]u8, buf_len: c_int) callconv(.C) c_int {
-        var self = @as(*connection, @ptrCast(@alignCast(ptr)));
+        var self = @as(*connection, @ptrCast(@alignCast(ptr))); // Cast ptr as connection
 
-        var ret = self.recieve(buf[0..@intCast(buf_len)]) catch {
+        const ret = self.recieve(buf[0..@intCast(buf_len)]) catch {
             return @intFromEnum(msgTypes.err_msg);
         };
 
@@ -190,23 +198,35 @@ const packet = struct {
         return packetId;
     }
 
+    /// Check the output of the MQTTSerialize_xyz functions for error returns and avoids buffer overflows
+    /// Returns a slice of the workBuffer
+    fn serializeCheck(packetLen: isize) ![]u8 {
+        if (packetLen <= 0) {
+            return mqtt_error.packetlen; // Could not serialize packet
+        } else if (packetLen > workBuffer.len) {
+            return mqtt_error.packetlen; // Packet too big
+        } else {
+            return workBuffer[0..@intCast(packetLen)];
+        }
+    }
+
     fn prepareConnectPacket(self: *@This(), clientID: []const u8, username: ?[]const u8, password: ?[]const u8) !u16 {
         var connectPacket = MQTTPacket_connectData_initializer;
-        connectPacket.clientID = initMQTTString(@constCast(clientID));
+        connectPacket.clientID = initMQTTString(clientID);
 
         if (username) |un| {
-            connectPacket.username = initMQTTString(@constCast(un));
+            connectPacket.username = initMQTTString(un);
         }
 
         if (password) |pw| {
-            connectPacket.password = initMQTTString(@constCast(pw));
+            connectPacket.password = initMQTTString(pw);
         }
 
         connectPacket.keepAliveInterval = 400;
 
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket);
+        const packetLen = try serializeCheck(c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket));
 
         return self.sendtoTxQueue(packetLen, null);
     }
@@ -214,15 +234,23 @@ const packet = struct {
     fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
+        const packetLen = try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
 
         return self.sendtoTxQueue(packetLen, null);
+    }
+
+    fn preparePubRecPacket(self: *@This(), packetId: u16) !u16 {
+        _ = try self.workBufferMutex.take(null);
+
+        const packetLen = try serializeCheck(c.MQTTSerialize_pubrec(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
+
+        return self.sendtoTxQueue(packetLen, packetId);
     }
 
     fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId);
+        const packetLen = try serializeCheck(c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
 
         return self.sendtoTxQueue(packetLen, packetId);
     }
@@ -230,7 +258,7 @@ const packet = struct {
     fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId);
+        const packetLen = try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId));
 
         return self.sendtoTxQueue(packetLen, packetId);
     }
@@ -241,7 +269,7 @@ const packet = struct {
         var packetId = self.generatePacketId();
         var dup: u8 = 0;
 
-        var packetLen: isize = c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos);
+        const packetLen = try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos));
 
         return self.sendtoTxQueue(packetLen, packetId);
     }
@@ -249,7 +277,7 @@ const packet = struct {
     fn preparePingPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len);
+        const packetLen = try serializeCheck(c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len));
 
         return self.sendtoTxQueue(packetLen, null);
     }
@@ -257,7 +285,7 @@ const packet = struct {
     fn prepareDisconnectPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var packetLen: isize = c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len);
+        const packetLen = try serializeCheck(c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len));
 
         return self.sendtoTxQueue(packetLen, null);
     }
@@ -265,12 +293,12 @@ const packet = struct {
     pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: u8) !u16 {
         _ = try self.workBufferMutex.take(null);
 
-        var topic_name = initMQTTString(@constCast(topic));
+        var topic_name = initMQTTString(topic);
         var dup: u8 = 0;
         var retain: u8 = 0;
         var packetId = self.generatePacketId();
 
-        var packetLen: isize = c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len));
+        const packetLen = try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len)));
 
         return self.sendtoTxQueue(packetLen, packetId);
     }
@@ -289,12 +317,13 @@ const packet = struct {
         }
     }
 
-    fn sendtoTxQueue(self: *@This(), packetLen: isize, packetId: ?u16) !u16 {
-        if (packetLen <= 0) {
-            return mqtt_error.packetlen;
-        } else if (!(@as(usize, @intCast(packetLen)) == self.txQueue.send(workBuffer[0..@intCast(packetLen)], null))) {
+    /// Send the content of the buffer to the txQueue.
+    /// The optional packet ID is propagated to the next layer if the operation was succesful
+    fn sendtoTxQueue(self: *@This(), buffer: []u8, packetId: ?u16) !u16 {
+        if (buffer.len != self.txQueue.send(buffer, null)) {
             return mqtt_error.enqueue_failed;
         }
+
         try self.workBufferMutex.give();
 
         return @intCast(packetId orelse 0);
@@ -310,66 +339,93 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
         if (0 == self.connection.waitRx(1)) {
             var readRet = self.packet.read(&rxBuffer);
-            if (readRet == msgTypes.try_again) {} else if ((readRet == msgTypes.connect) or (readRet == msgTypes.subscribe)) {
-                break;
-            } else if (readRet == msgTypes.connack) {
-                try self.packet.processConnAck(&rxBuffer);
-            } else if (readRet == msgTypes.publish) {
-                var dup: u8 = undefined;
-                var qos: c_int = undefined;
-                var retained: u8 = undefined;
+            switch (readRet) {
+                .try_again => {},
+                .publish => {
+                    var dup: u8 = undefined;
+                    var qos: c_int = undefined;
+                    var retained: u8 = undefined;
 
-                var topicName = MQTTString_initializer;
-                var payload: [*c]u8 = undefined;
-                var payloadLen: isize = undefined;
+                    var topicName = MQTTString_initializer;
+                    var payload: [*c]u8 = undefined;
+                    var payloadLen: isize = undefined;
 
-                var rx_packetId: u16 = undefined;
+                    var rx_packetId: u16 = undefined;
 
-                if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&rxBuffer[0]), rxBuffer.len)) {
-                    var packetId = switch (qos) {
-                        0 => 0,
-                        1 => try self.packet.preparePubAckPacket(rx_packetId),
-                        else => 0,
-                    };
+                    if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&rxBuffer[0]), rxBuffer.len)) {
+                        var packetId: u16 = switch (qos) {
+                            0 => 0,
+                            1 => try self.packet.preparePubAckPacket(rx_packetId),
+                            2 => try self.packet.preparePubRecPacket(rx_packetId),
+                            else => 0,
+                        };
 
-                    _ = packetId;
+                        // Process publish message
 
-                    // Process publish message
+                        _ = c.printf("publish recieved: %d\r\n", packetId);
+                    } else {
+                        break; // error state
+                    }
+                },
+                .puback => {
+                    // Response for Client pub qos1
+                    var packetType: u8 = undefined;
+                    var dup: u8 = undefined;
+                    var rx_packetId: u16 = undefined;
 
-                    _ = c.printf("publish recieved\r\n");
-                } else {
-                    break; // error state
-                }
-            } else if (readRet == msgTypes.puback) {
-                // Response for Client pub qos1
-                var packetType: u8 = undefined;
-                var dup: u8 = undefined;
-                var rx_packetId: u16 = undefined;
+                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                },
+                .pingresp => {
+                    _ = c.printf("pingresp!");
+                },
+                .connack => try self.packet.processConnAck(&rxBuffer),
+                .connect, .subscribe, .disconnect, .unsubscribe, .pingreq => break, // Broker messages
+                .suback => {
+                    var maxCount: c_int = 1;
+                    var count: c_int = 0;
+                    var grantedQoSs: c_int = 0;
+                    var packetId: u16 = undefined;
 
-                rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
-            } else if (readRet == msgTypes.pubrec) {
-                break;
-            } else if (readRet == msgTypes.pubrel) {
-                break;
-            } else if (readRet == msgTypes.pubcomp) {
-                break;
-            } else if (readRet == msgTypes.suback) {
-                break;
-                // MQTTDeserialize_suback(&submsgid, 1, &subcount, &granted_qos, buf, buflen);
-            } else if (readRet == msgTypes.unsubscribe) {
-                break;
-            } else if (readRet == msgTypes.unsuback) {
-                // unsuback
-            } else if (readRet == msgTypes.pingreq) {
-                break;
-            } else if (readRet == msgTypes.pingresp) {
-                // process the ping response
-                _ = c.printf("pingresp!");
-            } else if (readRet == msgTypes.disconnect) {
-                break;
-            } else {
-                break;
-                // Generic error
+                    // Deserialize
+                    if (packetId == try self.packet.deserializeSubAck(&rxBuffer, maxCount, &count, &grantedQoSs)) {
+                        _ = c.printf("Suback received\r\n");
+                    }
+                }, // To-do: process the sub-ack
+                .unsuback => {
+                    // currently unsuported
+                },
+                .pubrec => {
+                    // generate pubrel package
+                    var packetType: u8 = undefined;
+                    var dup: u8 = undefined;
+                    var rx_packetId: u16 = undefined;
+
+                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+
+                    _ = try self.packet.preparePubRelPacket(0, rx_packetId);
+                },
+                .pubrel => {
+                    // generate pubcomp package
+                    var packetType: u8 = undefined;
+                    var dup: u8 = undefined;
+                    var rx_packetId: u16 = undefined;
+
+                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+
+                    _ = try self.packet.preparePubCompPacket(rx_packetId);
+                },
+                .pubcomp => {
+                    // publish complete
+                    // process the pubrel package
+                    var packetType: u8 = undefined;
+                    var dup: u8 = undefined;
+                    var rx_packetId: u16 = undefined;
+
+                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+
+                    _ = c.printf("pubcomp received for packetId\r\n", rx_packetId);
+                },
+                .err_msg => break,
             }
         } else {
             _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
@@ -413,15 +469,16 @@ fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
 
-    _ = self.packet.preparePingPacket() catch {};
+    _ = self.packet.preparePingPacket() catch unreachable;
 }
 
 const fw_update_topic = "zig/fw";
+const conf_update_topic = "zig/conf";
 
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
     const payload = "test";
-    _ = self.packet.preparePublishPacket("zig/pub", payload, 1) catch {};
+    _ = self.packet.preparePublishPacket("zig/pub", payload, 1) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
@@ -460,9 +517,9 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         }
     }
 
-    const subTopic = comptime initMQTTString(fw_update_topic);
-    var qos: c_int = 1;
-    packetId = try self.packet.prepareSubscribePacket(1, @constCast(&subTopic), &qos);
+    const subTopic = [_]MQTTString{ comptime initMQTTString(fw_update_topic), comptime initMQTTString(conf_update_topic) };
+    const qos = [_]c_int{ 1, 2 };
+    packetId = try self.packet.prepareSubscribePacket(2, @constCast(&subTopic[0]), @constCast(&qos[0]));
 
     try self.processSendQueue();
 

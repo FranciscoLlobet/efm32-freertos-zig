@@ -29,6 +29,7 @@
 #include "em_msc.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
+#include "em_rmu.h"
 #include "gpiointerrupt.h"
 #include "spidrv.h"
 #include "uartdrv.h"
@@ -297,6 +298,8 @@ void BOARD_msDelay(uint32_t delay_in_ms);
 
 /* Perform the MCU Reset */
 void BOARD_MCU_Reset(void);
+
+uint32_t BOARD_MCU_GetResetCause(void);
 
 void Board_CC3100_Init(void);
 void board_i2c_init(void);
