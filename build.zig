@@ -103,7 +103,7 @@ pub fn build(b: *std.build.Builder) void {
         build_wakaama.aggregate(exe);
         build_mqtt.aggregate(exe);
         build_picohttpparser.aggregate(exe);
-        //exe.addOptions(module_name: []const u8, options: *std.build.OptionsStep)
+
         exe.installArtifact(b);
     }
 }

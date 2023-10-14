@@ -16,16 +16,10 @@ const c = @cImport({
     @cInclude("miso_config.h");
 });
 
-const MQTTSerialize_ack = c.MQTTSerialize_ack;
-const MQTTDeserialize_ack = c.MQTTDeserialize_ack;
-const MQTTPacket_len = c.MQTTPacket_len;
-const MQTTPacket_read = c.MQTTPacket_read;
-
 const keepAliveInterval_s = 60;
 const keepAliveInterval_ms = 1000 * keepAliveInterval_s;
 
 const MQTTTransport = c.MQTTTransport;
-
 const MQTTString = c.MQTTString;
 const MQTTLenString = c.MQTTLenString;
 
@@ -39,7 +33,7 @@ const state = enum(i32) {
     disconnecting,
 };
 
-const mqtt_error = error{
+pub const mqtt_error = error{
     packetlen,
     enqueue_failed,
     dequeue_failed,
@@ -50,10 +44,12 @@ const mqtt_error = error{
     publish_parse_failed,
 };
 
-pub const MQTTString_initializer = MQTTString{ .cstring = null, .lenstring = .{ .len = 0, .data = null } };
+const packet_response = @This().packet.publish_response;
+
+const MQTTString_initializer = MQTTString{ .cstring = null, .lenstring = .{ .len = 0, .data = null } };
 
 // Manually translated initializer
-pub const MQTTPacket_willOptions_initializer = c.MQTTPacket_willOptions{
+const MQTTPacket_willOptions_initializer = c.MQTTPacket_willOptions{
     .struct_id = [_]u8{ 'M', 'Q', 'T', 'W' },
     .struct_version = 0,
     .topicName = MQTTString_initializer,
@@ -63,7 +59,7 @@ pub const MQTTPacket_willOptions_initializer = c.MQTTPacket_willOptions{
 };
 
 // Manually translated initializer
-pub const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
+const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
     .struct_id = [_]u8{ 'M', 'Q', 'T', 'C' },
     .struct_version = 0,
     .MQTTVersion = 4,
@@ -142,6 +138,16 @@ const packet = struct {
     workBufferMutex: freertos.Mutex,
     txQueue: freertos.MessageBuffer = undefined,
 
+    /// Publish packet response
+    const publish_response = struct {
+        packetId: u16,
+        qos: u8,
+        dup: u8,
+        retained: u8,
+        topic: []u8,
+        payload: []u8,
+    };
+
     pub fn init(comptime packetId: u16) @This() {
         return @This(){ .transport = .{
             .getfn = getFn,
@@ -188,15 +194,6 @@ const packet = struct {
         self.transport.state = 0;
         return @as(msgTypes, @enumFromInt(c.MQTTPacket_readnb(@ptrCast(&buffer[0]), @intCast(buffer.len), &self.transport)));
     }
-
-    const publish_response = struct {
-        packetId: u16,
-        qos: u8,
-        dup: u8,
-        retained: u8,
-        topic: []u8,
-        payload: []u8,
-    };
 
     fn deserializePublish(self: *@This(), buffer: []u8) !publish_response {
         _ = self;
@@ -584,7 +581,7 @@ pub fn disconnect(self: *@This()) !void {
     }
 }
 
-pub inline fn resumeTask(self: *@This()) void {
+pub fn resumeTask(self: *@This()) void {
     self.task.resumeTask();
 }
 
