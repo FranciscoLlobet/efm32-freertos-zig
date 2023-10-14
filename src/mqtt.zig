@@ -47,6 +47,7 @@ const mqtt_error = error{
     send_failed,
     connack_failed,
     parse_failed,
+    publish_parse_failed,
 };
 
 pub const MQTTString_initializer = MQTTString{ .cstring = null, .lenstring = .{ .len = 0, .data = null } };
@@ -101,6 +102,15 @@ inline fn initMQTTString(data: []const u8) MQTTString {
 /// Init a MQTT String using a pointer and asuming a 0-terminated C-String
 inline fn initMQTTCstring(data: [*:0]u8) MQTTString {
     return MQTTString{ .cstring = @ptrCast(data), .lenstring = .{ .len = 0, .data = null } };
+}
+
+/// Get MQTT String as slice
+inline fn getMQTTString(data: MQTTString) []u8 {
+    if (data.cstring) |cstring| {
+        return cstring[0..c.strlen(cstring)];
+    } else {
+        return data.lenstring.data[0..@intCast(data.lenstring.len)];
+    }
 }
 
 fn init() @This() {
@@ -177,6 +187,32 @@ const packet = struct {
     fn read(self: *@This(), buffer: []u8) msgTypes {
         self.transport.state = 0;
         return @as(msgTypes, @enumFromInt(c.MQTTPacket_readnb(@ptrCast(&buffer[0]), @intCast(buffer.len), &self.transport)));
+    }
+
+    const publish_response = struct {
+        packetId: u16,
+        qos: u8,
+        dup: u8,
+        retained: u8,
+        topic: []u8,
+        payload: []u8,
+    };
+
+    fn deserializePublish(self: *@This(), buffer: []u8) !publish_response {
+        _ = self;
+        var topicName = MQTTString_initializer;
+        var payload: [*c]u8 = undefined;
+        var payloadLen: isize = undefined;
+        var packetId: u16 = undefined;
+        var retained: u8 = undefined;
+        var dup: u8 = undefined;
+        var qos: c_int = undefined;
+
+        if (1 != c.MQTTDeserialize_publish(&dup, &qos, &retained, &packetId, &topicName, &payload, &payloadLen, buffer.ptr, @intCast(buffer.len))) {
+            return mqtt_error.parse_failed;
+        }
+
+        return publish_response{ .packetId = packetId, .qos = @intCast(qos), .dup = dup, .retained = retained, .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
     }
 
     fn deserializeAck(self: *@This(), buffer: []u8, packetType: *u8, dup: *u8) !u16 {
@@ -342,30 +378,20 @@ fn loop(self: *@This(), uri: std.Uri) !void {
             switch (readRet) {
                 .try_again => {},
                 .publish => {
-                    var dup: u8 = undefined;
-                    var qos: c_int = undefined;
-                    var retained: u8 = undefined;
+                    const publish_response = try self.packet.deserializePublish(&rxBuffer);
+                    const packetId: u16 = switch (publish_response.qos) {
+                        0 => 0,
+                        1 => try self.packet.preparePubAckPacket(publish_response.packetId),
+                        2 => try self.packet.preparePubRecPacket(publish_response.packetId),
+                        else => 0,
+                    };
 
-                    var topicName = MQTTString_initializer;
-                    var payload: [*c]u8 = undefined;
-                    var payloadLen: isize = undefined;
+                    var buf: [64]u8 = undefined;
+                    @memset(&buf, 0);
 
-                    var rx_packetId: u16 = undefined;
+                    var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {s} {s}\r\n", .{ packetId, publish_response.topic, publish_response.payload });
 
-                    if (1 == c.MQTTDeserialize_publish(&dup, &qos, &retained, &rx_packetId, &topicName, &payload, &payloadLen, @ptrCast(&rxBuffer[0]), rxBuffer.len)) {
-                        var packetId: u16 = switch (qos) {
-                            0 => 0,
-                            1 => try self.packet.preparePubAckPacket(rx_packetId),
-                            2 => try self.packet.preparePubRecPacket(rx_packetId),
-                            else => 0,
-                        };
-
-                        // Process publish message
-
-                        _ = c.printf("publish recieved: %d\r\n", packetId);
-                    } else {
-                        break; // error state
-                    }
+                    _ = c.printf("%s", s.ptr);
                 },
                 .puback => {
                     // Response for Client pub qos1

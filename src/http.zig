@@ -143,7 +143,7 @@ pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
     var uri = try std.Uri.parse(url);
 
     if (self.tx_mutex.take(null)) {
-        const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
+        const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
         ret = self.connection.send(@ptrCast(request), request.len);
         _ = self.tx_mutex.give();
     }
@@ -159,7 +159,7 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
-        const request = std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end }) catch unreachable;
+        const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end });
         _ = try self.connection.send(request);
         _ = try self.tx_mutex.give();
     }
@@ -171,7 +171,7 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
-        const request = std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? }) catch unreachable;
+        const request = try std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
         _ = try self.connection.send(request);
         try self.tx_mutex.give();
     }
