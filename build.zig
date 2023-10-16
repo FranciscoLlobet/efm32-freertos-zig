@@ -1,5 +1,7 @@
 const std = @import("std");
-//const microzig = @import("deps/microzig/build.zig");
+
+pub const boards = @import("src/boards.zig");
+pub const chips = @import("src/chips.zig");
 
 const build_ff = @import("build_ff.zig");
 const build_gecko_sdk = @import("build_gecko_sdk.zig");
@@ -10,10 +12,7 @@ const build_mbedts = @import("build_mbedtls.zig");
 const build_wakaama = @import("build_wakaama.zig");
 const build_mqtt = @import("build_mqtt.zig");
 const build_picohttpparser = @import("build_picohttpparser.zig");
-pub const boards = @import("src/boards.zig");
-pub const chips = @import("src/chips.zig");
 const builtin = @import("builtin");
-const compile = std.Build.Step.Compile;
 
 pub fn build(b: *std.Build) !void {
     const include_path_array = [_][]const u8{
@@ -71,13 +70,9 @@ pub fn build(b: *std.Build) !void {
 
     const optimize = b.standardOptimizeOption(.{});
 
-    const Target = @import("microzig").Target;
-
-    var target = Target{ .preferred_format = .elf, .chip = chips.efm32gg390f1024, .board = boards.xdk110 };
-
     const firmware = microzig.addFirmware(b, .{
         .name = "miso",
-        .target = target,
+        .target = .{ .preferred_format = .elf, .chip = chips.efm32gg390f1024, .board = boards.xdk110 },
         .optimize = optimize,
         .source_file = .{ .path = "src/main.zig" },
     });
@@ -105,6 +100,6 @@ pub fn build(b: *std.Build) !void {
     build_mqtt.aggregate(firmware);
     build_picohttpparser.aggregate(firmware);
 
-    microzig.installFirmware(b, firmware, .{ .format = .elf });
+    microzig.installFirmware(b, firmware, .{});
     microzig.installFirmware(b, firmware, .{ .format = .bin });
 }
