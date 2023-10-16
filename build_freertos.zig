@@ -1,5 +1,5 @@
 const std = @import("std");
-const microzig = @import("deps/microzig/build.zig");
+const microzig = @import("microzig");
 
 const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-O2", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections" };
 
@@ -20,7 +20,7 @@ const source_paths = [_][]const u8{
     "csrc/system/FreeRTOS-Kernel/portable/MemMang/heap_4.c",
 };
 
-pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
+pub fn aggregate(exe: *microzig.Firmware) void {
     for (include_path) |path| {
         exe.addIncludePath(.{ .path = path });
     }

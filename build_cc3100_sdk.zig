@@ -1,5 +1,5 @@
 const std = @import("std");
-const microzig = @import("deps/microzig/build.zig");
+const microzig = @import("microzig");
 
 const include_path = [_][]const u8{
     "csrc/system/cc3100-sdk/simplelink/include",
@@ -26,7 +26,7 @@ const source_path = [_][]const u8{
 
 const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-D__OSI__=1", "-D__SL__", "-DOS_USE_TRACE_ITM", "-fdata-sections", "-ffunction-sections" };
 
-pub fn aggregate(exe: *microzig.EmbeddedExecutable) void {
+pub fn aggregate(exe: *microzig.Firmware) void {
     for (include_path) |path| {
         exe.addIncludePath(std.build.LazyPath{ .path = path });
     }

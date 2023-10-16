@@ -65,11 +65,7 @@ pub fn build(b: *std.Build) !void {
         "csrc/src/wifi_service.c",
     };
 
-    _ = include_path_array;
-    _ = src_paths;
-
     const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\"", "-fdata-sections", "-ffunction-sections" };
-    _ = c_flags;
 
     const microzig = @import("microzig").init(b, "microzig");
 
@@ -86,6 +82,29 @@ pub fn build(b: *std.Build) !void {
         .source_file = .{ .path = "src/main.zig" },
     });
 
-    microzig.installFirmware(b, firmware, .{});
+    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    firmware.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+
+    for (include_path_array) |path| {
+        firmware.addIncludePath(.{ .path = path });
+    }
+
+    for (src_paths) |path| {
+        firmware.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
+    }
+
+    build_ff.build_ff(firmware);
+    build_gecko_sdk.aggregate(firmware);
+    build_freertos.aggregate(firmware);
+    build_sensors.aggregate(firmware);
+    build_cc3100_sdk.aggregate(firmware);
+    build_mbedts.aggregate(firmware);
+    build_wakaama.aggregate(firmware);
+    build_mqtt.aggregate(firmware);
+    build_picohttpparser.aggregate(firmware);
+
     microzig.installFirmware(b, firmware, .{ .format = .elf });
+    microzig.installFirmware(b, firmware, .{ .format = .bin });
 }
