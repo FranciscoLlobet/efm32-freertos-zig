@@ -23,6 +23,8 @@ const MQTTTransport = c.MQTTTransport;
 const MQTTString = c.MQTTString;
 const MQTTLenString = c.MQTTLenString;
 
+const mqtt_ok: c_int = 1;
+
 const msgTypes = enum(c_int) { err_msg = -1, try_again = 0, connect = c.CONNECT, connack = c.CONNACK, publish = c.PUBLISH, puback = c.PUBACK, pubrec = c.PUBREC, pubrel = c.PUBREL, pubcomp = c.PUBCOMP, subscribe = c.SUBSCRIBE, suback = c.SUBACK, unsubscribe = c.UNSUBSCRIBE, unsuback = c.UNSUBACK, pingreq = c.PINGREQ, pingresp = c.PINGRESP, disconnect = c.DISCONNECT };
 
 const state = enum(i32) {
@@ -205,7 +207,7 @@ const packet = struct {
         var dup: u8 = undefined;
         var qos: c_int = undefined;
 
-        if (1 != c.MQTTDeserialize_publish(&dup, &qos, &retained, &packetId, &topicName, &payload, &payloadLen, buffer.ptr, @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_publish(&dup, &qos, &retained, &packetId, &topicName, &payload, &payloadLen, buffer.ptr, @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
 
@@ -216,7 +218,7 @@ const packet = struct {
         _ = self;
         var packetId: u16 = undefined;
 
-        if (1 != c.MQTTDeserialize_ack(packetType, dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(packetType, dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         return packetId;
@@ -225,7 +227,7 @@ const packet = struct {
     fn deserializeSubAck(self: *@This(), buffer: []u8, maxCount: c_int, count: *c_int, grantedQoSs: *c_int) !u16 {
         _ = self;
         var packetId: u16 = undefined;
-        if (1 != c.MQTTDeserialize_suback(&packetId, maxCount, count, grantedQoSs, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_suback(&packetId, maxCount, count, grantedQoSs, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         return packetId;
@@ -341,7 +343,7 @@ const packet = struct {
         var sessionPresent: u8 = undefined;
         var connack_rc: u8 = undefined;
 
-        if (1 == c.MQTTDeserialize_connack(&sessionPresent, &connack_rc, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok == c.MQTTDeserialize_connack(&sessionPresent, &connack_rc, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
             if (connack_rc != c.MQTT_CONNECTION_ACCEPTED) {
                 return mqtt_error.connack_failed;
             }

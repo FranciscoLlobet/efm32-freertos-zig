@@ -48,6 +48,9 @@ pub const mbedtls_error = error{
 
 pub const init_error = error{};
 
+const mbedtls_ok: i32 = 0;
+const mbedtls_nok: i32 = -1;
+
 pub const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
 pub const custom_init_callback_fn = *const fn (*@This(), connection.protocol, connection.security_mode) init_error!void;
 
@@ -112,10 +115,11 @@ pub fn getCredentialCallbackFn(self: *@This()) ?credential_callback_fn {
 }
 
 pub fn init(self: *@This(), connection_ctx: *connection, protocol: connection.protocol, mode: connection.security_mode) !i32 {
-    var ret: i32 = -1;
+    var ret: i32 = mbedtls_nok;
 
     if (!connection.protocol.isSecure(protocol))
-        return -1;
+        // Running init on a non secure protocol
+        return mbedtls_nok; // should return a different error code
 
     self.mode = mode;
 
@@ -135,66 +139,74 @@ pub fn init(self: *@This(), connection_ctx: *connection, protocol: connection.pr
         };
 
         ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
         }
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
             c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
             c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
             //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
             ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
-            if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = 0;
+            if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = mbedtls_ok;
         }
 
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             switch (mode) {
                 .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
                 .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
-                else => {},
+                else => {
+                    // This authentication mode is not supported yet.
+                    ret = mbedtls_nok;
+                },
             }
         }
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
             c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
 
-            // In case of DTLS
+            // In case of DTLS set CID
             ret = switch (protocol) {
                 .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
-                else => 0,
+                .tls_ip4, .tls_ip6 => mbedtls_ok, // Probably not necessary
+                else => mbedtls_nok,
             };
         }
 
         // Run the auth credentials callback
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             try self.auth_callback.?(self, self.mode);
         }
 
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             ret = c.mbedtls_ssl_setup(&self.context, &self.config);
         }
 
-        if (ret == 0) {
+        if (ret == mbedtls_ok) {
             c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
         }
     }
 
     // End the ssl initialization
-    if (ret == 0) {
+    if (ret == mbedtls_ok) {
         ret = c.miso_network_register_ssl_context(@as(*c.struct_miso_sockets_s, @ptrCast(connection_ctx.ctx)), &self.context);
+    }
+
+    if (ret != mbedtls_ok) {
+        // init failure
     }
 
     return ret;
 }
 
 pub fn confPsk(self: *@This(), psk: []u8, psk_id: [*:0]u8) !void {
-    return if (0 != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
+    return if (mbedtls_ok != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
 }
 
 pub fn base64Decode(input: [*:0]u8, output: []u8) ![]u8 {
     var len: usize = 0;
 
-    if (0 == c.mbedtls_base64_decode(output.ptr, output.len, &len, &input[0], c.strlen(input))) {
+    if (mbedtls_ok == c.mbedtls_base64_decode(output.ptr, output.len, &len, &input[0], c.strlen(input))) {
         return if (output.len >= len) output[0..len] else mbedtls_error.generic_error;
     }
 
