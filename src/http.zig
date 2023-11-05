@@ -139,17 +139,12 @@ const parsedResponse = struct {
 
 // Function to send an HTTP GET request to a specified URL.
 pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
-    var ret: i32 = -1;
     var uri = try std.Uri.parse(url);
 
     if (self.tx_mutex.take(null)) {
         const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
-        ret = self.connection.send(@ptrCast(request), request.len);
+        try self.connection.send(@ptrCast(request), request.len);
         _ = self.tx_mutex.give();
-    }
-
-    if (ret < 0) {
-        return @"error".tx_error;
     }
 }
 
@@ -159,9 +154,11 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
+        defer {
+            self.tx_mutex.give() catch {};
+        }
         const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end });
         _ = try self.connection.send(request);
-        _ = try self.tx_mutex.give();
     }
 }
 
@@ -171,9 +168,11 @@ pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
     var uri = try std.Uri.parse(url);
 
     if (try self.tx_mutex.take(null)) {
+        defer {
+            self.tx_mutex.give() catch {};
+        }
         const request = try std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
         _ = try self.connection.send(request);
-        try self.tx_mutex.give();
     }
 }
 
@@ -191,7 +190,9 @@ fn recieveResponse(self: *@This()) !rx_response {
     var payload: ?[]u8 = undefined;
     if (try self.rx_mutex.take(null)) {
         @memset(&self.rx_buffer, 0);
-
+        defer {
+            self.rx_mutex.give() catch {};
+        }
         while (pret == -2) {
             if (0 == self.connection.waitRx(5)) {
                 var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len - rx_count)]);
@@ -210,10 +211,8 @@ fn recieveResponse(self: *@This()) !rx_response {
             payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
         } else {
             // error
-            try self.rx_mutex.give();
             return @"error".rx_error;
         }
-        try self.rx_mutex.give();
     }
 
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = @intCast(status) };

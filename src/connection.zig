@@ -130,9 +130,9 @@ pub fn close(self: *@This()) !void {
 }
 
 /// Send Function
-pub fn send(self: *@This(), buffer: []const u8) !isize {
+pub fn send(self: *@This(), buffer: []const u8) !usize {
     const len: isize = c.miso_network_send(self.ctx, @as([*c]const u8, buffer.ptr), buffer.len);
-    return if (len <= 0) connection_error.send_error else len;
+    return if (len <= 0) connection_error.send_error else @intCast(len);
 }
 /// Recieve Function
 pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
