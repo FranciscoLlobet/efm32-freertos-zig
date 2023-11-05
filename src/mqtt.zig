@@ -44,6 +44,7 @@ pub const mqtt_error = error{
     connack_failed,
     parse_failed,
     publish_parse_failed,
+    qos_not_supported,
 };
 
 const packet_response = @This().packet.publish_response;
@@ -260,82 +261,73 @@ const packet = struct {
         connectPacket.keepAliveInterval = 400;
 
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket));
-
-        return self.sendtoTxQueue(packetLen, null);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket)), null);
     }
 
     fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
-
-        return self.sendtoTxQueue(packetLen, null);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), null);
     }
 
     fn preparePubRecPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_pubrec(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
-
-        return self.sendtoTxQueue(packetLen, packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrec(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
     fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId));
-
-        return self.sendtoTxQueue(packetLen, packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
     fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId));
-
-        return self.sendtoTxQueue(packetLen, packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId)), packetId);
     }
 
     fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
         var packetId = self.generatePacketId();
         var dup: u8 = 0;
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos));
-
-        return self.sendtoTxQueue(packetLen, packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos)), packetId);
     }
 
     fn preparePingPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len));
-
-        return self.sendtoTxQueue(packetLen, null);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len)), null);
     }
 
     fn prepareDisconnectPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len));
-
-        return self.sendtoTxQueue(packetLen, null);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len)), null);
     }
 
     pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: u8) !u16 {
         _ = try self.workBufferMutex.take(null);
+        defer self.workBufferMutex.give() catch {};
 
         var topic_name = initMQTTString(topic);
         var dup: u8 = 0;
         var retain: u8 = 0;
         var packetId = self.generatePacketId();
 
-        const packetLen = try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len)));
-
-        return self.sendtoTxQueue(packetLen, packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len))), packetId);
     }
 
     pub fn processConnAck(self: *@This(), buffer: []u8) !void {
@@ -359,8 +351,6 @@ const packet = struct {
             return mqtt_error.enqueue_failed;
         }
 
-        try self.workBufferMutex.give();
-
         return @intCast(packetId orelse 0);
     }
 };
@@ -372,6 +362,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     while (true) {
         try self.processSendQueue();
 
+        // process the qos tx queue
+
         if (0 == self.connection.waitRx(1)) {
             var readRet = self.packet.read(&rxBuffer);
             switch (readRet) {
@@ -382,15 +374,33 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                         0 => 0,
                         1 => try self.packet.preparePubAckPacket(publish_response.packetId),
                         2 => try self.packet.preparePubRecPacket(publish_response.packetId),
-                        else => 0,
+                        else => return mqtt_error.qos_not_supported,
                     };
 
-                    var buf: [64]u8 = undefined;
-                    @memset(&buf, 0);
+                    // Immediatly send the ACK to the broker in case of QOS 1
+                    if (publish_response.qos == 1) {
+                        try self.processSendQueue();
+                    }
 
-                    var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {s} {s}\r\n", .{ packetId, publish_response.topic, publish_response.payload });
+                    if (publish_response.qos != 2) {
+                        // If QOS is 0 or 1, then we can send the message to the application layer
+                        var buf: [64]u8 = undefined;
+                        @memset(&buf, 0);
 
-                    _ = c.printf("%s", s.ptr);
+                        var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {d} {s} {s}\r\n", .{ packetId, publish_response.qos, publish_response.topic, publish_response.payload });
+
+                        _ = c.printf("%s", s.ptr);
+                    } else {
+                        // If the publish message has QOS2, then we should to wait for the pubrel
+                        // The code should actually enqueue the message and process it later when the pubrel is received
+                        // Enqueue the message into the QOS2 rx queue
+                        var buf: [64]u8 = undefined;
+                        @memset(&buf, 0);
+
+                        var s = try std.fmt.bufPrint(&buf, "publish QOS2 recieved: {d}, {d} {s} {s}\r\n", .{ packetId, publish_response.qos, publish_response.topic, publish_response.payload });
+
+                        _ = c.printf("%s", s.ptr);
+                    }
                 },
                 .puback => {
                     // Response for Client pub qos1
@@ -399,6 +409,9 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     var rx_packetId: u16 = undefined;
 
                     rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+
+                    // Process the puback packet
+                    // Remove the packet from the qos1 tx queue
                 },
                 .pingresp => {
                     _ = c.printf("pingresp!");
@@ -438,10 +451,16 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
                     _ = try self.packet.preparePubCompPacket(rx_packetId);
+
+                    // Send the pubcomp package to the broker immediately
+                    try self.processSendQueue();
+
+                    // get the package from the qos2 rx queue
+                    // once the package is confirmed we can send it to the application
+
                 },
                 .pubcomp => {
                     // publish complete
-                    // process the pubrel package
                     var packetType: u8 = undefined;
                     var dup: u8 = undefined;
                     var rx_packetId: u16 = undefined;
@@ -449,18 +468,24 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
                     _ = c.printf("pubcomp received for packetId\r\n", rx_packetId);
+                    // process the qos tx queue
+
                 },
                 .err_msg => break,
             }
         } else {
             _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
         }
+
+        // Process the qos1 to 2 tx queue
+
     }
 }
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
 
+    // Clear the buffers
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
     @memset(&workBuffer, 0);
@@ -475,9 +500,9 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (true) {
         var uri = std.Uri.parse(self.uri_string[0..c.strlen(self.uri_string)]) catch unreachable;
 
-        self.loop(uri) catch {};
-
-        _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
+        self.loop(uri) catch {
+            _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
+        };
     }
 
     // Go to disconnect phase
