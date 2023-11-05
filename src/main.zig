@@ -205,8 +205,6 @@ pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
 pub export fn main() void {
     board.init();
 
-    usb.usb.init();
-
     const appCounter = nvm.incrementAppCounter() catch 0;
 
     user.user_task.create();

@@ -63,7 +63,4 @@ void BOARD_USB_Init(void)
 	usbx.releaseBcd = (uint16_t)0x01;
 	usbx.useFifo = 0;
 	USBX_init(&usbx);
-	USBX_apiCallbackEnable(BOARD_USB_Callback);
-
-	USBX_blockRead(usb_rx_buf, 1, &rx_count);
 }

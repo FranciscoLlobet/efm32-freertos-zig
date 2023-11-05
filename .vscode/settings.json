@@ -54,6 +54,7 @@
         "gpiointerrupt.h": "c",
         "em_rmu.h": "c",
         "osi.h": "c",
-        "em_usbxpress_internal.h": "c"
+        "em_usbxpress_internal.h": "c",
+        "em_usb.h": "c"
     }
 }

@@ -6,6 +6,9 @@ const c = @cImport({
     @cInclude("board.h");
 });
 
+tx_semaphore: freertos.Mutex,
+rx_semaphore: freertos.Mutex,
+
 export fn callback() callconv(.C) void {
     var source = c.USBX_getCallbackSource();
     var pxHigherPriorityTaskWoken = freertos.pdFALSE;
@@ -17,28 +20,25 @@ export fn callback() callconv(.C) void {
     freertos.portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
-const Usb = struct {
-    tx_semaphore: freertos.Mutex,
-    rx_semaphore: freertos.Mutex,
+pub fn init() @This() {
+    var self: @This() = undefined;
 
-    pub fn init(self: *@This()) void {
-        self.tx_semaphore = freertos.Mutex.create() catch unreachable;
-        self.rx_semaphore = freertos.Mutex.create() catch unreachable;
+    self.tx_semaphore = freertos.Mutex.create() catch unreachable;
+    self.rx_semaphore = freertos.Mutex.create() catch unreachable;
 
-        c.USBX_apiCallbackEnable(callback);
-    }
-    pub fn write(self: *@This(), block: [*c]const u8, numBytes: usize) usize {
-        var countPtr: u32 = 0;
-        _ = self;
-        //_ = self.tx_semaphore.take(0);
+    c.USBX_apiCallbackEnable(callback);
 
-        var res = c.USBX_blockWrite(@constCast(block), @intCast(numBytes), &countPtr);
+    return self;
+}
 
-        _ = res;
-        // _ = self.tx_semaphore.take(null);
+pub fn write(self: *@This(), block: []const u8) usize {
+    var countPtr: u32 = 0;
 
-        return @intCast(countPtr);
-    }
-};
+    var res = c.USBX_blockWrite(@constCast(block.ptr), @intCast(block.len), &countPtr);
+    _ = res;
+    _ = self;
 
-pub var usb: Usb = undefined;
+    return @intCast(countPtr);
+}
+
+pub var usb: @This() = undefined;
