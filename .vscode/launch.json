@@ -6,7 +6,7 @@
     "configurations": [
         {
             "cwd": "${workspaceRoot}",
-            "executable": "${workspaceRoot}/zig-out/bin/XDK110.elf",
+            "executable": "${workspaceRoot}/zig-out/firmware/miso.elf",
             "name": "Debug Microcontroller",
             "request": "launch",
             "type": "cortex-debug",

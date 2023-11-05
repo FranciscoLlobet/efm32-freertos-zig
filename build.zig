@@ -1,5 +1,8 @@
 const std = @import("std");
-const microzig = @import("deps/microzig/build.zig");
+
+pub const boards = @import("src/boards.zig");
+pub const chips = @import("src/chips.zig");
+
 const build_ff = @import("build_ff.zig");
 const build_gecko_sdk = @import("build_gecko_sdk.zig");
 const build_freertos = @import("build_freertos.zig");
@@ -9,17 +12,9 @@ const build_mbedts = @import("build_mbedtls.zig");
 const build_wakaama = @import("build_wakaama.zig");
 const build_mqtt = @import("build_mqtt.zig");
 const build_picohttpparser = @import("build_picohttpparser.zig");
-pub const boards = @import("src/boards.zig");
-pub const chips = @import("src/chips.zig");
 const builtin = @import("builtin");
-const compile = std.Build.Step.Compile;
 
-// Although this function looks imperative, note that its job is to
-// declaratively construct a build graph that will be executed by an external
-// runner.
-pub fn build(b: *std.build.Builder) void {
-    const optimize = b.standardOptimizeOption(.{});
-
+pub fn build(b: *std.Build) !void {
     const include_path_array = [_][]const u8{
         // Configuration Files for miso
         "csrc/config",
@@ -71,39 +66,40 @@ pub fn build(b: *std.build.Builder) void {
 
     const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\"", "-fdata-sections", "-ffunction-sections" };
 
-    inline for (@typeInfo(boards).Struct.decls) |decl| {
-        const exe = microzig.addEmbeddedExecutable(b, .{
-            .name = @field(boards, decl.name).name ++ ".elf",
-            .source_file = .{
-                .path = "src/main.zig",
-            },
-            .backing = .{ .board = @field(boards, decl.name) },
-            .optimize = optimize,
-        });
+    const microzig = @import("microzig").init(b, "microzig");
 
-        exe.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
-        exe.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
-        exe.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
-        exe.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+    const optimize = b.standardOptimizeOption(.{});
 
-        for (include_path_array) |path| {
-            exe.addIncludePath(.{ .path = path });
-        }
+    const firmware = microzig.addFirmware(b, .{
+        .name = "miso",
+        .target = .{ .preferred_format = .elf, .chip = chips.efm32gg390f1024, .board = boards.xdk110 },
+        .optimize = optimize,
+        .source_file = .{ .path = "src/main.zig" },
+    });
 
-        for (src_paths) |path| {
-            exe.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
-        }
+    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    firmware.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
-        build_ff.build_ff(exe);
-        build_gecko_sdk.aggregate(exe);
-        build_freertos.aggregate(exe);
-        build_sensors.aggregate(exe);
-        build_cc3100_sdk.aggregate(exe);
-        build_mbedts.aggregate(exe);
-        build_wakaama.aggregate(exe);
-        build_mqtt.aggregate(exe);
-        build_picohttpparser.aggregate(exe);
-
-        exe.installArtifact(b);
+    for (include_path_array) |path| {
+        firmware.addIncludePath(.{ .path = path });
     }
+
+    for (src_paths) |path| {
+        firmware.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
+    }
+
+    build_ff.build_ff(firmware);
+    build_gecko_sdk.aggregate(firmware);
+    build_freertos.aggregate(firmware);
+    build_sensors.aggregate(firmware);
+    build_cc3100_sdk.aggregate(firmware);
+    build_mbedts.aggregate(firmware);
+    build_wakaama.aggregate(firmware);
+    build_mqtt.aggregate(firmware);
+    build_picohttpparser.aggregate(firmware);
+
+    microzig.installFirmware(b, firmware, .{});
+    microzig.installFirmware(b, firmware, .{ .format = .bin });
 }

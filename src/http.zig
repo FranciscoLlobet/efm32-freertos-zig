@@ -120,7 +120,7 @@ const parsedResponse = struct {
                         self.etag = header.value[0..header.value_len];
                     },
                     .connection => {
-                        // TODO: Determine if the connection is 'keep-alive' or 'close'.
+                        // Determine if the connection should be kept alive or closed.
                         self.keep_alive = try keepAlive.match(header);
                     },
                     else => {
@@ -412,14 +412,13 @@ const contentType = enum(usize) {
 
     fn match(header: c.phr_header) !@This() {
         // Match content length to Content-Type(s)
-        var idx: usize = 0;
-        for (strings) |ct| {
+
+        for (strings, 0..) |ct, idx| {
             if (header.value_len >= ct.len) {
                 if (std.mem.eql(u8, header.value[0..ct.len], ct)) {
                     return @enumFromInt(idx);
                 }
             }
-            idx = idx + 1;
         }
 
         return @"error".parse_error;

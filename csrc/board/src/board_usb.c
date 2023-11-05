@@ -9,9 +9,13 @@ USBX_Init_t usbx;
 USBX_BUF(usb_rx_buf, 64);
 USBX_BUF(usb_tx_buf, 64);
 
+static uint32_t rx_count = 0;
+
 void BOARD_USB_Callback(void)
 {
 	uint32_t intSource = USBX_getCallbackSource();
+
+	printf("intsrc: %d\r\n", intSource);
 	if(intSource & USBX_RESET)
 	{
 		// USB Reset
@@ -19,6 +23,10 @@ void BOARD_USB_Callback(void)
 	if(intSource & USBX_TX_COMPLETE)
 	{
 
+	}
+	if(intSource & USBX_RX_COMPLETE)
+	{
+		printf("USBX_RX_COMPLETE\n");
 	}
 	if(intSource & USBX_DEV_OPEN)
 	{
@@ -38,7 +46,7 @@ void BOARD_USB_Callback(void)
 	}
 	if(intSource & USBX_RX_OVERRUN)
 	{
-
+		printf("USBX_RX_OVERRUN\n");
 	} 
 }
 
@@ -54,5 +62,5 @@ void BOARD_USB_Init(void)
 	usbx.powerAttribute = (uint8_t)0x80;
 	usbx.releaseBcd = (uint16_t)0x01;
 	usbx.useFifo = 0;
-	//USBX_init(&usbx);
+	USBX_init(&usbx);
 }
