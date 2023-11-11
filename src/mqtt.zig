@@ -189,6 +189,10 @@ const QueuedMessgeQueue = struct {
                     // Remove the message from the list
                     var msg = self.message.orderedRemove(idx);
 
+                    // Clear topic and payload content
+                    @memset(msg.topic, 0);
+                    @memset(msg.payload, 0);
+
                     self.message.allocator.free(msg.topic);
                     self.message.allocator.free(msg.payload);
 
@@ -344,7 +348,7 @@ const packet = struct {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
-        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), null);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
     fn preparePubRecPacket(self: *@This(), packetId: u16) !u16 {
@@ -372,8 +376,8 @@ const packet = struct {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
-        var packetId = self.generatePacketId();
-        var dup: u8 = 0;
+        const packetId = self.generatePacketId();
+        const dup: u8 = 0;
 
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos)), packetId);
     }
@@ -447,7 +451,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                 .publish => {
                     const publish_response = try self.packet.deserializePublish(&rxBuffer);
                     const packetId: u16 = switch (publish_response.qos) {
-                        0 => 0,
+                        0 => publish_response.packetId,
                         1 => try self.packet.preparePubAckPacket(publish_response.packetId),
                         2 => try self.packet.preparePubRecPacket(publish_response.packetId),
                         else => return mqtt_error.qos_not_supported,
@@ -482,9 +486,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     // Response for Client pub qos1
                     var packetType: u8 = undefined;
                     var dup: u8 = undefined;
-                    var rx_packetId: u16 = undefined;
 
-                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
                     // Process the puback packet
                     // Remove the packet from the qos1 tx queue
@@ -511,9 +514,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     // generate pubrel package
                     var packetType: u8 = undefined;
                     var dup: u8 = undefined;
-                    var rx_packetId: u16 = undefined;
 
-                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
                     _ = try self.packet.preparePubRelPacket(0, rx_packetId);
                 },
@@ -521,9 +523,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     // generate pubcomp package
                     var packetType: u8 = undefined;
                     var dup: u8 = undefined;
-                    var rx_packetId: u16 = undefined;
 
-                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
                     _ = try self.packet.preparePubCompPacket(rx_packetId);
 
