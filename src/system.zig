@@ -7,6 +7,17 @@ const nvm = @import("nvm.zig");
 
 const max_reset_delay: freertos.TickType_t = 2000;
 
+pub const time = struct {
+    /// Get current time in seconds
+    pub fn now() u32 {
+        return board.getTime();
+    }
+
+    pub fn calculateDeadline(timeout_s: u32) u32 {
+        return now() + timeout_s;
+    }
+};
+
 fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     _ = param2;
     _ = param1;

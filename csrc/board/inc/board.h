@@ -42,6 +42,9 @@
 /* Include us delay */
 #include "sl_udelay.h"
 
+/* Include sleeptimer */
+#include "sl_sleeptimer.h"
+
 /* include usbexpress */
 #include "em_usbxpress.h"
 

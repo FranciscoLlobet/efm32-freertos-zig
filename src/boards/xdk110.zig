@@ -7,6 +7,10 @@ pub const c = @cImport({
 
 pub const cpu_frequency = 48_000_000; // 48MHz
 
+pub fn getTime() u32 {
+    return c.sl_sleeptimer_get_time();
+}
+
 pub fn mcuReset() noreturn {
     c.BOARD_MCU_Reset();
     unreachable;

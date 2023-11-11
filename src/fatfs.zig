@@ -48,7 +48,7 @@ const fRet = enum(c_uint) {
     fr_invalid_parameter = c.FR_INVALID_PARAMETER,
     generic_error,
 
-    /// Check the return value of a FatFs function and map the corresponding error
+    /// Check the return value of a FatFs function and map to the corresponding error
     fn check(ret: FRESULT) frError!void {
         return switch (@as(@This(), @enumFromInt(ret))) {
             .fr_ok => {},
@@ -79,17 +79,21 @@ const fRet = enum(c_uint) {
 // Global variable for FS
 pub export var fileSystem: c.FATFS = undefined;
 
+/// Directory functions
 pub const dir = struct {
     handle: c.DIR,
 
+    /// Rename file
     pub fn rename(old_name: [*:0]const u8, new_name: [*:0]const u8) frError!void {
         return fRet.check(c.f_rename(old_name, new_name));
     }
 
+    /// Unlink (delete) a file
     pub fn unlink(path: [*:0]const u8) frError!void {
         return fRet.check(c.f_unlink(path));
     }
 
+    /// Open a directory given path
     pub fn open(path: [*:0]const u8) frError!@This() {
         var self: @This() = undefined;
 
@@ -98,14 +102,18 @@ pub const dir = struct {
         return self;
     }
 
+    /// Close the current directory
     pub fn close(self: *@This()) frError!void {
         try fRet.check(c.f_closedir(&self.handle));
     }
 };
 
+/// File API
 pub const file = struct {
+    /// File handle
     handle: c.FIL,
 
+    /// File open mode. See documentation for `f_open` in `ff.h`
     pub const fMode = enum(u8) {
         read = c.FA_READ,
         write = c.FA_WRITE,
@@ -116,7 +124,7 @@ pub const file = struct {
         open_append = c.FA_OPEN_APPEND,
     };
 
-    /// Open a file in given path and with the given mode
+    /// Open a file in given path and with the given mode. See `fMode` for possible modes.
     pub fn open(path: [*:0]const u8, mode: u8) frError!@This() {
         var self: @This() = undefined;
 
@@ -130,7 +138,7 @@ pub const file = struct {
         try fRet.check(c.f_close(&self.handle));
     }
 
-    /// Read a slice of bytes from the current file
+    /// Read a slice of bytes from the current open file
     pub fn read(self: *@This(), buf: []u8) frError![]u8 {
         var bytesRead: usize = 0;
 
@@ -139,19 +147,19 @@ pub const file = struct {
         return if (bytesRead > buf.len) frError.buffer_overflow else buf[0..bytesRead];
     }
 
+    /// Read a slice of bytes from the current open file.
+    /// Returns optional type, so it can be used in a while loop or if statement.
     pub fn readEof(self: *@This(), buf: []u8) frError!?[]u8 {
-        var bytesRead: usize = 0;
-
         if (0 != c.f_eof(&self.handle)) {
             return null;
         } else {
-            try fRet.check(c.f_read(&self.handle, buf.ptr, buf.len, &bytesRead));
-
-            return if (bytesRead > buf.len) frError.buffer_overflow else if (bytesRead == 0) null else buf[0..bytesRead];
+            const ret = try self.read(buf);
+            return if (ret.len == 0) null else ret;
         }
     }
 
     /// Write a slice of bytes to the current file
+    /// Returns the number of bytes written, or an error.
     pub fn write(self: *@This(), buf: []const u8) frError!usize {
         var bytesWritten: usize = 0;
 
@@ -188,7 +196,6 @@ pub const file = struct {
 
     /// Test for end-of-file
     /// Returns true if the file pointer is at the end of the file
-    /// This behaviour is
     pub fn eof(self: *@This()) bool {
         return (0 != c.f_eof(&self.handle));
     }
@@ -199,10 +206,12 @@ pub const file = struct {
     }
 };
 
+/// Mount a volume into the global file system
 pub fn mount(volume: [*:0]const u8) frError!void {
     try fRet.check(c.f_mount(&fileSystem, volume, 1));
 }
 
+/// Unmount a volume from the global file system
 pub fn unmount(volume: [*:0]const u8) frError!void {
     try fRet.check(c.f_unmount(volume));
 }

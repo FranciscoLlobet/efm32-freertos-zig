@@ -45,6 +45,9 @@ pub const mqtt_error = error{
     parse_failed,
     publish_parse_failed,
     qos_not_supported,
+
+    qos_packet_not_found,
+    qos_packet_timeout,
 };
 
 const packet_response = @This().packet.publish_response;
@@ -87,6 +90,7 @@ state: state,
 packet: @This().packet,
 uri_string: [*:0]u8,
 device_id: [*:0]u8,
+qosQueue: QueuedMessgeQueue,
 
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
@@ -113,7 +117,20 @@ inline fn getMQTTString(data: MQTTString) []u8 {
 }
 
 fn init() @This() {
-    return @This(){ .connection = undefined, .connectionCounter = 0, .disconnectionCounter = 0, .rxQueue = undefined, .pingTimer = undefined, .pubTimer = undefined, .task = undefined, .state = .not_connected, .packet = packet.init(0x5555), .uri_string = undefined, .device_id = undefined };
+    return @This(){
+        .connection = undefined,
+        .connectionCounter = 0,
+        .disconnectionCounter = 0,
+        .rxQueue = undefined,
+        .pingTimer = undefined,
+        .pubTimer = undefined,
+        .task = undefined,
+        .state = .not_connected,
+        .packet = packet.init(0x5555),
+        .uri_string = undefined,
+        .device_id = undefined,
+        .qosQueue = QueuedMessgeQueue.init(freertos.allocator),
+    };
 }
 
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
@@ -134,6 +151,63 @@ fn processSendQueue(self: *@This()) !void {
         _ = try self.connection.send(buf);
     }
 }
+
+const QoS = enum(u8) { qos0 = 0, qos1 = 1, qos2 = 2 };
+
+const QueuedMessage = struct {
+    packetId: ?u16,
+    qos: QoS,
+    dup: bool,
+    retained: bool,
+    deadline: u32,
+    topic: []u8,
+    payload: []u8,
+};
+
+const QueuedMessgeQueue = struct {
+    message: std.ArrayList(QueuedMessage),
+
+    pub fn init(comptime allocator: std.mem.Allocator) @This() {
+        return @This(){ .message = std.ArrayList(QueuedMessage).init(allocator) };
+    }
+
+    pub fn add(self: *@This(), packetId: u16, qos: QoS, dup: bool, retained: bool, topic: []const u8, payload: []const u8, deadline: u32) !void {
+        var new_payload = try self.message.allocator.alloc(u8, payload.len);
+        var new_topic = try self.message.allocator.alloc(u8, topic.len);
+
+        @memcpy(new_payload, payload);
+        @memcpy(new_topic, topic);
+
+        try self.message.append(QueuedMessage{ .packetId = packetId, .qos = qos, .dup = dup, .retained = retained, .topic = new_topic, .payload = new_payload, .deadline = deadline });
+    }
+
+    /// Scan the queue for messages that match the packetId
+    pub fn acknowledge(self: *@This(), packetId: u16) !void {
+        for (self.message.items, 0..) |*item, idx| {
+            if (item.packetId) |id| {
+                if (id == packetId) {
+                    // Remove the message from the list
+                    var msg = self.message.orderedRemove(idx);
+
+                    self.message.allocator.free(msg.topic);
+                    self.message.allocator.free(msg.payload);
+
+                    return;
+                }
+            }
+        }
+        return mqtt_error.qos_packet_not_found;
+    }
+
+    pub fn prune(self: *@This()) ?QueuedMessage {
+        for (self.message.items, 0..) |*item, idx| {
+            if (item.deadline < system.time.now()) {
+                return self.message.orderedRemove(idx);
+            }
+        }
+        return null;
+    }
+};
 
 const packet = struct {
     transport: MQTTTransport,
@@ -318,16 +392,14 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len)), null);
     }
 
-    pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: u8) !u16 {
+    pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, packetId: ?u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
         var topic_name = initMQTTString(topic);
-        var dup: u8 = 0;
         var retain: u8 = 0;
-        var packetId = self.generatePacketId();
 
-        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, dup, qos, retain, packetId, topic_name, @constCast(payload.ptr), @intCast(payload.len))), packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, if (dup) 1 else 0, @intFromEnum(qos), retain, packetId orelse self.generatePacketId(), topic_name, @constCast(payload.ptr), @intCast(payload.len))), packetId);
     }
 
     pub fn processConnAck(self: *@This(), buffer: []u8) !void {
@@ -360,9 +432,13 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     defer self.disconnect() catch {};
 
     while (true) {
-        try self.processSendQueue();
-
         // process the qos tx queue
+        while (self.qosQueue.prune()) |msg| {
+            try self.publish(msg.topic, msg.payload, msg.qos, msg.dup, system.time.calculateDeadline(2000)); // Do resend
+            // free the topic and the payload
+        }
+
+        try self.processSendQueue();
 
         if (0 == self.connection.waitRx(1)) {
             var readRet = self.packet.read(&rxBuffer);
@@ -412,6 +488,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
                     // Process the puback packet
                     // Remove the packet from the qos1 tx queue
+                    try self.qosQueue.acknowledge(rx_packetId);
                 },
                 .pingresp => {
                     _ = c.printf("pingresp!");
@@ -422,12 +499,10 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     var maxCount: c_int = 1;
                     var count: c_int = 0;
                     var grantedQoSs: c_int = 0;
-                    var packetId: u16 = undefined;
 
                     // Deserialize
-                    if (packetId == try self.packet.deserializeSubAck(&rxBuffer, maxCount, &count, &grantedQoSs)) {
-                        _ = c.printf("Suback received\r\n");
-                    }
+                    const packetId = try self.packet.deserializeSubAck(&rxBuffer, maxCount, &count, &grantedQoSs);
+                    _ = packetId;
                 }, // To-do: process the sub-ack
                 .unsuback => {
                     // currently unsuported
@@ -501,7 +576,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         var uri = std.Uri.parse(self.uri_string[0..c.strlen(self.uri_string)]) catch unreachable;
 
         self.loop(uri) catch {
-            _ = c.printf("Disconnected... reconnect: %d", self.connectionCounter);
+            _ = c.printf("Disconnected... reconnect: %d \r\n", self.connectionCounter);
         };
     }
 
@@ -525,10 +600,15 @@ fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 
+pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, deadline: u32) !void {
+    const packetId = try self.packet.preparePublishPacket(topic, payload, qos, dup, null);
+    try self.qosQueue.add(packetId, qos, dup, false, topic, payload, deadline);
+}
+
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
     const payload = "test";
-    _ = self.packet.preparePublishPacket("zig/pub", payload, 1) catch unreachable;
+    self.publish("zig/pub", payload, .qos1, true, system.time.calculateDeadline(2000)) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
@@ -589,6 +669,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
 
     self.state = .connected;
     self.pingTimer.changePeriod(60000, null) catch unreachable;
+    self.pubTimer.start(null) catch unreachable;
 
     errdefer {
         self.state = .err;
