@@ -219,3 +219,26 @@ pub export fn main() void {
 
     unreachable;
 }
+
+/// Mini heap used for sbrk. Mainly used by printf()
+var mini_heap: [1050]u8 align(@alignOf(u32)) = undefined;
+var heap_end align(@alignOf(u32)) = &mini_heap[0];
+
+/// Current Zig-based implementation of the sbrk() function
+pub export fn _sbrk(inc: isize) callconv(.C) ?*anyopaque {
+    if (heap_end == undefined) {
+        heap_end = &mini_heap[0];
+    }
+
+    const prev_heap_end: isize = @intCast(@intFromPtr(heap_end));
+    const new_heap_end: isize = prev_heap_end + inc;
+
+    if (new_heap_end > @as(isize, @intCast(@intFromPtr(&mini_heap[mini_heap.len - 1])))) {
+        return null;
+    }
+
+    // Update the heap end
+    heap_end = @ptrFromInt(@as(usize, @intCast(new_heap_end)));
+
+    return @as(*anyopaque, @ptrCast(@as(@TypeOf(heap_end), @ptrFromInt(@as(usize, @intCast(prev_heap_end))))));
+}

@@ -396,10 +396,11 @@ const packet = struct {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
-        var topic_name = initMQTTString(topic);
-        var retain: u8 = 0;
+        const topic_name = initMQTTString(topic);
+        const retain: u8 = 0;
+        const id = packetId orelse self.generatePacketId();
 
-        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, if (dup) 1 else 0, @intFromEnum(qos), retain, packetId orelse self.generatePacketId(), topic_name, @constCast(payload.ptr), @intCast(payload.len))), packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, if (dup) 1 else 0, @intFromEnum(qos), retain, id, topic_name, @constCast(payload.ptr), @intCast(payload.len))), id);
     }
 
     pub fn processConnAck(self: *@This(), buffer: []u8) !void {
@@ -435,7 +436,6 @@ fn loop(self: *@This(), uri: std.Uri) !void {
         // process the qos tx queue
         while (self.qosQueue.prune()) |msg| {
             try self.publish(msg.topic, msg.payload, msg.qos, msg.dup, system.time.calculateDeadline(2000)); // Do resend
-            // free the topic and the payload
         }
 
         try self.processSendQueue();

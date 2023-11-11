@@ -33,10 +33,10 @@ pub fn build(b: *std.Build) !void {
     };
     const src_paths = [_][]const u8{
         // Newlib adapter
-        "csrc/system/newlib/assert.c",
-        "csrc/system/newlib/exit.c",
-        "csrc/system/newlib/sbrk.c",
-        "csrc/system/newlib/syscalls.c",
+        //"csrc/system/newlib/assert.c",
+        //"csrc/system/newlib/exit.c",
+        //"csrc/system/newlib/sbrk.c",
+        //"csrc/system/newlib/syscalls.c",
 
         // Board (support) package
         "csrc/board/src/system_efm32gg.c",
