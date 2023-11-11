@@ -90,7 +90,12 @@ state: state,
 packet: @This().packet,
 uri_string: [*:0]u8,
 device_id: [*:0]u8,
+
+/// Qos1 tx queue
 qosQueue: QueuedMessgeQueue,
+
+/// QoS2 rx queue
+qos2Queue: QueuedMessgeQueue,
 
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
@@ -130,6 +135,7 @@ fn init() @This() {
         .uri_string = undefined,
         .device_id = undefined,
         .qosQueue = QueuedMessgeQueue.init(freertos.allocator),
+        .qos2Queue = QueuedMessgeQueue.init(freertos.allocator),
     };
 }
 
@@ -211,6 +217,17 @@ const QueuedMessgeQueue = struct {
         }
         return null;
     }
+
+    pub fn findAndRemove(self: *@This(), packetId: u16) ?QueuedMessage {
+        for (self.message.items, 0..) |*item, idx| {
+            if (item.packetId) |id| {
+                if (id == packetId) {
+                    return self.message.orderedRemove(idx);
+                }
+            }
+        }
+        return null;
+    }
 };
 
 const packet = struct {
@@ -222,9 +239,9 @@ const packet = struct {
     /// Publish packet response
     const publish_response = struct {
         packetId: u16,
-        qos: u8,
-        dup: u8,
-        retained: u8,
+        qos: QoS,
+        dup: bool,
+        retained: bool,
         topic: []u8,
         payload: []u8,
     };
@@ -281,7 +298,7 @@ const packet = struct {
         var topicName = MQTTString_initializer;
         var payload: [*c]u8 = undefined;
         var payloadLen: isize = undefined;
-        var packetId: u16 = undefined;
+        var packetId: u16 = 0;
         var retained: u8 = undefined;
         var dup: u8 = undefined;
         var qos: c_int = undefined;
@@ -290,7 +307,14 @@ const packet = struct {
             return mqtt_error.parse_failed;
         }
 
-        return publish_response{ .packetId = packetId, .qos = @intCast(qos), .dup = dup, .retained = retained, .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
+        const retQos: QoS = switch (qos) {
+            0 => .qos0,
+            1 => .qos1,
+            2 => .qos2,
+            else => return mqtt_error.qos_not_supported,
+        };
+
+        return publish_response{ .packetId = packetId, .qos = retQos, .dup = (if (dup == 0) false else true), .retained = (if (retained == 0) false else true), .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
     }
 
     fn deserializeAck(self: *@This(), buffer: []u8, packetType: *u8, dup: *u8) !u16 {
@@ -442,6 +466,14 @@ fn loop(self: *@This(), uri: std.Uri) !void {
             try self.publish(msg.topic, msg.payload, msg.qos, msg.dup, system.time.calculateDeadline(2000)); // Do resend
         }
 
+        // process the qos tx queue
+        while (self.qos2Queue.prune()) |msg| {
+            @memset(msg.topic, 0);
+            @memset(msg.payload, 0);
+            self.qos2Queue.message.allocator.free(msg.topic);
+            self.qos2Queue.message.allocator.free(msg.payload);
+        }
+
         try self.processSendQueue();
 
         if (0 == self.connection.waitRx(1)) {
@@ -450,36 +482,32 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                 .try_again => {},
                 .publish => {
                     const publish_response = try self.packet.deserializePublish(&rxBuffer);
+
+                    // prepare the response packets depwnding on the QOS
                     const packetId: u16 = switch (publish_response.qos) {
-                        0 => publish_response.packetId,
-                        1 => try self.packet.preparePubAckPacket(publish_response.packetId),
-                        2 => try self.packet.preparePubRecPacket(publish_response.packetId),
-                        else => return mqtt_error.qos_not_supported,
+                        .qos0 => publish_response.packetId,
+                        .qos1 => try self.packet.preparePubAckPacket(publish_response.packetId),
+                        .qos2 => try self.packet.preparePubRecPacket(publish_response.packetId),
                     };
 
                     // Immediatly send the ACK to the broker in case of QOS 1
-                    if (publish_response.qos == 1) {
+                    if (publish_response.qos == .qos1) {
                         try self.processSendQueue();
                     }
 
-                    if (publish_response.qos != 2) {
+                    if (publish_response.qos != .qos2) {
                         // If QOS is 0 or 1, then we can send the message to the application layer
                         var buf: [64]u8 = undefined;
                         @memset(&buf, 0);
 
-                        var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {d} {s} {s}\r\n", .{ packetId, publish_response.qos, publish_response.topic, publish_response.payload });
+                        var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {d} {s} {s}\r\n", .{ packetId, @intFromEnum(publish_response.qos), publish_response.topic, publish_response.payload });
 
                         _ = c.printf("%s", s.ptr);
                     } else {
                         // If the publish message has QOS2, then we should to wait for the pubrel
                         // The code should actually enqueue the message and process it later when the pubrel is received
                         // Enqueue the message into the QOS2 rx queue
-                        var buf: [64]u8 = undefined;
-                        @memset(&buf, 0);
-
-                        var s = try std.fmt.bufPrint(&buf, "publish QOS2 recieved: {d}, {d} {s} {s}\r\n", .{ packetId, publish_response.qos, publish_response.topic, publish_response.payload });
-
-                        _ = c.printf("%s", s.ptr);
+                        try self.qos2Queue.add(packetId, publish_response.qos, publish_response.dup, publish_response.retained, publish_response.topic, publish_response.payload, system.time.calculateDeadline(2000));
                     }
                 },
                 .puback => {
@@ -526,14 +554,23 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
                     const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
 
-                    _ = try self.packet.preparePubCompPacket(rx_packetId);
+                    if (self.qos2Queue.findAndRemove(rx_packetId)) |msg| {
+                        _ = try self.packet.preparePubCompPacket(rx_packetId);
+                        try self.processSendQueue();
 
-                    // Send the pubcomp package to the broker immediately
-                    try self.processSendQueue();
+                        var buf: [64]u8 = undefined;
+                        @memset(&buf, 0);
 
-                    // get the package from the qos2 rx queue
-                    // once the package is confirmed we can send it to the application
+                        var s = try std.fmt.bufPrint(&buf, "Pubrel recieved: {d}, {d} {s} {s}\r\n", .{ rx_packetId, @intFromEnum(msg.qos), msg.topic, msg.payload });
 
+                        _ = c.printf("%s", s.ptr);
+
+                        @memset(msg.topic, 0);
+                        @memset(msg.payload, 0);
+
+                        self.qos2Queue.message.allocator.free(msg.topic);
+                        self.qos2Queue.message.allocator.free(msg.payload);
+                    }
                 },
                 .pubcomp => {
                     // publish complete
