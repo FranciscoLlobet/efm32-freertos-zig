@@ -23,8 +23,11 @@ const MQTTTransport = c.MQTTTransport;
 const MQTTString = c.MQTTString;
 const MQTTLenString = c.MQTTLenString;
 
+/// MQTT OK return code
+/// Used internally to check the return code of the MQTTPacket functions
 const mqtt_ok: c_int = 1;
 
+/// Message types from MQTTPacket
 const msgTypes = enum(c_int) { err_msg = -1, try_again = 0, connect = c.CONNECT, connack = c.CONNACK, publish = c.PUBLISH, puback = c.PUBACK, pubrec = c.PUBREC, pubrel = c.PUBREL, pubcomp = c.PUBCOMP, subscribe = c.SUBSCRIBE, suback = c.SUBACK, unsubscribe = c.UNSUBSCRIBE, unsuback = c.UNSUBACK, pingreq = c.PINGREQ, pingresp = c.PINGRESP, disconnect = c.DISCONNECT };
 
 const state = enum(i32) {
@@ -35,6 +38,7 @@ const state = enum(i32) {
     disconnecting,
 };
 
+//// Mqtt Error codes
 pub const mqtt_error = error{
     packetlen,
     enqueue_failed,
@@ -44,17 +48,20 @@ pub const mqtt_error = error{
     connack_failed,
     parse_failed,
     publish_parse_failed,
+    subscribe_qos_topic_count_mismatch, // The number of topics and qos do not match
     qos_not_supported,
 
     qos_packet_not_found,
     qos_packet_timeout,
 };
 
+/// Publish response type
 const packet_response = @This().packet.publish_response;
 
+/// MQTT String initializer
 const MQTTString_initializer = MQTTString{ .cstring = null, .lenstring = .{ .len = 0, .data = null } };
 
-// Manually translated initializer
+/// Manually translated initializer
 const MQTTPacket_willOptions_initializer = c.MQTTPacket_willOptions{
     .struct_id = [_]u8{ 'M', 'Q', 'T', 'W' },
     .struct_version = 0,
@@ -64,7 +71,7 @@ const MQTTPacket_willOptions_initializer = c.MQTTPacket_willOptions{
     .qos = 0,
 };
 
-// Manually translated initializer
+/// Manually translated initializer
 const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
     .struct_id = [_]u8{ 'M', 'Q', 'T', 'C' },
     .struct_version = 0,
@@ -139,6 +146,7 @@ fn init() @This() {
     };
 }
 
+/// Authentification callback for mbedTLS connections
 fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
     if (security_mode == .psk) {
         var psk_buf: [64]u8 = undefined; // Request 64 Bytes for Base64 decoder
@@ -152,31 +160,38 @@ fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mo
     }
 }
 
+/// Process and send the contents of the txQueue
 fn processSendQueue(self: *@This()) !void {
     while (self.packet.txQueue.receive(&txBuffer, 0)) |buf| {
         _ = try self.connection.send(buf);
     }
 }
 
-const QoS = enum(u8) { qos0 = 0, qos1 = 1, qos2 = 2 };
+/// Quality of Service
+const QoS = enum(c_int) { qos0 = 0, qos1 = 1, qos2 = 2 };
 
+/// Queued message
 const QueuedMessage = struct {
     packetId: ?u16,
     qos: QoS,
     dup: bool,
     retained: bool,
-    deadline: u32,
     topic: []u8,
     payload: []u8,
+    deadline: u32,
 };
 
+/// Queued Message Queue
 const QueuedMessgeQueue = struct {
+    /// Message Queue
     message: std.ArrayList(QueuedMessage),
 
+    /// Comptime Initializer
     pub fn init(comptime allocator: std.mem.Allocator) @This() {
         return @This(){ .message = std.ArrayList(QueuedMessage).init(allocator) };
     }
 
+    /// Add a message to the queue
     pub fn add(self: *@This(), packetId: u16, qos: QoS, dup: bool, retained: bool, topic: []const u8, payload: []const u8, deadline: u32) !void {
         var new_payload = try self.message.allocator.alloc(u8, payload.len);
         var new_topic = try self.message.allocator.alloc(u8, topic.len);
@@ -209,6 +224,7 @@ const QueuedMessgeQueue = struct {
         return mqtt_error.qos_packet_not_found;
     }
 
+    /// Remove all messages that have expired
     pub fn prune(self: *@This()) ?QueuedMessage {
         for (self.message.items, 0..) |*item, idx| {
             if (item.deadline < system.time.now()) {
@@ -218,6 +234,7 @@ const QueuedMessgeQueue = struct {
         return null;
     }
 
+    /// Find and remove a message from the queue
     pub fn findAndRemove(self: *@This(), packetId: u16) ?QueuedMessage {
         for (self.message.items, 0..) |*item, idx| {
             if (item.packetId) |id| {
@@ -265,19 +282,21 @@ const packet = struct {
         self.txQueue = freertos.MessageBuffer.create(1024) catch unreachable; // Create message buffer
     }
 
-    // Use XorShift Algorithm to generate the packet id
+    /// Generate Packet ID
+    /// Uses XorShift Algorithm to generate the packet id
     fn generatePacketId(self: *@This()) u16 {
         if (self.packetIdState != 0) {
             self.packetIdState ^= self.packetIdState << 7;
             self.packetIdState ^= self.packetIdState >> 9;
             self.packetIdState ^= self.packetIdState << 8;
         } else {
-            self.packetIdState = 0x5555;
+            self.packetIdState = 1;
         }
 
         return self.packetIdState;
     }
 
+    /// Get function for the MQTTTransport
     fn getFn(ptr: ?*anyopaque, buf: [*c]u8, buf_len: c_int) callconv(.C) c_int {
         var self = @as(*connection, @ptrCast(@alignCast(ptr))); // Cast ptr as connection
 
@@ -288,11 +307,14 @@ const packet = struct {
         return @intCast(ret.len);
     }
 
+    /// Read from the transport layer
+    /// Uses the non-blocking (NB) version of the MQTTPacket read function
     fn read(self: *@This(), buffer: []u8) msgTypes {
         self.transport.state = 0;
         return @as(msgTypes, @enumFromInt(c.MQTTPacket_readnb(@ptrCast(&buffer[0]), @intCast(buffer.len), &self.transport)));
     }
 
+    /// Deserialize a publish packet from buffer and converts it into a `publish_response`
     fn deserializePublish(self: *@This(), buffer: []u8) !publish_response {
         _ = self;
         var topicName = MQTTString_initializer;
@@ -317,6 +339,7 @@ const packet = struct {
         return publish_response{ .packetId = packetId, .qos = retQos, .dup = (if (dup == 0) false else true), .retained = (if (retained == 0) false else true), .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
     }
 
+    /// Deserialize an ACK packet from buffer
     fn deserializeAck(self: *@This(), buffer: []u8, packetType: *u8, dup: *u8) !u16 {
         _ = self;
         var packetId: u16 = undefined;
@@ -327,13 +350,16 @@ const packet = struct {
         return packetId;
     }
 
-    fn deserializeSubAck(self: *@This(), buffer: []u8, maxCount: c_int, count: *c_int, grantedQoSs: *c_int) !u16 {
+    /// Deserialize a suback packet from buffer
+    fn deserializeSubAck(self: *@This(), buffer: []u8, qos: []QoS) !struct { packetId: u16, qos: []QoS } {
         _ = self;
         var packetId: u16 = undefined;
-        if (mqtt_ok != c.MQTTDeserialize_suback(&packetId, maxCount, count, grantedQoSs, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        var count: c_int = 0;
+
+        if (mqtt_ok != c.MQTTDeserialize_suback(&packetId, @intCast(qos.len), &count, @ptrCast(qos.ptr), @ptrCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
-        return packetId;
+        return .{ .packetId = packetId, .qos = qos[0..@as(usize, @intCast(count))] };
     }
 
     /// Check the output of the MQTTSerialize_xyz functions for error returns and avoids buffer overflows
@@ -348,6 +374,7 @@ const packet = struct {
         }
     }
 
+    /// Prepare a connect packet
     fn prepareConnectPacket(self: *@This(), clientID: []const u8, username: ?[]const u8, password: ?[]const u8) !u16 {
         var connectPacket = MQTTPacket_connectData_initializer;
         connectPacket.clientID = initMQTTString(clientID);
@@ -368,6 +395,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_connect(&workBuffer[0], workBuffer.len, &connectPacket)), null);
     }
 
+    /// Prepare the puback packet and sends to TX Queue
     fn preparePubAckPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -375,6 +403,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_puback(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
+    /// Prepare the pubrec packet and sends to TX Queue
     fn preparePubRecPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -382,6 +411,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrec(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
+    /// Prepare the pubcomp packet and sends to TX Queue
     fn preparePubCompPacket(self: *@This(), packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -389,6 +419,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubcomp(@ptrCast(&workBuffer[0]), workBuffer.len, packetId)), packetId);
     }
 
+    /// Prepare the `pubrel` packet and sends to TX Queue
     fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -396,16 +427,20 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId)), packetId);
     }
 
-    fn prepareSubscribePacket(self: *@This(), count: usize, topicFilter: *MQTTString, qos: *c_int) !u16 {
+    /// Prepare the subscribe packet and sends to TX Queue
+    /// Both topicFilter and qos must have the same length
+    fn prepareSubscribePacket(self: *@This(), topicFilter: []MQTTString, qos: []QoS) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
+        const count = if (topicFilter.len == qos.len) topicFilter.len else return mqtt_error.subscribe_qos_topic_count_mismatch;
         const packetId = self.generatePacketId();
         const dup: u8 = 0;
 
-        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter, qos)), packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_subscribe(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId, @intCast(count), topicFilter.ptr, @ptrCast(qos.ptr))), packetId);
     }
 
+    /// Prepare a ping packet and sends to TX Queue
     fn preparePingPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -413,6 +448,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pingreq(@ptrCast(&workBuffer[0]), workBuffer.len)), null);
     }
 
+    /// prepare a disconnect packet and sends to TX Queue
     fn prepareDisconnectPacket(self: *@This()) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -420,6 +456,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_disconnect(@ptrCast(&workBuffer[0]), workBuffer.len)), null);
     }
 
+    /// Prepare a publish packet and sends to TX Queue
     pub fn preparePublishPacket(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, packetId: ?u16) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
@@ -431,6 +468,7 @@ const packet = struct {
         return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_publish(&workBuffer[0], workBuffer.len, if (dup) 1 else 0, @intFromEnum(qos), retain, id, topic_name, @constCast(payload.ptr), @intCast(payload.len))), id);
     }
 
+    /// Process the connack packet
     pub fn processConnAck(self: *@This(), buffer: []u8) !void {
         _ = self;
         var sessionPresent: u8 = undefined;
@@ -527,13 +565,11 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                 .connack => try self.packet.processConnAck(&rxBuffer),
                 .connect, .subscribe, .disconnect, .unsubscribe, .pingreq => break, // Broker messages
                 .suback => {
-                    var maxCount: c_int = 1;
-                    var count: c_int = 0;
-                    var grantedQoSs: c_int = 0;
+                    var grantedQoSs: [2]QoS = .{ .qos0, .qos0 };
 
                     // Deserialize
-                    const packetId = try self.packet.deserializeSubAck(&rxBuffer, maxCount, &count, &grantedQoSs);
-                    _ = packetId;
+                    const res = try self.packet.deserializeSubAck(&rxBuffer, &grantedQoSs);
+                    _ = res;
                 }, // To-do: process the sub-ack
                 .unsuback => {
                     // currently unsuported
@@ -660,7 +696,7 @@ pub fn create(self: *@This()) void {
     }
 }
 
-/// Add
+/// Connect to the MQTT broker
 pub fn connect(self: *@This(), uri: std.Uri) !void {
     self.state = .connecting;
     var packetId: u16 = 0;
@@ -681,26 +717,25 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         if (msgTypes.connack == self.packet.read(&rxBuffer)) {
             try self.packet.processConnAck(&rxBuffer);
         } else {
-            //
+            return mqtt_error.connect_failed;
         }
     }
 
     const subTopic = [_]MQTTString{ comptime initMQTTString(fw_update_topic), comptime initMQTTString(conf_update_topic) };
-    const qos = [_]c_int{ 1, 2 };
-    packetId = try self.packet.prepareSubscribePacket(2, @constCast(&subTopic[0]), @constCast(&qos[0]));
+    const qos = [_]QoS{ QoS.qos1, QoS.qos2 };
+    packetId = try self.packet.prepareSubscribePacket(@constCast(&subTopic), @constCast(&qos));
 
     try self.processSendQueue();
 
     // Wait for the connack
     if (0 == self.connection.waitRx(5)) {
         if (msgTypes.suback == self.packet.read(&rxBuffer)) {
-            var maxCount: c_int = 1;
-            var count: c_int = 0;
-            var grantedQoSs: c_int = 0;
+            var grantedQoSs: [2]QoS = .{ .qos0, .qos0 };
 
             // Deserialize
-            if (packetId == try self.packet.deserializeSubAck(&rxBuffer, maxCount, &count, &grantedQoSs)) {
-                _ = c.printf("Suback received\r\n");
+            const res = try self.packet.deserializeSubAck(&rxBuffer, &grantedQoSs);
+            if (res.packetId == packetId) {
+                _ = c.printf("Suback received: %d..%d,%d\r\n", res.qos.len, @intFromEnum(res.qos[0]), @intFromEnum(res.qos[1]));
             }
         }
     }

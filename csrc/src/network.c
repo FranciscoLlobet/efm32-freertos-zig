@@ -304,8 +304,9 @@ static void select_task(void *param)
 		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL))
 		{
 			// Start second cycle
+			// The select function is called with a timeout of 20 ms
 			const struct timeval tv =
-				{.tv_sec = 0, .tv_usec = 0}; // Here we have the select cycle time
+				{.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
 
 			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
 
