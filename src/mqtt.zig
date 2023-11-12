@@ -52,6 +52,7 @@ pub const mqtt_error = error{
     qos_not_supported,
 
     qos_packet_not_found,
+    pubrel_packet_not_found,
     qos_packet_timeout,
 };
 
@@ -179,6 +180,7 @@ const QueuedMessage = struct {
     topic: []u8,
     payload: []u8,
     deadline: u32,
+    packetType: msgTypes,
 };
 
 /// Queued Message Queue
@@ -192,36 +194,43 @@ const QueuedMessgeQueue = struct {
     }
 
     /// Add a message to the queue
-    pub fn add(self: *@This(), packetId: u16, qos: QoS, dup: bool, retained: bool, topic: []const u8, payload: []const u8, deadline: u32) !void {
+    pub fn addPublish(self: *@This(), packetId: u16, qos: QoS, dup: bool, retained: bool, topic: []const u8, payload: []const u8, deadline: u32) !void {
         var new_payload = try self.message.allocator.alloc(u8, payload.len);
         var new_topic = try self.message.allocator.alloc(u8, topic.len);
 
         @memcpy(new_payload, payload);
         @memcpy(new_topic, topic);
 
-        try self.message.append(QueuedMessage{ .packetId = packetId, .qos = qos, .dup = dup, .retained = retained, .topic = new_topic, .payload = new_payload, .deadline = deadline });
+        try self.message.append(QueuedMessage{ .packetId = packetId, .qos = qos, .dup = dup, .retained = retained, .topic = new_topic, .payload = new_payload, .deadline = deadline, .packetType = .publish });
+    }
+
+    /// Add a pubrel message to the queue
+    pub fn addPubRel(self: *@This(), packetId: u16, dup: bool, deadline: u32) !void {
+        try self.message.append(QueuedMessage{ .packetId = packetId, .qos = .qos2, .dup = dup, .retained = false, .topic = undefined, .payload = undefined, .deadline = deadline, .packetType = .pubrel });
     }
 
     /// Scan the queue for messages that match the packetId
-    pub fn acknowledge(self: *@This(), packetId: u16) !void {
+    pub fn acknowledge(self: *@This(), packetId: u16, packetType: msgTypes) !bool {
         for (self.message.items, 0..) |*item, idx| {
             if (item.packetId) |id| {
-                if (id == packetId) {
+                if ((id == packetId) and (item.packetType == packetType)) {
                     // Remove the message from the list
                     var msg = self.message.orderedRemove(idx);
 
-                    // Clear topic and payload content
-                    @memset(msg.topic, 0);
-                    @memset(msg.payload, 0);
+                    if (msg.packetType == .publish) {
+                        // Clear topic and payload content
+                        @memset(msg.topic, 0);
+                        @memset(msg.payload, 0);
 
-                    self.message.allocator.free(msg.topic);
-                    self.message.allocator.free(msg.payload);
+                        self.message.allocator.free(msg.topic);
+                        self.message.allocator.free(msg.payload);
+                    }
 
-                    return;
+                    return true;
                 }
             }
         }
-        return mqtt_error.qos_packet_not_found;
+        return false;
     }
 
     /// Remove all messages that have expired
@@ -339,14 +348,68 @@ const packet = struct {
         return publish_response{ .packetId = packetId, .qos = retQos, .dup = (if (dup == 0) false else true), .retained = (if (retained == 0) false else true), .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
     }
 
-    /// Deserialize an ACK packet from buffer
-    fn deserializeAck(self: *@This(), buffer: []u8, packetType: *u8, dup: *u8) !u16 {
+    fn deserializePuback(self: *@This(), buffer: []u8) !struct { packetId: u16, dup: bool } {
         _ = self;
         var packetId: u16 = undefined;
+        var dup: u8 = undefined;
+        var packetType: u8 = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_ack(packetType, dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
+        if (packetType != c.PUBACK) {
+            return mqtt_error.parse_failed; // Not actually a puback when expected
+        }
+        return .{ .packetId = packetId, .dup = (if (dup == 0) false else true) };
+    }
+
+    /// Deserialize a pubrel packet from buffer
+    fn deserializePubrel(self: *@This(), buffer: []u8) !struct { packetId: u16, dup: bool } {
+        _ = self;
+        var packetId: u16 = undefined;
+        var dup: u8 = undefined;
+        var packetType: u8 = undefined;
+
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+            return mqtt_error.parse_failed;
+        }
+        if (packetType != c.PUBREL) {
+            return mqtt_error.parse_failed; // Not actually a pubrel when expected
+        }
+        return .{ .packetId = packetId, .dup = (if (dup == 0) false else true) };
+    }
+
+    /// Deserialize a pubrec packet from buffer
+    fn deserializePubrec(self: *@This(), buffer: []u8) !u16 {
+        _ = self;
+        var packetId: u16 = undefined;
+        var dup: u8 = undefined;
+        var packetType: u8 = undefined;
+
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+            return mqtt_error.parse_failed;
+        }
+        if (packetType != c.PUBREC) {
+            return mqtt_error.parse_failed; // Not actually a pubrec when expected
+        }
+
+        return packetId;
+    }
+
+    /// Deserialize a pubcomp packet from buffer
+    fn deserializePubcomp(self: *@This(), buffer: []u8) !u16 {
+        _ = self;
+        var packetId: u16 = undefined;
+        var dup: u8 = undefined;
+        var packetType: u8 = undefined;
+
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+            return mqtt_error.parse_failed;
+        }
+        if (packetType != c.PUBCOMP) {
+            return mqtt_error.parse_failed; // Not actually a pubcomp when expected
+        }
+
         return packetId;
     }
 
@@ -420,11 +483,11 @@ const packet = struct {
     }
 
     /// Prepare the `pubrel` packet and sends to TX Queue
-    fn preparePubRelPacket(self: *@This(), dup: u8, packetId: u16) !u16 {
+    fn preparePubRelPacket(self: *@This(), packetId: u16, dup: bool) !u16 {
         _ = try self.workBufferMutex.take(null);
         defer self.workBufferMutex.give() catch {};
 
-        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, dup, packetId)), packetId);
+        return self.sendtoTxQueue(try serializeCheck(c.MQTTSerialize_pubrel(@ptrCast(&workBuffer[0]), workBuffer.len, @intFromBool(dup), packetId)), packetId);
     }
 
     /// Prepare the subscribe packet and sends to TX Queue
@@ -499,12 +562,21 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     defer self.disconnect() catch {};
 
     while (true) {
-        // process the qos tx queue
+        // process the QoS1 tx queue
         while (self.qosQueue.prune()) |msg| {
-            try self.publish(msg.topic, msg.payload, msg.qos, msg.dup, system.time.calculateDeadline(2000)); // Do resend
+            switch (msg.packetType) {
+                .publish => {
+                    try self.publish(msg.topic, msg.payload, msg.qos, true, msg.packetId, system.time.calculateDeadline(2000));
+                },
+                .pubrel => {
+                    const ret = try self.packet.preparePubRelPacket(msg.packetId.?, true);
+                    try self.qosQueue.addPubRel(ret, true, system.time.calculateDeadline(2000));
+                },
+                else => {},
+            }
         }
 
-        // process the qos tx queue
+        // process the QoS2 rx queue
         while (self.qos2Queue.prune()) |msg| {
             @memset(msg.topic, 0);
             @memset(msg.payload, 0);
@@ -545,19 +617,18 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                         // If the publish message has QOS2, then we should to wait for the pubrel
                         // The code should actually enqueue the message and process it later when the pubrel is received
                         // Enqueue the message into the QOS2 rx queue
-                        try self.qos2Queue.add(packetId, publish_response.qos, publish_response.dup, publish_response.retained, publish_response.topic, publish_response.payload, system.time.calculateDeadline(2000));
+                        try self.qos2Queue.addPublish(packetId, publish_response.qos, publish_response.dup, publish_response.retained, publish_response.topic, publish_response.payload, system.time.calculateDeadline(2000));
                     }
                 },
                 .puback => {
                     // Response for Client pub qos1
-                    var packetType: u8 = undefined;
-                    var dup: u8 = undefined;
-
-                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    const resp = try self.packet.deserializePuback(&rxBuffer);
 
                     // Process the puback packet
-                    // Remove the packet from the qos1 tx queue
-                    try self.qosQueue.acknowledge(rx_packetId);
+                    // Acknowledges a QoS1 publish message
+                    if (false == try self.qosQueue.acknowledge(resp.packetId, .publish)) {
+                        return mqtt_error.qos_packet_not_found;
+                    }
                 },
                 .pingresp => {
                     _ = c.printf("pingresp!");
@@ -576,28 +647,30 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                 },
                 .pubrec => {
                     // generate pubrel package
-                    var packetType: u8 = undefined;
-                    var dup: u8 = undefined;
+                    // pubrec does not have a duplicate
+                    const rx_packetId = try self.packet.deserializePubrec(&rxBuffer);
 
-                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    // Search for duplicate packets in queue
+                    const dup = try self.qosQueue.acknowledge(rx_packetId, .pubrel);
 
-                    _ = try self.packet.preparePubRelPacket(0, rx_packetId);
+                    const ret = try self.packet.preparePubRelPacket(rx_packetId, dup);
+                    // Add to queue
+                    try self.qosQueue.addPubRel(ret, false, system.time.calculateDeadline(2000));
                 },
                 .pubrel => {
-                    // generate pubcomp package
-                    var packetType: u8 = undefined;
-                    var dup: u8 = undefined;
+                    // Recieved pubrel from broker
+                    const ret = try self.packet.deserializePubrel(&rxBuffer);
 
-                    const rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    if (self.qos2Queue.findAndRemove(ret.packetId)) |msg| {
 
-                    if (self.qos2Queue.findAndRemove(rx_packetId)) |msg| {
-                        _ = try self.packet.preparePubCompPacket(rx_packetId);
+                        // Send the pubcomp packet to the broker
+                        _ = try self.packet.preparePubCompPacket(ret.packetId);
                         try self.processSendQueue();
 
                         var buf: [64]u8 = undefined;
                         @memset(&buf, 0);
 
-                        var s = try std.fmt.bufPrint(&buf, "Pubrel recieved: {d}, {d} {s} {s}\r\n", .{ rx_packetId, @intFromEnum(msg.qos), msg.topic, msg.payload });
+                        var s = try std.fmt.bufPrint(&buf, "Pubrel recieved: {d}, {d} {s} {s}\r\n", .{ ret.packetId, @intFromEnum(msg.qos), msg.topic, msg.payload });
 
                         _ = c.printf("%s", s.ptr);
 
@@ -606,19 +679,20 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
                         self.qos2Queue.message.allocator.free(msg.topic);
                         self.qos2Queue.message.allocator.free(msg.payload);
+                    } else {
+                        // No message found in the queue
                     }
                 },
                 .pubcomp => {
-                    // publish complete
-                    var packetType: u8 = undefined;
-                    var dup: u8 = undefined;
-                    var rx_packetId: u16 = undefined;
+                    // publish complete recieved from broker
+                    const resp = try self.packet.deserializePubcomp(&rxBuffer);
 
-                    rx_packetId = try self.packet.deserializeAck(&rxBuffer, &packetType, &dup);
+                    _ = c.printf("pubcomp received for packetId\r\n", resp);
 
-                    _ = c.printf("pubcomp received for packetId\r\n", rx_packetId);
-                    // process the qos tx queue
-
+                    // Look for the pubrel package in the queue
+                    if (false == try self.qosQueue.acknowledge(resp, .pubrel)) {
+                        return mqtt_error.pubrel_packet_not_found;
+                    }
                 },
                 .err_msg => break,
             }
@@ -674,15 +748,15 @@ fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 
-pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, deadline: u32) !void {
-    const packetId = try self.packet.preparePublishPacket(topic, payload, qos, dup, null);
-    try self.qosQueue.add(packetId, qos, dup, false, topic, payload, deadline);
+pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, packetId: ?u16, deadline: u32) !void {
+    const ret = try self.packet.preparePublishPacket(topic, payload, qos, dup, packetId);
+    try self.qosQueue.addPublish(ret, qos, dup, false, topic, payload, deadline);
 }
 
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
     const payload = "test";
-    self.publish("zig/pub", payload, .qos1, true, system.time.calculateDeadline(2000)) catch unreachable;
+    self.publish("zig/pub", payload, .qos1, true, null, system.time.calculateDeadline(2000)) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
