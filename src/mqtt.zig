@@ -631,7 +631,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     }
                 },
                 .pingresp => {
-                    _ = c.printf("pingresp!");
+                    _ = c.printf("pingresp!\r\n");
                 },
                 .connack => try self.packet.processConnAck(&rxBuffer),
                 .connect, .subscribe, .disconnect, .unsubscribe, .pingreq => break, // Broker messages
@@ -654,7 +654,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     const dup = try self.qosQueue.acknowledge(rx_packetId, .pubrel);
 
                     const ret = try self.packet.preparePubRelPacket(rx_packetId, dup);
-                    // Add to queue
+
+                    // Add to tx queue
                     try self.qosQueue.addPubRel(ret, false, system.time.calculateDeadline(2000));
                 },
                 .pubrel => {
@@ -687,11 +688,11 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     // publish complete recieved from broker
                     const resp = try self.packet.deserializePubcomp(&rxBuffer);
 
-                    _ = c.printf("pubcomp received for packetId\r\n", resp);
-
                     // Look for the pubrel package in the queue
                     if (false == try self.qosQueue.acknowledge(resp, .pubrel)) {
                         return mqtt_error.pubrel_packet_not_found;
+                    } else {
+                        _ = c.printf("pubcomp received for packetId\r\n", resp);
                     }
                 },
                 .err_msg => break,
@@ -756,7 +757,7 @@ pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS,
 fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
     const payload = "test";
-    self.publish("zig/pub", payload, .qos1, true, null, system.time.calculateDeadline(2000)) catch unreachable;
+    self.publish("zig/pub", payload, .qos2, false, null, system.time.calculateDeadline(2000)) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
