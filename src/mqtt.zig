@@ -224,6 +224,8 @@ const QueuedMessgeQueue = struct {
 
                         self.message.allocator.free(msg.topic);
                         self.message.allocator.free(msg.payload);
+                    } else {
+                        _ = c.printf("pubrel removed: %d\r\n", msg.packetId.?);
                     }
 
                     return true;
@@ -650,9 +652,15 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     // pubrec does not have a duplicate
                     const rx_packetId = try self.packet.deserializePubrec(&rxBuffer);
 
+                    // Remove the publish message from the queue
+                    if (false == try self.qosQueue.acknowledge(rx_packetId, .publish)) {
+                        return mqtt_error.qos_packet_not_found;
+                    }
+
                     // Search for duplicate packets in queue
                     const dup = try self.qosQueue.acknowledge(rx_packetId, .pubrel);
 
+                    // Prepare the pubrel packet
                     const ret = try self.packet.preparePubRelPacket(rx_packetId, dup);
 
                     // Add to tx queue
