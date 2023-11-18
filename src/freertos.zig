@@ -45,6 +45,7 @@ const FreeRtosError = error{
     QueueReceiveFailed,
 
     SemaphoreCreationFailed,
+    SemaphoreTakeTimeout,
     TimerCreationFailed,
 
     TimerStartFailed,
@@ -178,101 +179,141 @@ pub const Queue = struct {
     }
 };
 
-pub const Mutex = struct {
-    handle: SemaphoreHandle_t = undefined,
-
-    pub fn create() !@This() {
-        const self = @This(){ .handle = c.xSemaphoreCreateMutex() };
-
-        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
-    }
-
-    pub fn take(self: *@This(), xTicksToWait: ?TickType_t) !bool {
-        return if (pdTRUE == c.xSemaphoreTake(self.handle, xTicksToWait orelse portMAX_DELAY)) true else FreeRtosError.pdFAIL;
-    }
-
-    pub fn give(self: *@This()) !void {
-        return if (pdTRUE == c.xSemaphoreGive(self.handle)) {} else FreeRtosError.pdFAIL;
-    }
-
-    pub inline fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
-        return if (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken)) {} else FreeRtosError.pdFAIL;
-    }
-};
-
 pub const Semaphore = struct {
     handle: SemaphoreHandle_t = undefined,
 
+    /// Create a binary Semaphore
     pub fn createBinary() !@This() {
         const self = @This(){ .handle = c.xSemaphoreCreateBinary() };
         if (self.handle == null) {
             return FreeRtosError.SemaphoreCreationFailed;
         }
     }
+
+    /// Create a counting semaphore
     pub fn createCountingSemaphore(self: *@This(), uxMaxCount: u32, uxInitialCount: u32) !void {
         self.handle = c.xSemaphoreCreateCounting(uxMaxCount, uxInitialCount);
         if (self.handle == null) {
             return FreeRtosError.SemaphoreCreationFailed;
         }
     }
-    pub fn take(self: *@This(), xTicksToWait: ?TickType_t) bool {
-        return (pdTRUE == c.xSemaphoreTake(self.handle, xTicksToWait orelse portMAX_DELAY));
+
+    /// Create a mutex
+    pub fn createMutex() !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateMutex() };
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
-    pub fn give(self: *@This()) bool {
-        return (pdTRUE == c.xSemaphoreGive(self.handle));
+
+    /// Take the semaphore
+    pub fn take(self: *const @This(), xTicksToWait: ?TickType_t) !bool {
+        return if (pdTRUE == c.xSemaphoreTake(self.handle, xTicksToWait orelse portMAX_DELAY)) true else FreeRtosError.SemaphoreTakeTimeout;
     }
-    pub inline fn giveFromIsr(self: *@This(), pxHigherPriorityTaskWoken: *BaseType_t) bool {
-        return (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken));
+
+    /// Give the semaphore
+    pub fn give(self: *const @This()) !void {
+        return if (pdTRUE == c.xSemaphoreGive(self.handle)) {} else FreeRtosError.pdFAIL;
     }
+
+    /// Give the semaphore from ISR
+    pub inline fn giveFromIsr(self: *const @This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
+        return if (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken)) {} else FreeRtosError.pdFAIL;
+    }
+
+    /// Initialize Semaphore from handle
     pub fn initFromHandle(handle: SemaphoreHandle_t) @This() {
         return @This(){ .handle = handle };
     }
 };
 
-const typedCreation = true;
+pub const Mutex = struct {
+    semaphore: Semaphore = undefined,
 
+    pub fn create() !@This() {
+        var self: @This() = undefined;
+
+        self.semaphore = try Semaphore.createMutex();
+
+        return self;
+    }
+
+    pub fn take(self: *const @This(), xTicksToWait: ?TickType_t) !bool {
+        return self.semaphore.take(xTicksToWait);
+    }
+
+    pub fn give(self: *const @This()) !void {
+        return self.semaphore.give();
+    }
+
+    pub inline fn giveFromIsr(self: *const @This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
+        return self.semaphore.giveFromIsr(pxHigherPriorityTaskWoken);
+    }
+};
+
+/// Timer
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
+    /// Get the timer ID from the timer handle and cast it into the desired (referenced) type
+    pub fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
+        return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
+    }
+
+    /// Create a FreeRTOS timer
     pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
         var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction) };
 
         return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
     }
-    pub fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
-        return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
+
+    /// Get the timer ID from the own timer
+    pub fn getId(self: *const @This(), comptime T: type) ?*T {
+        return @as(?*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(self.timer))));
     }
+
+    /// Start the timer
     pub fn start(self: *const @This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_START, c.xTaskGetTickCount(), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStartFailed;
         }
     }
+
+    /// Stop the timer
     pub fn stop(self: *const @This(), xTicksToWait: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_STOP, @as(TickType_t, 0), null, xTicksToWait orelse portMAX_DELAY)) {
             return FreeRtosError.TimerStopFailed;
         }
     }
+
+    /// Change the period of the timer
     pub fn changePeriod(self: *const @This(), xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
         if (pdFAIL == c.xTimerGenericCommand(self.handle, c.tmrCOMMAND_CHANGE_PERIOD, xNewPeriod, null, xBlockTime orelse portMAX_DELAY)) {
             return FreeRtosError.TimerChangePeriodFailed;
         }
     }
+
+    /// Delete the timer
     pub fn delete(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerDelete(self.handle, xTicksToWait);
     }
+
+    /// Reset the timer
     pub fn reset(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
         return c.xTimerReset(self.handle, xTicksToWait);
     }
-    pub fn getId(self: *const @This(), comptime T: type) ?*T {
-        return @as(?*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(self.timer))));
-    }
+
+    /// Initialize Timer from handle
     pub fn initFromHandle(handle: TimerHandle_t) @This() {
         return @This(){ .handle = handle };
     }
 };
 
+/// Message Buffer
 pub const MessageBuffer = struct {
+    /// Handle to the message buffer
     handle: MessageBufferHandle_t = undefined,
+
+    /// Create a message buffer with the given size
     pub fn create(xBufferSizeBytes: usize) !@This() {
         var self: @This() = undefined;
 
@@ -280,25 +321,32 @@ pub const MessageBuffer = struct {
 
         return if (self.handle != null) self else FreeRtosError.MessageBufferCreationFailed;
     }
-    pub fn send(self: *@This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
+
+    /// Send a message to the message buffer
+    pub fn send(self: *const @This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
         return c.xMessageBufferSend(self.handle, txData.ptr, txData.len, xTicksToWait orelse portMAX_DELAY);
     }
-    pub fn receive(self: *@This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
+
+    /// Receive a message from the message buffer
+    pub fn receive(self: *const @This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
         var rx_len: usize = c.xMessageBufferReceive(self.handle, @constCast(rxData.ptr), rxData.len, ticks_to_wait orelse portMAX_DELAY);
 
         return if (rx_len != 0) @constCast(rxData)[0..rx_len] else null;
     }
 };
 
+/// Allocator to use in a FreeRTOS application
 pub const allocator = std.mem.Allocator{ .ptr = undefined, .vtable = &allocator_vtable };
 
-pub const allocator_vtable = std.mem.Allocator.VTable{
+/// VTable for the FreeRTOS allocator
+const allocator_vtable = std.mem.Allocator.VTable{
     .alloc = freertos_alloc,
     .resize = freertos_resize,
     .free = freertos_free,
 };
 
-pub fn freertos_alloc(
+/// FreeRTOS allocator
+fn freertos_alloc(
     _: *anyopaque,
     len: usize,
     log2_ptr_align: u8,
