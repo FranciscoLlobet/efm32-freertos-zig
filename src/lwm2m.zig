@@ -13,7 +13,7 @@ const c = @cImport({
 
 extern fn write_temperature(temperature: f32) callconv(.C) void;
 
-task: freertos.Task,
+task: freertos.StaticTask(config.rtos_stack_depth_lwm2m),
 reg_update: freertos.Timer,
 timer_update: freertos.Timer,
 
@@ -49,7 +49,7 @@ fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task = freertos.Task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", config.rtos_stack_depth_lwm2m, self, config.rtos_prio_lwm2m) catch unreachable;
+    self.task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", self, config.rtos_prio_lwm2m) catch unreachable;
 
     self.task.suspendTask();
 

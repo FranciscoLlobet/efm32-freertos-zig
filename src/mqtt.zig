@@ -89,11 +89,11 @@ const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
 connection: connection,
 connectionCounter: usize,
 disconnectionCounter: usize,
-rxQueue: freertos.Queue,
+//rxQueue: freertos.Queue,
 
 pingTimer: freertos.Timer,
 pubTimer: freertos.Timer, // delete this!
-task: freertos.Task,
+task: freertos.StaticTask(config.rtos_stack_depth_mqtt),
 state: state,
 packet: @This().packet,
 uri_string: [*:0]u8,
@@ -134,7 +134,6 @@ fn init() @This() {
         .connection = undefined,
         .connectionCounter = 0,
         .disconnectionCounter = 0,
-        .rxQueue = undefined,
         .pingTimer = undefined,
         .pubTimer = undefined,
         .task = undefined,
@@ -769,7 +768,7 @@ fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task = freertos.Task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", config.rtos_stack_depth_mqtt, self, config.rtos_prio_mqtt) catch unreachable;
+    self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.connection = connection.init(.mqtt, authCallback, null);

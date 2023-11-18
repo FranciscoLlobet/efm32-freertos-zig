@@ -39,7 +39,7 @@ const state = enum(usize) {
         };
     }
 };
-task: freertos.Task,
+task: freertos.StaticTask(config.rtos_stack_depth_user_task),
 timer: freertos.Timer,
 state: state,
 
@@ -83,7 +83,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
             //eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null);
             while ((eventValue & c.miso_connectivity_on) != c.miso_connectivity_on) {
-                eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null).?;
+                if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
+                    eventValue = val;
+                }
             }
 
             self.state = .perform_firmware_download;
@@ -118,7 +120,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         } else if (self.state == .working) {
             // recieve
 
-            if (self.task.waitForNotify(0, 0xFFFFFFFF, null)) |_| {
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |_| {
                 //_ = val;
                 leds.yellow.toggle();
                 _ = c.printf("UserTask: %d\r\n", self.task.getStackHighWaterMark());
@@ -129,7 +131,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
 pub fn create(self: *@This()) void {
     self.state = state.verify_config;
-    self.task = freertos.Task.create(myUserTaskFunction, "user_task", config.rtos_stack_depth_user_task, @constCast(self), config.rtos_prio_user_task) catch unreachable;
+    self.task.create(myUserTaskFunction, "user_task", @constCast(self), config.rtos_prio_user_task) catch unreachable;
     self.timer = freertos.Timer.create("user_timer", 2000, true, @This(), self, myTimerFunction) catch unreachable;
 }
 

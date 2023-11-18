@@ -28,6 +28,24 @@ export fn vApplicationIdleHook() void {
     board.watchdogFeed();
 }
 
+var xTimerTaskTCP: freertos.StaticTask_t = undefined;
+var xIdleTaskTCP: freertos.StaticTask_t = undefined;
+
+var uxTimerTaskStack: [config.rtos_stack_depth_timer_task]freertos.StackType_t align(@alignOf(freertos.StackType_t)) = undefined;
+var uxIdleTaskStack: [config.rtos_stack_depth_idle_task]freertos.StackType_t align(@alignOf(freertos.StackType_t)) = undefined;
+
+export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
+    ppxTimerTaskTCBBuffer.* = &xTimerTaskTCP;
+    ppxTimerTaskStackBuffer.* = &uxTimerTaskStack[0];
+    pulTimerTaskStackSize.* = uxTimerTaskStack.len;
+}
+
+export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticTask_t, ppxIdleTaskStackBuffer: **freertos.StackType_t, pulIdleTaskStackSize: *c_uint) callconv(.C) void {
+    ppxIdleTaskTCBBuffer.* = &xIdleTaskTCP;
+    ppxIdleTaskStackBuffer.* = &uxIdleTaskStack[0];
+    pulIdleTaskStackSize.* = uxIdleTaskStack.len;
+}
+
 export fn vApplicationDaemonTaskStartupHook() void {
     _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
 

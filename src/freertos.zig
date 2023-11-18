@@ -20,6 +20,9 @@ pub const PendedFunction_t = c.PendedFunction_t;
 pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
 pub const MessageBufferHandle_t = c.MessageBufferHandle_t;
 
+pub const StaticTask_t = c.StaticTask_t;
+pub const StackType_t = c.StackType_t;
+
 pub const portMAX_DELAY = c.portMAX_DELAY;
 pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
 
@@ -54,23 +57,29 @@ const FreeRtosError = error{
 
     MessageBufferCreationFailed,
     MessageBufferReceiveFailed,
+    MessageBufferOverflow,
 };
 
-// Kernel function
+/// Kernel function
 pub inline fn vTaskStartScheduler() noreturn {
     c.vTaskStartScheduler();
     unreachable;
 }
 
+/// Get current scheduler state
 pub fn xTaskGetSchedulerState() eTaskSchedulerState {
     return @enumFromInt(c.xTaskGetSchedulerState());
 }
 
-pub fn vPortMalloc(xSize: usize) ?*anyopaque {
+pub fn xTaskGetCurrentTaskHandle() TaskHandle_t {
+    return c.xTaskGetCurrentTaskHandle();
+}
+
+fn vPortMalloc(xSize: usize) ?*anyopaque {
     return c.pvPortMalloc(xSize);
 }
 
-pub fn vPortFree(pv: ?*anyopaque) void {
+fn vPortFree(pv: ?*anyopaque) void {
     c.vPortFree(pv);
 }
 
@@ -95,6 +104,45 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
     return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY));
 }
 
+/// Create a Static Task
+pub fn StaticTask(comptime stackSize: usize) type {
+    return struct {
+        stack: [stackSize]StackType_t = undefined,
+        staticTask: StaticTask_t = undefined,
+        task: Task = undefined,
+
+        pub fn create(self: *@This(), comptime pxTaskCode: TaskFunction_t, comptime pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
+            self.task = Task.initFromHandle(c.xTaskCreateStatic(pxTaskCode, pcName, self.stack.len, @ptrCast(@alignCast(pvParameters)), uxPriority, &self.stack[0], &self.staticTask));
+
+            return if (self.task.handle == null) FreeRtosError.TaskCreationFailed;
+        }
+        pub fn resumeTask(self: *const @This()) void {
+            self.task.resumeTask();
+        }
+        pub fn suspendTask(self: *const @This()) void {
+            self.task.suspendTask();
+        }
+        pub fn notify(self: *const @This(), ulValue: u32, eAction: Task.eNotifyAction) FreeRtosError!void {
+            return self.task.notify(ulValue, eAction);
+        }
+        pub fn notifyFromIsr(self: *const @This(), ulValue: u32, eAction: Task.eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
+            return self.task.notifyFromIsr(ulValue, eAction, pxHigherPriorityTaskWoken);
+        }
+        pub fn waitForNotify(self: *const @This(), ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) !?u32 {
+            return self.task.waitForNotify(ulBitsToClearOnEntry, ulBitsToClearOnExit, xTicksToWait);
+        }
+        pub fn getStackHighWaterMark(self: *const @This()) u32 {
+            return self.task.getStackHighWaterMark();
+        }
+        pub fn delayTask(self: *const @This(), xTicksToDelay: TickType_t) void {
+            self.task.delayTask(xTicksToDelay);
+        }
+        pub fn getHandle(self: *const @This()) TaskHandle_t {
+            return self.task.getHandle();
+        }
+    };
+}
+
 pub const Task = struct {
     pub const eNotifyAction = enum(u32) {
         eSetBits = c.eSetBits,
@@ -109,6 +157,8 @@ pub const Task = struct {
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
         return @This(){ .handle = task_handle };
     }
+
+    /// Create a FreeRTOS task using dynamic memory allocation
     pub fn create(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
         var self: @This() = undefined;
 
@@ -146,36 +196,29 @@ pub const Task = struct {
     pub inline fn notifyFromISR(self: *const @This(), ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
-    pub fn waitForNotify(self: *const @This(), ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) ?u32 {
-        _ = self;
+
+    /// Wait for notification to task.
+    ///  Returns the notification value if the task was notified, null otherwise
+    pub fn waitForNotify(self: *const @This(), ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) !?u32 {
         var pulNotificationValue: u32 = undefined;
-        return if (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, &pulNotificationValue, xTicksToWait orelse portMAX_DELAY)) pulNotificationValue else null;
+
+        // The xTaskNotifyWait function supposes that you call it from the task that you want to wait for the notification
+        if (self.handle == xTaskGetCurrentTaskHandle()) {
+            return if (pdPASS == c.xTaskNotifyWait(ulBitsToClearOnEntry, ulBitsToClearOnExit, &pulNotificationValue, xTicksToWait orelse portMAX_DELAY)) pulNotificationValue else null;
+        } else {
+            return FreeRtosError.TaskNotifyFailed;
+        }
     }
+
+    /// Get own stack high water mark
     pub fn getStackHighWaterMark(self: *const @This()) u32 {
         return @intCast(c.uxTaskGetStackHighWaterMark(self.handle));
     }
+
+    /// Delay the task for the given number of ticks
     pub fn delayTask(self: *const @This(), xTicksToDelay: TickType_t) void {
         _ = self;
         c.vTaskDelay(xTicksToDelay);
-    }
-};
-
-pub const Queue = struct {
-    handle: QueueHandle_t = undefined,
-
-    pub fn create(comptime T: type, len: usize) !@This() {
-        var self: @This() = .{ .handle = c.xQueueCreate(@sizeOf(T), len) };
-        return if (self.handle == null) FreeRtosError.QueueCreationFailed else self;
-    }
-    pub fn send(self: *@This(), comptime T: type, item: *const T, comptime ticks_to_wait: ?TickType_t) bool {
-        return (pdTRUE == c.xQueueSend(self.handle, @ptrCast(@constCast(item)), ticks_to_wait orelse portMAX_DELAY));
-    }
-    pub fn receive(self: *@This(), comptime T: type, item: *const T, comptime ticks_to_wait: ?TickType_t) bool {
-        return (pdTRUE == c.xQueueReceive(self.handle, @ptrCast(@as(*T, @alignCast(item))), ticks_to_wait orelse portMAX_DELAY));
-    }
-    pub fn delete(self: *@This()) void {
-        c.xQueueDelete(self.handle);
-        self.handle = undefined;
     }
 };
 
@@ -329,7 +372,7 @@ pub const MessageBuffer = struct {
 
     /// Receive a message from the message buffer
     pub fn receive(self: *const @This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
-        var rx_len: usize = c.xMessageBufferReceive(self.handle, @constCast(rxData.ptr), rxData.len, ticks_to_wait orelse portMAX_DELAY);
+        const rx_len: usize = c.xMessageBufferReceive(self.handle, @constCast(rxData.ptr), rxData.len, ticks_to_wait orelse portMAX_DELAY);
 
         return if (rx_len != 0) @constCast(rxData)[0..rx_len] else null;
     }
