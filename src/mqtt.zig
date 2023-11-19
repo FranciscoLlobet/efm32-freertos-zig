@@ -261,7 +261,7 @@ const packet = struct {
     transport: MQTTTransport,
     packetIdState: u16,
     workBufferMutex: freertos.Mutex,
-    txQueue: freertos.MessageBuffer = undefined,
+    txQueue: freertos.StaticMessageBuffer(1024),
 
     /// Publish packet response
     const publish_response = struct {
@@ -281,7 +281,7 @@ const packet = struct {
             .rem_len = undefined,
             .len = undefined,
             .state = undefined,
-        }, .packetIdState = packetId, .workBufferMutex = undefined };
+        }, .packetIdState = packetId, .workBufferMutex = undefined, .txQueue = undefined };
     }
 
     pub fn create(self: *@This(), conn: *connection) void {
@@ -289,7 +289,7 @@ const packet = struct {
 
         self.workBufferMutex = freertos.Mutex.create() catch unreachable;
 
-        self.txQueue = freertos.MessageBuffer.create(1024) catch unreachable; // Create message buffer
+        self.txQueue.create() catch unreachable; // Create message buffer
     }
 
     /// Generate Packet ID

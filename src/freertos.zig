@@ -19,6 +19,7 @@ pub const TickType_t = c.TickType_t;
 pub const PendedFunction_t = c.PendedFunction_t;
 pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
 pub const MessageBufferHandle_t = c.MessageBufferHandle_t;
+pub const StaticStreamBuffer_t = c.StaticStreamBuffer_t;
 
 pub const StaticTask_t = c.StaticTask_t;
 pub const StackType_t = c.StackType_t;
@@ -351,6 +352,27 @@ pub const Timer = struct {
     }
 };
 
+/// Create a static message buffer of desired size
+pub fn StaticMessageBuffer(comptime xBufferSizeBytes: usize) type {
+    return struct {
+        messageBuffer: MessageBuffer = undefined,
+        staticMessageBuffer: StaticStreamBuffer_t = undefined,
+        buffer: [xBufferSizeBytes]u8 = undefined,
+
+        pub fn create(self: *@This()) !void {
+            self.messageBuffer = try MessageBuffer.initStatic(self.buffer[0..], &self.staticMessageBuffer);
+        }
+
+        pub fn send(self: *const @This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
+            return self.messageBuffer.send(txData, xTicksToWait);
+        }
+
+        pub fn receive(self: *const @This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
+            return self.messageBuffer.receive(rxData, ticks_to_wait);
+        }
+    };
+}
+
 /// Message Buffer
 pub const MessageBuffer = struct {
     /// Handle to the message buffer
@@ -363,6 +385,18 @@ pub const MessageBuffer = struct {
         self.handle = c.xStreamBufferGenericCreate(xBufferSizeBytes, 0, pdTRUE, null, null);
 
         return if (self.handle != null) self else FreeRtosError.MessageBufferCreationFailed;
+    }
+
+    pub fn initStatic(buffer: []u8, staticMessageBuffer: *StaticStreamBuffer_t) !@This() {
+        var self: @This() = undefined;
+
+        self.handle = c.xStreamBufferGenericCreateStatic(buffer.len, 0, pdTRUE, buffer.ptr, staticMessageBuffer, null, null);
+
+        return if (self.handle != null) self else FreeRtosError.MessageBufferCreationFailed;
+    }
+
+    pub fn createFromHandle(handle: MessageBufferHandle_t) @This() {
+        return @This(){ .handle = handle };
     }
 
     /// Send a message to the message buffer
