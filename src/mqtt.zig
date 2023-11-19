@@ -839,7 +839,6 @@ pub fn disconnect(self: *@This()) !void {
 
     defer {
         self.connection.close() catch {};
-        _ = self.connection.ssl.deinit();
         self.disconnectionCounter += 1;
     }
 }

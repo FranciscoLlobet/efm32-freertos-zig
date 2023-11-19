@@ -63,10 +63,12 @@ pub const security_mode = enum(u32) {
 
 pub const schemes = enum(u32) {
     no_scheme = 0,
+    // Unsecured schemes
     ntp = 1,
     http = 2,
     mqtt = 3,
     coap = 4,
+    // Secured schemes
     https = 2 + 16,
     mqtts = 3 + 16,
     coaps = 4 + 16,
@@ -96,12 +98,13 @@ pub const schemes = enum(u32) {
 };
 
 ctx: network_ctx,
+proto: protocol,
 id: connection_id,
 ssl: mbedtls,
 
 pub fn init(id: connection_id, credential_callback: ?mbedtls.credential_callback_fn, custom_ssl_init: ?mbedtls.custom_init_callback_fn) @This() {
     // Think about how to rewrite this for non-ssl connections
-    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .ssl = mbedtls.create(credential_callback, custom_ssl_init) };
+    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .proto = undefined, .ssl = mbedtls.create(credential_callback, custom_ssl_init) };
 }
 
 pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol, mode: ?security_mode) !void {
@@ -114,16 +117,24 @@ pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol,
 
 /// Create a connection to a host
 pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
-    if (proto.isSecure()) {
-        _ = try self.ssl.init(self, proto, mode.?);
+    self.proto = proto;
+
+    if (self.proto.isSecure()) {
+        _ = try self.ssl.init(self, self.proto, mode.?);
     }
 
-    if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(proto)))) {
+    if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(self.proto)))) {
         return connection_error.create_error;
     }
 }
 
 pub fn close(self: *@This()) !void {
+    defer {
+        if (self.proto.isSecure()) {
+            _ = self.ssl.deinit();
+        }
+    }
+
     if (0 != c.miso_close_network_connection(self.ctx)) {
         return connection_error.close_error;
     }
