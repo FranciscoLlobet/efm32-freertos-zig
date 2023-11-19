@@ -21,7 +21,6 @@
 
 typedef int (*_network_send_fn)(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 typedef int (*_network_read_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
-typedef int (*_network_close_fn)(miso_network_ctx_t ctx);
 
 struct miso_sockets_s
 {
@@ -30,7 +29,6 @@ struct miso_sockets_s
 
 	_network_send_fn send_fn;	/* Send function for the protocol */
 	_network_read_fn read_fn;	/* Read function for the protocol */
-	_network_close_fn close_fn; /* Close function for the protocol */
 
 	/* Wait deadlines */
 	uint32_t rx_wait_deadline_s; /* Deadline for rx (in s) */
@@ -50,7 +48,7 @@ struct miso_sockets_s
 
 	mbedtls_ssl_context *ssl_context; /* Optional SSL context */
 	// ssl connect callback
-	int (*ssl_cleanup)(mbedtls_ssl_context *ssl); // optional SSL cleanup function
+	//int (*ssl_cleanup)(mbedtls_ssl_context *ssl); // optional SSL cleanup function
 
 	uint32_t last_send_time; // Last time we sent a packet
 	uint32_t last_recv_time; // Last time we received a packet
@@ -641,22 +639,18 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, siz
 	case miso_protocol_udp_ip4:
 		ctx->read_fn = _recv_bio_udp;
 		ctx->send_fn = _send_udp;
-		ctx->close_fn = _network_close;
 		break;
 	case miso_protocol_tcp_ip4:
 		ctx->read_fn = _read_tcp;
 		ctx->send_fn = _send_tcp;
-		ctx->close_fn = _network_close;
 		break;
 	case miso_protocol_dtls_ip4:
 		ctx->read_fn = _read_dtls;
 		ctx->send_fn = _send_dtls;
-		ctx->close_fn = NULL;
 		break;
 	case miso_protocol_tls_ip4:
 		ctx->read_fn = _read_tls;
 		ctx->send_fn = _send_tls;
-		ctx->close_fn = NULL;
 		break;
 	default:
 		break;
