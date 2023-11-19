@@ -9,23 +9,27 @@ pub const c = @cImport({
 });
 
 pub const BaseType_t = c.BaseType_t;
-pub const TaskFunction_t = c.TaskFunction_t;
 pub const UBaseType_t = c.UBaseType_t;
+pub const TickType_t = c.TickType_t;
+
+//  General handle types
 pub const TaskHandle_t = c.TaskHandle_t;
 pub const QueueHandle_t = c.QueueHandle_t;
 pub const SemaphoreHandle_t = c.SemaphoreHandle_t;
 pub const TimerHandle_t = c.TimerHandle_t;
-pub const TickType_t = c.TickType_t;
-pub const PendedFunction_t = c.PendedFunction_t;
-pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
 pub const MessageBufferHandle_t = c.MessageBufferHandle_t;
+
+pub const PendedFunction_t = c.PendedFunction_t;
+pub const TaskFunction_t = c.TaskFunction_t;
+pub const TimerCallbackFunction_t = c.TimerCallbackFunction_t;
+
+// Static types
 pub const StaticStreamBuffer_t = c.StaticStreamBuffer_t;
-
+pub const StaticTimer_t = c.StaticTimer_t;
 pub const StaticTask_t = c.StaticTask_t;
-pub const StackType_t = c.StackType_t;
+pub const StaticSemaphore_t = c.StaticSemaphore_t;
 
-pub const portMAX_DELAY = c.portMAX_DELAY;
-pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
+pub const StackType_t = c.StackType_t;
 
 // Common FreeRTOS constants
 pub const pdPASS = c.pdPASS;
@@ -33,6 +37,9 @@ pub const pdFAIL = c.pdFAIL;
 
 pub const pdTRUE = c.pdTRUE;
 pub const pdFALSE = c.pdFALSE;
+
+pub const portMAX_DELAY = c.portMAX_DELAY;
+pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
 
 // Scheduler State
 const eTaskSchedulerState = enum(BaseType_t) { taskSCHEDULER_NOT_STARTED = c.taskSCHEDULER_NOT_STARTED, taskSCHEDULER_SUSPENDED = c.taskSCHEDULER_SUSPENDED, taskSCHEDULER_RUNNING = c.taskSCHEDULER_RUNNING };
@@ -113,9 +120,7 @@ pub fn StaticTask(comptime stackSize: usize) type {
         task: Task = undefined,
 
         pub fn create(self: *@This(), comptime pxTaskCode: TaskFunction_t, comptime pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
-            self.task = Task.initFromHandle(c.xTaskCreateStatic(pxTaskCode, pcName, self.stack.len, @ptrCast(@alignCast(pvParameters)), uxPriority, &self.stack[0], &self.staticTask));
-
-            return if (self.task.handle == null) FreeRtosError.TaskCreationFailed;
+            self.task = try Task.createStatic(pxTaskCode, pcName, pvParameters, uxPriority, self.stack[0..], &self.staticTask);
         }
         pub fn resumeTask(self: *const @This()) void {
             self.task.resumeTask();
@@ -165,6 +170,12 @@ pub const Task = struct {
 
         return if (pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) self else FreeRtosError.TaskCreationFailed;
     }
+    pub fn createStatic(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t, stack: []StackType_t, pxTaskBuffer: *StaticTask_t) !@This() {
+        var self = @This(){ .handle = c.xTaskCreateStatic(pxTaskCode, pcName, stack.len, pvParameters, uxPriority, stack.ptr, pxTaskBuffer) };
+
+        return if (self.handle == null) FreeRtosError.TaskCreationFailed else self;
+    }
+
     pub fn setHandle(self: *const @This(), handle: TaskHandle_t) !void {
         if (self.handle != undefined) {
             self.handle = handle;
@@ -229,17 +240,15 @@ pub const Semaphore = struct {
     /// Create a binary Semaphore
     pub fn createBinary() !@This() {
         const self = @This(){ .handle = c.xSemaphoreCreateBinary() };
-        if (self.handle == null) {
-            return FreeRtosError.SemaphoreCreationFailed;
-        }
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
 
     /// Create a counting semaphore
-    pub fn createCountingSemaphore(self: *@This(), uxMaxCount: u32, uxInitialCount: u32) !void {
-        self.handle = c.xSemaphoreCreateCounting(uxMaxCount, uxInitialCount);
-        if (self.handle == null) {
-            return FreeRtosError.SemaphoreCreationFailed;
-        }
+    pub fn createCountingSemaphore(uxMaxCount: u32, uxInitialCount: u32) !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateCounting(uxMaxCount, uxInitialCount) };
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
 
     /// Create a mutex
@@ -274,11 +283,7 @@ pub const Mutex = struct {
     semaphore: Semaphore = undefined,
 
     pub fn create() !@This() {
-        var self: @This() = undefined;
-
-        self.semaphore = try Semaphore.createMutex();
-
-        return self;
+        return @This(){ .semaphore = try Semaphore.createMutex() };
     }
 
     pub fn take(self: *const @This(), xTicksToWait: ?TickType_t) !bool {
@@ -294,6 +299,13 @@ pub const Mutex = struct {
     }
 };
 
+pub fn StaticTimer() type {
+    return struct {
+        timer: Timer = undefined,
+        staticTimer: StaticTimer_t = undefined,
+    };
+}
+
 /// Timer
 pub const Timer = struct {
     handle: TimerHandle_t = undefined,
@@ -306,6 +318,12 @@ pub const Timer = struct {
     /// Create a FreeRTOS timer
     pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
         var self: @This() = .{ .handle = c.xTimerCreate(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction) };
+
+        return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
+    }
+
+    pub fn createStatic(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t, pxTimerBuffer: *StaticTimer_t) !@This() {
+        var self: @This() = .{ .handle = c.xTimerCreateStatic(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction, pxTimerBuffer) };
 
         return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
     }
