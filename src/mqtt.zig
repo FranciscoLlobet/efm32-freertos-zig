@@ -731,8 +731,11 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (true) {
         var uri = std.Uri.parse(self.uri_string[0..c.strlen(self.uri_string)]) catch unreachable;
 
-        self.loop(uri) catch {
-            _ = c.printf("Disconnected... reconnect: %d \r\n", self.connectionCounter);
+        self.loop(uri) catch |err| {
+            if (err == connection.connection_error.create_error) {
+                self.task.delayTask(1000);
+            }
+            _ = c.printf("Disconnected... reconnect: %d. %d \r\n", self.connectionCounter, @intFromError(err));
         };
     }
 
@@ -784,11 +787,12 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
     var packetId: u16 = 0;
 
     self.connectionCounter += 1;
-
-    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.match(uri.scheme).?.getProtocol(), .psk);
     errdefer {
+        self.state = .err;
         self.connection.close() catch {};
     }
+
+    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.match(uri.scheme).?.getProtocol(), .psk);
 
     _ = try self.packet.prepareConnectPacket(self.device_id[0..c.strlen(self.device_id)], null, null);
 
@@ -825,22 +829,17 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
     self.state = .connected;
     self.pingTimer.changePeriod(60000, null) catch unreachable;
     self.pubTimer.start(null) catch unreachable;
-
-    errdefer {
-        self.state = .err;
-    }
 }
 
 pub fn disconnect(self: *@This()) !void {
     self.pingTimer.stop(null) catch {};
-
-    _ = try self.packet.prepareDisconnectPacket();
-    try self.processSendQueue();
-
     defer {
         self.connection.close() catch {};
         self.disconnectionCounter += 1;
     }
+
+    _ = try self.packet.prepareDisconnectPacket();
+    try self.processSendQueue();
 }
 
 pub fn resumeTask(self: *@This()) void {

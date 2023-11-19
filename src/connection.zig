@@ -11,11 +11,20 @@ const c = @cImport({
     @cInclude("lwm2m_client.h");
 });
 
-const connection_error = error{
+pub const connection_error = error{
+    /// Create Connection Error
+    /// Could not create a connection to the host
     create_error,
+
+    /// SSL Init error
+    ssl_init_error,
+
     close_error,
+
     send_error,
+
     recieve_error,
+
     buffer_owerflow,
 };
 
@@ -116,11 +125,14 @@ pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol,
 }
 
 /// Create a connection to a host
+///
 pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
     self.proto = proto;
 
     if (self.proto.isSecure()) {
-        _ = try self.ssl.init(self, self.proto, mode.?);
+        _ = self.ssl.init(self, self.proto, mode.?) catch {
+            return connection_error.ssl_init_error;
+        };
     }
 
     if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(self.proto)))) {
