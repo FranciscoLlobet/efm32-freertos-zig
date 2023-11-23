@@ -115,9 +115,9 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
 /// Create a Static Task
 pub fn StaticTask(comptime stackSize: usize) type {
     return struct {
+        task: Task = undefined,
         stack: [stackSize]StackType_t = undefined,
         staticTask: StaticTask_t = undefined,
-        task: Task = undefined,
 
         pub fn create(self: *@This(), comptime pxTaskCode: TaskFunction_t, comptime pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
             self.task = try Task.createStatic(pxTaskCode, pcName, pvParameters, uxPriority, self.stack[0..], &self.staticTask);
@@ -209,8 +209,11 @@ pub const Task = struct {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
 
-    /// Wait for notification to task.
-    ///  Returns the notification value if the task was notified, null otherwise
+    /// Wait for notification.
+    /// This function can only be called from the same task that is waiting for the notification in order to avoid concurrency issues.
+    /// Returns error if task object is not the current task
+    /// Returns the notification value if the notification was received or null if no notification was received
+    /// If xTicksToWait is null, the function will wait indefinitely for the notification
     pub fn waitForNotify(self: *const @This(), ulBitsToClearOnEntry: u32, ulBitsToClearOnExit: u32, xTicksToWait: ?TickType_t) !?u32 {
         var pulNotificationValue: u32 = undefined;
 
