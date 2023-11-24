@@ -37,3 +37,6 @@
 [submodule "csrc/connectivity/picohttpparser"]
 	path = csrc/connectivity/picohttpparser
 	url = https://github.com/FranciscoLlobet/picohttpparser.git
+[submodule "csrc/mcuboot/mcuboot"]
+	path = csrc/mcuboot/mcuboot
+	url = https://github.com/mcu-tools/mcuboot.git
