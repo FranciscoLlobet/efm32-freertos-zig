@@ -12,6 +12,7 @@ const build_mbedts = @import("build_mbedtls.zig");
 const build_wakaama = @import("build_wakaama.zig");
 const build_mqtt = @import("build_mqtt.zig");
 const build_picohttpparser = @import("build_picohttpparser.zig");
+const build_mcuboot = @import("build_mcuboot.zig");
 const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) !void {
@@ -99,7 +100,7 @@ pub fn build(b: *std.Build) !void {
     build_wakaama.aggregate(firmware);
     build_mqtt.aggregate(firmware);
     build_picohttpparser.aggregate(firmware);
-
+    build_mcuboot.aggregate(firmware);
     microzig.installFirmware(b, firmware, .{});
     microzig.installFirmware(b, firmware, .{ .format = .bin });
 }
