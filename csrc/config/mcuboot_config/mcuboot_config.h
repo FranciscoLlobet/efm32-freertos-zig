@@ -8,6 +8,8 @@
 #ifndef __MCUBOOT_CONFIG_H__
 #define __MCUBOOT_CONFIG_H__
 
+#include <miso_mbedtls_config.h>
+
 /*
  * Template configuration file for MCUboot.
  *
@@ -155,5 +157,7 @@
 #define MCUBOOT_CPU_IDLE() \
     do {                   \
     } while (0)
+
+
 
 #endif /* __MCUBOOT_CONFIG_H__ */
