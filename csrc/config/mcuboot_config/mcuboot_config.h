@@ -122,7 +122,9 @@
  *
  *    MCUBOOT_LOG_ERR > MCUBOOT_LOG_WRN > MCUBOOT_LOG_INF > MCUBOOT_LOG_DBG
  */
-#define MCUBOOT_HAVE_LOGGING 1
+#ifdef MCUBOOT_HAVE_LOGGING
+#undef MCUBOOT_HAVE_LOGGING
+#endif
 
 /*
  * Assertions
@@ -141,10 +143,8 @@
  * doing a swap upgrade and the time it takes for a swapping is long enough
  * to cause an unwanted reset. If implementing this, the OS main.c must also
  * enable the watchdog (if required)!
- *
- * #define MCUBOOT_WATCHDOG_FEED()
- *    do { do watchdog feeding here! } while (0)
  */
+ #define MCUBOOT_WATCHDOG_FEED()  do{}while(0)
 
 /* If a OS ports support single thread mode or is bare-metal then:
  * This macro implements call that switches CPU to an idle state, from which
