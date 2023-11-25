@@ -9,10 +9,28 @@ fn get_root_path() []const u8 {
 
 const build_root_path = get_root_path();
 
+/// Number of bytes in a kilobyte.
 const KiB: usize = 1024;
 
-pub const efm32gg390f1024 = .{ .name = "EFM32GG390F1024", .cpu = .cortex_m3, .memory_regions = &.{
-    .{ .offset = 0x00000000, .length = (1024 * KiB) - (16 * 4096), .kind = .flash },
-    .{ .offset = 0x000F0000, .length = (16 * 4 * KiB), .kind = .reserved },
-    .{ .offset = 0x20000000, .length = 128 * KiB, .kind = .ram },
-}, .register_definition = .{ .svd = .{ .cwd_relative = build_root_path ++ "/chips/EFM32GG390F1024.svd" } } };
+/// Size of the NVM3 region in bytes.
+const NVM3_SIZE: usize = 64 * KiB;
+
+/// Size of the RAM region in bytes.
+const RAM_SIZE: usize = 128 * KiB;
+
+/// Size of the flash region in bytes.
+const FLASH_SIZE: usize = 1024 * KiB;
+
+/// Size of the available flash region in bytes.
+const FLASH_AVAILABLE_SIZE: usize = FLASH_SIZE - NVM3_SIZE;
+
+pub const efm32gg390f1024 = .{
+    .name = "EFM32GG390F1024",
+    .cpu = .cortex_m3,
+    .memory_regions = &.{
+        .{ .offset = 0x00000000, .length = FLASH_AVAILABLE_SIZE, .kind = .flash }, // Main Application
+        .{ .offset = FLASH_AVAILABLE_SIZE, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
+        .{ .offset = 0x20000000, .length = RAM_SIZE, .kind = .ram }, // RAM
+    },
+    .register_definition = .{ .svd = .{ .cwd_relative = build_root_path ++ "/chips/EFM32GG390F1024.svd" } },
+};

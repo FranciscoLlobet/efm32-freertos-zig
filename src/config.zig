@@ -85,7 +85,7 @@ fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) !void {
     var key_file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
     defer key_file.close() catch {};
 
-    const key = try allocator.alloc(u8, key_file.size() + 1);
+    const key = try allocator.alloc(u8, key_file.size());
     defer allocator.free(key);
 
     @memset(key, 0);

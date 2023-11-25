@@ -65,6 +65,9 @@
         "ecdsa.h": "c",
         "mbedtls_config.h": "c",
         "bootutil.h": "c",
-        "fault_injection_hardening.h": "c"
+        "fault_injection_hardening.h": "c",
+        "bootutil_priv.h": "c",
+        "private_access.h": "c",
+        "miso_mbedtls_config.h": "c"
     }
 }
