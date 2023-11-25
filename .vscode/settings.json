@@ -55,6 +55,16 @@
         "em_rmu.h": "c",
         "osi.h": "c",
         "em_usbxpress_internal.h": "c",
-        "em_usb.h": "c"
+        "em_usb.h": "c",
+        "mcuboot_config.h": "c",
+        "sha.h": "c",
+        "asn1.h": "c",
+        "sign_key.h": "c",
+        "oid.h": "c",
+        "pk.h": "c",
+        "ecdsa.h": "c",
+        "mbedtls_config.h": "c",
+        "bootutil.h": "c",
+        "fault_injection_hardening.h": "c"
     }
 }
