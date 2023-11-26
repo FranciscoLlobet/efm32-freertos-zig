@@ -44,31 +44,7 @@ export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticT
 }
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
-
-    leds.red.on();
-
-    board.msDelay(500);
-
-    leds.orange.on();
-
-    board.msDelay(500);
-
-    leds.yellow.on();
-
-    board.msDelay(500);
-
-    leds.red.off();
-
-    board.msDelay(500);
-
-    leds.orange.off();
-
-    board.msDelay(500);
-
-    leds.yellow.off();
-
-    board.watchdogEnable();
+    appStart();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -217,24 +193,6 @@ pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
     user.user_task.task.notify(event, .eSetBits) catch {};
 }
 
-pub export fn main() void {
-    board.init();
-
-    const appCounter = nvm.incrementAppCounter() catch 0;
-
-    user.user_task.create();
-
-    sensors.service.init() catch unreachable;
-
-    network.start();
-
-    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
-
-    freertos.vTaskStartScheduler();
-
-    unreachable;
-}
-
 /// Mini heap used for sbrk. Mainly used by printf()
 var mini_heap: [1050]u8 align(@alignOf(u32)) = undefined;
 var heap_end align(@alignOf(u32)) = &mini_heap[0];
@@ -256,4 +214,51 @@ pub export fn _sbrk(inc: isize) callconv(.C) ?*anyopaque {
     heap_end = @ptrFromInt(@as(usize, @intCast(new_heap_end)));
 
     return @as(*anyopaque, @ptrCast(@as(@TypeOf(heap_end), @ptrFromInt(@as(usize, @intCast(prev_heap_end))))));
+}
+
+/// Application entry point
+pub export fn main() void {
+    board.init();
+
+    const appCounter = nvm.incrementAppCounter() catch 0;
+
+    user.user_task.create();
+
+    sensors.service.init() catch unreachable;
+
+    network.start();
+
+    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
+
+    freertos.vTaskStartScheduler();
+
+    unreachable;
+}
+
+pub export fn appStart() void {
+    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
+
+    leds.red.on();
+
+    board.msDelay(500);
+
+    leds.orange.on();
+
+    board.msDelay(500);
+
+    leds.yellow.on();
+
+    board.msDelay(500);
+
+    leds.red.off();
+
+    board.msDelay(500);
+
+    leds.orange.off();
+
+    board.msDelay(500);
+
+    leds.yellow.off();
+
+    board.watchdogEnable();
 }
