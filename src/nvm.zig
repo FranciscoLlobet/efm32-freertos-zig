@@ -101,7 +101,7 @@ const nvm_size_in_bytes: usize = 16 * 4096;
 const nvm_initial_address: c.nvm3_HalPtr_t = @ptrFromInt(0x000F0000); // 1024*1024 - 16*4096
 
 /// NVM3 initial configuration
-pub const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = nvm_initial_address, .nvmSize = nvm_size_in_bytes, .cachePtr = &cache, .cacheEntryCount = cache.len, .maxObjectSize = max_object_size, .repackHeadroom = 0, .halHandle = &c.nvm3_halFlashHandle };
+pub export const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = nvm_initial_address, .nvmSize = nvm_size_in_bytes, .cachePtr = &cache, .cacheEntryCount = cache.len, .maxObjectSize = max_object_size, .repackHeadroom = 0, .halHandle = &c.nvm3_halFlashHandle };
 
 /// NVM3 cache
 var cache: [cache_len]c.nvm3_CacheEntry_t align(@alignOf(u32)) = undefined;
@@ -164,6 +164,7 @@ pub fn readData(key: app_nvm_keys, buffer: []u8) ![]u8 {
     }
 
     try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), buffer.ptr, len));
+
     return buffer[0..len];
 }
 
@@ -180,7 +181,6 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
 }
 
 /// Write data into NVM using Zig slices
-///
 pub fn writeData(key: app_nvm_keys, value: []const u8) !void {
     try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), @ptrCast(value), value.len));
 }

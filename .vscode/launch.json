@@ -7,7 +7,24 @@
         {
             "cwd": "${workspaceRoot}",
             "executable": "${workspaceRoot}/zig-out/firmware/miso.elf",
-            "name": "Debug Microcontroller",
+            "name": "Boot",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "jlink",
+            "serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
+            "armToolchainPath": "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\bin",
+            "device": "EFM32GG390F1024",
+            "interface": "swd",
+            "runToEntryPoint": "ResetHandler"
+            "serialNumber": "", // add J-Link serial number if having multiple attached the same time.
+            "svdFile": "${workspaceRoot}/src/chips/EFM32GG390F1024.svd",
+            "rtos": "FreeRTOS",
+            "swoConfig": { "cpuFrequency": 48000000, "swoFrequency": 875000, "enabled": true, "source": "socket", "decoders": [{"port": 0, "type": "console", "encoding": "ascii", "label": "Output"}]},
+        },
+        {
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/zig-out/firmware/app.elf",
+            "name": "Main Application",
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "jlink",

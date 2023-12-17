@@ -75,11 +75,11 @@ pub inline fn vTaskStartScheduler() noreturn {
 }
 
 /// Get current scheduler state
-pub fn xTaskGetSchedulerState() eTaskSchedulerState {
+pub inline fn xTaskGetSchedulerState() eTaskSchedulerState {
     return @enumFromInt(c.xTaskGetSchedulerState());
 }
 
-pub fn xTaskGetCurrentTaskHandle() TaskHandle_t {
+pub inline fn xTaskGetCurrentTaskHandle() TaskHandle_t {
     return c.xTaskGetCurrentTaskHandle();
 }
 
@@ -108,8 +108,9 @@ pub inline fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
     }
 }
 
-pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: ?TickType_t) bool {
-    return (pdTRUE == c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY));
+/// Pend function call to the timer service task
+pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?*anyopaque, ulParameter2: u32, xTicksToWait: ?TickType_t) !void {
+    if (pdTRUE != c.xTimerPendFunctionCall(xFunctionToPend, pvParameter1, ulParameter2, xTicksToWait orelse portMAX_DELAY)) return FreeRtosError.pdFAIL;
 }
 
 /// Create a Static Task

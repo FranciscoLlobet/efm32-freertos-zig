@@ -2,16 +2,17 @@ const std = @import("std");
 const microzig = @import("microzig");
 const freertos = @import("freertos.zig");
 const system = @import("system.zig");
-const sensors = @import("sensors.zig");
-const network = @import("network.zig");
+//const sensors = @import("sensors.zig");
+//const network = @import("network.zig");
 const config = @import("config.zig");
 const leds = @import("leds.zig");
 const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
-const user = @import("user.zig");
-const events = @import("events.zig");
+//const user = @import("user.zig");
+//const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
+const boot_app = @import("boot_app.zig");
 
 const c = @cImport({
     @cInclude("board.h");
@@ -190,10 +191,6 @@ pub export fn system_reset() callconv(.C) void {
     system.reset();
 }
 
-pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
-    user.user_task.task.notify(event, .eSetBits) catch {};
-}
-
 /// Mini heap used for sbrk. Mainly used by printf()
 var mini_heap: [1050]u8 align(@alignOf(u32)) = undefined;
 var heap_end align(@alignOf(u32)) = &mini_heap[0];
@@ -223,13 +220,11 @@ pub export fn main() noreturn {
 
     const appCounter = nvm.incrementAppCounter() catch 0;
 
-    user.user_task.create();
+    _ = c.printf("--- BOOT starting FreeRTOS %d---\n\r", appCounter);
 
-    sensors.service.init() catch unreachable;
+    boot_app.boot_app.init();
 
-    network.start();
-
-    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
+    // boot_app.prepareJump();
 
     // Start the FreeRTOS scheduler
     freertos.vTaskStartScheduler();
@@ -262,5 +257,7 @@ pub export fn appStart() void {
 
     leds.yellow.off();
 
-    board.watchdogEnable();
+    boot_app.boot_app.task.resumeTask();
+
+    // board.watchdogEnable();
 }

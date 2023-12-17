@@ -147,7 +147,7 @@ void BOARD_Init(void)
 	/* Initialize SPI peripherals */
 	BOARD_SD_Card_Init();
 	Board_CC3100_Init();
-	BOARD_EM9301_Init;
+	BOARD_EM9301_Init();
 
 	/* Initialize I2C peripheral */
 	board_i2c_init();
@@ -185,6 +185,28 @@ void BOARD_MCU_Reset(void)
 
 	/* Disable the IRQs that may interfere now */
 	__disable_irq();
+
+	// Disable all interrupts
+	NVIC->ICER[0] = 0xFFFFFFFF;
+	NVIC->ICER[1] = 0xFFFFFFFF;
+	NVIC->ICER[2] = 0xFFFFFFFF;
+	NVIC->ICER[3] = 0xFFFFFFFF;
+	NVIC->ICER[4] = 0xFFFFFFFF;
+	NVIC->ICER[5] = 0xFFFFFFFF;
+	NVIC->ICER[6] = 0xFFFFFFFF;
+	NVIC->ICER[7] = 0xFFFFFFFF;
+
+	// Clear all pending interrupts
+	NVIC->ICPR[0] = 0xFFFFFFFF;
+	NVIC->ICPR[1] = 0xFFFFFFFF;
+	NVIC->ICPR[2] = 0xFFFFFFFF;
+	NVIC->ICPR[3] = 0xFFFFFFFF;
+	NVIC->ICPR[4] = 0xFFFFFFFF;
+	NVIC->ICPR[5] = 0xFFFFFFFF;
+	NVIC->ICPR[6] = 0xFFFFFFFF;
+	NVIC->ICPR[7] = 0xFFFFFFFF;
+
+	BOARD_SysTick_Disable();
 
 	/* Data Synch Barrier */
 	__DSB();
@@ -224,3 +246,88 @@ int _gettimeofday(struct timeval* ptimeval, void * ptimezone)
 
 	return 0;
 }
+
+__attribute__( (naked, noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH) {
+  __asm("MSR      MSP,r0");
+  __asm("BX       r1");
+}
+
+typedef void (*jumpFunction)(void);
+
+
+struct vector_table {
+	uint32_t msp;
+	uint32_t reset;
+};
+
+__attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr)
+{
+	struct vector_table * vt = (struct vector_table *) addr;
+
+	BOARD_USB_Deinit();
+
+	__DSB();
+	__ISB();
+
+
+
+	jumpFunction jumpToApplication = (jumpFunction)vt->reset;
+
+	// Set to privileged mode
+	if( CONTROL_nPRIV_Msk & __get_CONTROL( ) )
+	{
+		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_nPRIV_Msk );
+	}
+
+	__ISB();
+	__disable_irq();
+
+   // Disable and clear NVIC interrupts
+    for (uint32_t i = 0; i < 8; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFF;
+        NVIC->ICPR[i] = 0xFFFFFFFF;
+    }
+
+	__DSB();
+	__ISB();
+
+	// Disable the SysTick
+	SysTick->CTRL = 0 ;
+	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk ;
+
+	// Disable all Faultmasks
+	SCB->SHCSR &= ~( SCB_SHCSR_USGFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_MEMFAULTENA_Msk ) ;
+
+	if( CONTROL_SPSEL_Msk & __get_CONTROL( ) )
+	{  /* MSP is not active */
+  		__set_MSP( __get_PSP( ) ) ;
+  		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_SPSEL_Msk ) ;
+	}
+
+
+	//__enable_irq();
+
+	
+	SCB->VTOR = ( uint32_t )vt;
+	
+	__set_MSP(vt->msp);
+	//__set_CONTROL(0x00);
+
+	//__ISB();
+
+	jumpToApplication();
+	
+	//BootJumpASM(addr[0], addr[1]);
+
+	while(1);
+
+    // Inline assembly to jump to new address
+    asm volatile (
+        "MSR MSP, %0\n\t"    // Load addr[0] into MSP
+        "BX %1\n\t"          // Jump to addr[1]
+        :
+        : "r" (addr[0]), "r" (addr[1])
+        : 
+    );
+}
+

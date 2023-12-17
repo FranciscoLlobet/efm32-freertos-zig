@@ -26,6 +26,9 @@ pub const enable_lwm2m = false;
 pub const enable_mqtt = true;
 pub const enable_http = true;
 
+pub const rtos_prio_boot_app = @intFromEnum(task_priorities.rtos_prio_highest);
+
+// SENSOR TASK
 pub const rtos_prio_sensor = @intFromEnum(task_priorities.rtos_prio_low);
 pub const rtos_stack_depth_sensor: u16 = 440;
 

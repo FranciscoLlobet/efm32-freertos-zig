@@ -5,7 +5,7 @@ const leds = @import("leds.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
 
-const max_reset_delay: freertos.TickType_t = 2000;
+const max_reset_delay: freertos.TickType_t = 5000;
 
 pub const time = struct {
     /// Get current time in seconds
@@ -37,12 +37,14 @@ fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     freertos.c.taskENTER_CRITICAL();
 
     board.mcuReset();
+
+    unreachable;
 }
 
 pub fn reset() void {
-    if (!freertos.xTimerPendFunctionCall(performReset, null, 0, freertos.portMAX_DELAY)) {
+    freertos.xTimerPendFunctionCall(performReset, null, 0, max_reset_delay) catch {
         performReset(null, 0);
-    }
+    };
 }
 
 pub fn shutdown() void {
