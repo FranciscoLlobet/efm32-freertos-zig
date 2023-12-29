@@ -16,7 +16,7 @@ const nvm = @import("nvm.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
-    @cInclude("sl_simple_led.h");
+    // @cInclude("sl_simple_led.h");
     @cInclude("miso_config.h");
 });
 
@@ -155,36 +155,6 @@ pub const microzig_options = struct {
     };
 };
 
-// Button On-Change Callback
-pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
-    const instance = buttons.getInstance(handle);
-    const state = instance.getState();
-    switch (instance.getName()) {
-        .button1 => {
-            switch (state) {
-                .pressed => {
-                    leds.red.on();
-                },
-                .released => {
-                    leds.red.off();
-                },
-                else => {},
-            }
-        },
-        .button2 => {
-            switch (state) {
-                .pressed => {
-                    leds.orange.on();
-                },
-                .released => {
-                    leds.orange.off();
-                },
-                else => {},
-            }
-        },
-    }
-}
-
 pub export fn SVC7_Handler() callconv(.Naked) void {
     asm volatile (
         \\nop
@@ -247,8 +217,40 @@ pub export fn appStart() void {
     board.watchdogEnable();
 }
 
+// Initialisation of the C runtime.
+
 extern fn __libc_init_array() callconv(.C) void;
 
 pub export fn init() void {
     __libc_init_array();
+}
+
+// Button On-Change Callback
+pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
+    const instance = buttons.getInstance(handle);
+    const state = instance.getState();
+    switch (instance.getName()) {
+        .button1 => {
+            switch (state) {
+                .pressed => {
+                    leds.red.on();
+                },
+                .released => {
+                    leds.red.off();
+                },
+                else => {},
+            }
+        },
+        .button2 => {
+            switch (state) {
+                .pressed => {
+                    leds.orange.on();
+                },
+                .released => {
+                    leds.orange.off();
+                },
+                else => {},
+            }
+        },
+    }
 }

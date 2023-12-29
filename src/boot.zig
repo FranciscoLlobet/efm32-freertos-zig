@@ -17,7 +17,6 @@ const boot_app = @import("boot_app.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
-    @cInclude("sl_simple_led.h");
     @cInclude("miso_config.h");
 });
 
@@ -160,61 +159,8 @@ pub export fn SVC7_Handler() callconv(.C) void {
     //microzig.cpu.regs.CONTROL.modify(.{ .nPRIV = 0 });
 }
 
-// Button On-Change Callback
-pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
-    const instance = buttons.getInstance(handle);
-    const state = instance.getState();
-    switch (instance.getName()) {
-        .button1 => {
-            switch (state) {
-                .pressed => {
-                    leds.red.on();
-                },
-                .released => {
-                    leds.red.off();
-                },
-                else => {},
-            }
-        },
-        .button2 => {
-            switch (state) {
-                .pressed => {
-                    leds.orange.on();
-                },
-                .released => {
-                    leds.orange.off();
-                },
-                else => {},
-            }
-        },
-    }
-}
-
 pub export fn system_reset() callconv(.C) void {
     system.reset();
-}
-
-/// Mini heap used for sbrk. Mainly used by printf()
-var mini_heap: [1050]u8 align(@alignOf(u32)) = undefined;
-var heap_end align(@alignOf(u32)) = &mini_heap[0];
-
-/// Current Zig-based implementation of the sbrk() function
-pub export fn _sbrk(inc: isize) callconv(.C) ?*anyopaque {
-    if (heap_end == undefined) {
-        heap_end = &mini_heap[0];
-    }
-
-    const prev_heap_end: isize = @intCast(@intFromPtr(heap_end));
-    const new_heap_end: isize = prev_heap_end + inc;
-
-    if (new_heap_end > @as(isize, @intCast(@intFromPtr(&mini_heap[mini_heap.len - 1])))) {
-        return null;
-    }
-
-    // Update the heap end
-    heap_end = @ptrFromInt(@as(usize, @intCast(new_heap_end)));
-
-    return @as(*anyopaque, @ptrCast(@as(@TypeOf(heap_end), @ptrFromInt(@as(usize, @intCast(prev_heap_end))))));
 }
 
 /// Application entry point
@@ -263,4 +209,41 @@ pub export fn appStart() void {
     boot_app.boot_app.task.resumeTask();
 
     // board.watchdogEnable();
+}
+
+// Initialisation of the C runtime.
+extern fn __libc_init_array() callconv(.C) void;
+
+pub export fn init() void {
+    __libc_init_array();
+}
+
+// Button On-Change Callback
+pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
+    const instance = buttons.getInstance(handle);
+    const state = instance.getState();
+    switch (instance.getName()) {
+        .button1 => {
+            switch (state) {
+                .pressed => {
+                    leds.red.on();
+                },
+                .released => {
+                    leds.red.off();
+                },
+                else => {},
+            }
+        },
+        .button2 => {
+            switch (state) {
+                .pressed => {
+                    leds.orange.on();
+                },
+                .released => {
+                    leds.orange.off();
+                },
+                else => {},
+            }
+        },
+    }
 }

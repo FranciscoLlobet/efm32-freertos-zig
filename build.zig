@@ -67,14 +67,22 @@ pub fn build(b: *std.Build) !void {
 
     const bootloader_target = .{
         .name = "miso",
-        .target = .{ .preferred_format = .elf, .chip = chips.bootloader, .board = boards.xdk110 },
+        .target = .{
+            .preferred_format = .elf,
+            .chip = chips.bootloader,
+            .board = boards.xdk110,
+        },
         .optimize = optimize,
         .source_file = .{ .path = "src/main.zig" },
     };
 
     const application_target = .{
         .name = "app",
-        .target = .{ .preferred_format = .elf, .chip = chips.application, .board = boards.xdk110 },
+        .target = .{
+            .preferred_format = .elf,
+            .chip = chips.application,
+            .board = boards.xdk110,
+        },
         .optimize = optimize,
         .source_file = .{ .path = "src/main.zig" },
     };

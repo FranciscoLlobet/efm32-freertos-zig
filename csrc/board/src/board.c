@@ -362,3 +362,15 @@ static FILE __stdio = FDEV_SETUP_STREAM(miso_putc, miso_getc, miso_flush, _FDEV_
 FILE *const stdin = &__stdio;
 STDIO_ALIAS(stdout);
 STDIO_ALIAS(stderr);
+
+int write(int handle, const unsigned char * buffer, size_t size)
+{
+	(void)handle;
+
+	for (size_t i = 0; i < size; i++)
+	{
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, buffer[i]);
+	}
+
+	return size;
+}
