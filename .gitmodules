@@ -43,3 +43,6 @@
 [submodule "csrc/mcuboot/mcuboot"]
 	path = csrc/mcuboot/mcuboot
 	url = https://github.com/FranciscoLlobet/mcuboot.git
+[submodule "csrc/picolibc"]
+	path = csrc/picolibc
+	url = git@github.com:FranciscoLlobet/picolibc.git
