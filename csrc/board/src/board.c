@@ -226,9 +226,9 @@ uint32_t BOARD_MCU_GetResetCause(void)
 #include <sys/time.h>
 // Gets called by time()
 
-extern int _gettimeofday(struct timeval* ptimeval, void * ptimezone);
+extern int gettimeofday(struct timeval* ptimeval, void * ptimezone);
 /* implementing system time */
-int _gettimeofday(struct timeval* ptimeval, void * ptimezone)
+int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 {
 	struct timezone * timezone_ptr = (struct timezone * )ptimezone;
 
@@ -247,36 +247,34 @@ int _gettimeofday(struct timeval* ptimeval, void * ptimezone)
 	return 0;
 }
 
-__attribute__( (naked, noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH) {
+__attribute__( (naked, noreturn, section(".ramfunc"))) void BootJumpASM(uint32_t SP, uint32_t PC) {
   __asm("MSR      MSP,r0");
-  __asm("BX       r1");
-}
+  __asm("MSR	  PSP,r0");
+  __asm("MOV      PC,r1");
+};
 
 typedef void (*jumpFunction)(void);
 
 
-struct vector_table {
+__attribute__((packed)) struct vector_table {
 	uint32_t msp;
 	uint32_t reset;
 };
 
-__attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr)
+ __attribute__((noreturn, section(".ramfunc"))) void BOARD_JumpToAddress(uint32_t * addr)
 {
-	struct vector_table * vt = (struct vector_table *) addr;
+	uint32_t sp = addr[0];
+	uint32_t pc = addr[1];
 
 	BOARD_USB_Deinit();
 
 	__DSB();
 	__ISB();
 
-
-
-	jumpFunction jumpToApplication = (jumpFunction)vt->reset;
-
 	// Set to privileged mode
 	if( CONTROL_nPRIV_Msk & __get_CONTROL( ) )
 	{
-		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_nPRIV_Msk );
+		__ASM volatile ("svc 0x07");
 	}
 
 	__ISB();
@@ -291,9 +289,25 @@ __attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr)
 	__DSB();
 	__ISB();
 
+	RTC->CTRL         = _RTC_CTRL_RESETVALUE;
+	RTC->COMP0        = _RTC_COMP0_RESETVALUE;
+	RTC->IEN          = _RTC_IEN_RESETVALUE;
+	/* Disable RTC clock */
+	CMU->LFACLKEN0    = _CMU_LFACLKEN0_RESETVALUE;
+	CMU->LFCLKSEL     = _CMU_LFCLKSEL_RESETVALUE;
+	/* Disable LFRCO */
+	CMU->OSCENCMD     = CMU_OSCENCMD_LFRCODIS;
+	/* Disable LE interface */
+	CMU->HFCORECLKEN0 = _CMU_HFCORECLKEN0_RESETVALUE;
+	/* Reset clocks */
+	CMU->HFPERCLKDIV  = _CMU_HFPERCLKDIV_RESETVALUE;
+	CMU->HFPERCLKEN0  = _CMU_HFPERCLKEN0_RESETVALUE;
+
 	// Disable the SysTick
-	SysTick->CTRL = 0 ;
-	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk ;
+	BOARD_SysTick_Disable();
+
+	__DSB();
+	__ISB();
 
 	// Disable all Faultmasks
 	SCB->SHCSR &= ~( SCB_SHCSR_USGFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_MEMFAULTENA_Msk ) ;
@@ -304,30 +318,9 @@ __attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr)
   		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_SPSEL_Msk ) ;
 	}
 
+	SCB->VTOR = ( uint32_t )addr;
+	//MSC->CACHECMD = MSC_CACHECMD_INVCACHE;
 
-	//__enable_irq();
-
-	
-	SCB->VTOR = ( uint32_t )vt;
-	
-	__set_MSP(vt->msp);
-	//__set_CONTROL(0x00);
-
-	//__ISB();
-
-	jumpToApplication();
-	
-	//BootJumpASM(addr[0], addr[1]);
-
-	while(1);
-
-    // Inline assembly to jump to new address
-    asm volatile (
-        "MSR MSP, %0\n\t"    // Load addr[0] into MSP
-        "BX %1\n\t"          // Jump to addr[1]
-        :
-        : "r" (addr[0]), "r" (addr[1])
-        : 
-    );
+	BootJumpASM( sp, pc);
 }
 

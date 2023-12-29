@@ -127,19 +127,18 @@ pub const microzig_options = struct {
         pub fn SVCall() callconv(.Naked) void {
             // Copy pasta the assembler code since the call to the naked function was not working
             asm volatile (
-                \\ldr r3, pxCurrentTCBConst2  /* Restore the context. */
-                \\ldr r1, [r3]                /* Use pxCurrentTCBConst to get the pxCurrentTCB address. */
-                \\ldr r0, [r1]                /* The first item in pxCurrentTCB is the task top of stack. */
-                \\ldmia r0!, {r4-r11}         /* Pop the registers that are not automatically saved on exception entry and the critical nesting count. */
-                \\msr psp, r0                 /* Restore the task stack pointer. */
-                \\isb                         
-                \\mov r0, #0                  
-                \\msr basepri, r0             
-                \\orr r14, #0xd               
-                \\bx r14                      
-                \\                            
-                \\.align 4                  
-                \\pxCurrentTCBConst2: .word pxCurrentTCB
+                \\ tst lr, #4                
+                \\ ite eq                    
+                \\ mrseq r0, msp             
+                \\ mrsne r0, psp             
+                \\ ldr r1, [r0, #24]   
+                \\ ldrb r1, [r1, #-2]  
+                \\ cmp r1, #0
+                \\ beq SVC_Handler
+                \\ cmp r1, #7
+                \\ beq SVC7_Handler
+                \\
+                \\ bx lr
             );
         }
         pub fn HardFault() void {
@@ -156,6 +155,10 @@ pub const microzig_options = struct {
         }
     };
 };
+
+pub export fn SVC7_Handler() callconv(.C) void {
+    //microzig.cpu.regs.CONTROL.modify(.{ .nPRIV = 0 });
+}
 
 // Button On-Change Callback
 pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
@@ -222,9 +225,9 @@ pub export fn main() noreturn {
 
     _ = c.printf("--- BOOT starting FreeRTOS %d---\n\r", appCounter);
 
-    boot_app.boot_app.init();
+    //boot_app.boot_app.init();
 
-    // boot_app.prepareJump();
+    boot_app.prepareJump();
 
     // Start the FreeRTOS scheduler
     freertos.vTaskStartScheduler();

@@ -34,7 +34,7 @@ pub const bootloader = .{
     .memory_regions = &.{
         .{ .offset = 0x00000000, .length = FLASH_APP_SIZE, .kind = .flash }, // Main Application
         .{ .offset = FLASH_APP_SIZE, .length = FLASH_RESERVE_SIZE, .kind = .reserved }, // Main Application
-        .{ .offset = FLASH_AVAILABLE_SIZE, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
+        .{ .offset = 2 * 10, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
         .{ .offset = 0x20000000, .length = RAM_SIZE, .kind = .ram }, // RAM
     },
     .register_definition = .{ .svd = .{ .cwd_relative = build_root_path ++ "/chips/EFM32GG390F1024.svd" } },

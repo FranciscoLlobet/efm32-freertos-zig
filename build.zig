@@ -81,9 +81,12 @@ pub fn build(b: *std.Build) !void {
 
     const firmware = microzig.addFirmware(b, bootloader_target);
 
-    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
-    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
-    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    //firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\include" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
+    firmware.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libdummyhost.a" });
+    //firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
+    //firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
     firmware.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
@@ -107,9 +110,16 @@ pub fn build(b: *std.Build) !void {
 
     const application = microzig.addFirmware(b, application_target);
 
-    application.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
-    application.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
-    application.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    //application.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+    //  application.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
+    // application.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    // application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+    //firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
+    application.addSystemIncludePath(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\include" });
+    application.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
+    application.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
+    application.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libdummyhost.a" });
+    //firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
     application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
@@ -131,8 +141,10 @@ pub fn build(b: *std.Build) !void {
     build_picohttpparser.aggregate(application);
     build_mcuboot.aggregate(application);
 
-    microzig.installFirmware(b, firmware, .{});
+    microzig.installFirmware(b, firmware, .{ .format = .elf });
     microzig.installFirmware(b, firmware, .{ .format = .bin });
-    microzig.installFirmware(b, application, .{});
+    microzig.installFirmware(b, firmware, .{ .format = .hex });
+    microzig.installFirmware(b, application, .{ .format = .elf });
+    microzig.installFirmware(b, application, .{ .format = .hex });
     microzig.installFirmware(b, application, .{ .format = .bin });
 }
