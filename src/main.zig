@@ -219,12 +219,6 @@ pub export fn main() noreturn {
     unreachable;
 }
 
-extern fn __libc_init_array() callconv(.C) void;
-
-pub export fn init() void {
-    __libc_init_array();
-}
-
 pub export fn appStart() void {
     _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
 
@@ -251,4 +245,10 @@ pub export fn appStart() void {
     leds.yellow.off();
 
     board.watchdogEnable();
+}
+
+extern fn __libc_init_array() callconv(.C) void;
+
+pub export fn init() void {
+    __libc_init_array();
 }
