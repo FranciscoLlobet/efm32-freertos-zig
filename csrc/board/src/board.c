@@ -147,7 +147,7 @@ void BOARD_Init(void)
 	/* Initialize SPI peripherals */
 	BOARD_SD_Card_Init();
 	Board_CC3100_Init();
-	BOARD_EM9301_Init;
+	BOARD_EM9301_Init();
 
 	/* Initialize I2C peripheral */
 	board_i2c_init();
@@ -186,6 +186,28 @@ void BOARD_MCU_Reset(void)
 	/* Disable the IRQs that may interfere now */
 	__disable_irq();
 
+	// Disable all interrupts
+	NVIC->ICER[0] = 0xFFFFFFFF;
+	NVIC->ICER[1] = 0xFFFFFFFF;
+	NVIC->ICER[2] = 0xFFFFFFFF;
+	NVIC->ICER[3] = 0xFFFFFFFF;
+	NVIC->ICER[4] = 0xFFFFFFFF;
+	NVIC->ICER[5] = 0xFFFFFFFF;
+	NVIC->ICER[6] = 0xFFFFFFFF;
+	NVIC->ICER[7] = 0xFFFFFFFF;
+
+	// Clear all pending interrupts
+	NVIC->ICPR[0] = 0xFFFFFFFF;
+	NVIC->ICPR[1] = 0xFFFFFFFF;
+	NVIC->ICPR[2] = 0xFFFFFFFF;
+	NVIC->ICPR[3] = 0xFFFFFFFF;
+	NVIC->ICPR[4] = 0xFFFFFFFF;
+	NVIC->ICPR[5] = 0xFFFFFFFF;
+	NVIC->ICPR[6] = 0xFFFFFFFF;
+	NVIC->ICPR[7] = 0xFFFFFFFF;
+
+	BOARD_SysTick_Disable();
+
 	/* Data Synch Barrier */
 	__DSB();
 
@@ -204,9 +226,9 @@ uint32_t BOARD_MCU_GetResetCause(void)
 #include <sys/time.h>
 // Gets called by time()
 
-extern int _gettimeofday(struct timeval* ptimeval, void * ptimezone);
+extern int gettimeofday(struct timeval* ptimeval, void * ptimezone);
 /* implementing system time */
-int _gettimeofday(struct timeval* ptimeval, void * ptimezone)
+int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 {
 	struct timezone * timezone_ptr = (struct timezone * )ptimezone;
 
@@ -223,4 +245,132 @@ int _gettimeofday(struct timeval* ptimeval, void * ptimezone)
 	}
 
 	return 0;
+}
+
+__attribute__( (naked, noreturn, section(".ramfunc"))) void BootJumpASM(uint32_t SP, uint32_t PC) {
+  __asm("MSR      MSP,r0");
+  __asm("MSR	  PSP,r0");
+  __asm("MOV      PC,r1");
+};
+
+typedef void (*jumpFunction)(void);
+
+
+__attribute__((packed)) struct vector_table {
+	uint32_t msp;
+	uint32_t reset;
+};
+
+ __attribute__((noreturn, section(".ramfunc"))) void BOARD_JumpToAddress(uint32_t * addr)
+{
+	uint32_t sp = addr[0];
+	uint32_t pc = addr[1];
+
+	BOARD_USB_Deinit();
+
+	__DSB();
+	__ISB();
+
+	// Set to privileged mode
+	if( CONTROL_nPRIV_Msk & __get_CONTROL( ) )
+	{
+		__ASM volatile ("svc 0x07");
+	}
+
+	__ISB();
+	__disable_irq();
+
+   // Disable and clear NVIC interrupts
+    for (uint32_t i = 0; i < 8; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFF;
+        NVIC->ICPR[i] = 0xFFFFFFFF;
+    }
+
+	__DSB();
+	__ISB();
+
+	RTC->CTRL         = _RTC_CTRL_RESETVALUE;
+	RTC->COMP0        = _RTC_COMP0_RESETVALUE;
+	RTC->IEN          = _RTC_IEN_RESETVALUE;
+	/* Disable RTC clock */
+	CMU->LFACLKEN0    = _CMU_LFACLKEN0_RESETVALUE;
+	CMU->LFCLKSEL     = _CMU_LFCLKSEL_RESETVALUE;
+	/* Disable LFRCO */
+	CMU->OSCENCMD     = CMU_OSCENCMD_LFRCODIS;
+	/* Disable LE interface */
+	CMU->HFCORECLKEN0 = _CMU_HFCORECLKEN0_RESETVALUE;
+	/* Reset clocks */
+	CMU->HFPERCLKDIV  = _CMU_HFPERCLKDIV_RESETVALUE;
+	CMU->HFPERCLKEN0  = _CMU_HFPERCLKEN0_RESETVALUE;
+
+	// Disable the SysTick
+	BOARD_SysTick_Disable();
+
+	__DSB();
+	__ISB();
+
+	// Disable all Faultmasks
+	SCB->SHCSR &= ~( SCB_SHCSR_USGFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_MEMFAULTENA_Msk ) ;
+
+	if( CONTROL_SPSEL_Msk & __get_CONTROL( ) )
+	{  /* MSP is not active */
+  		__set_MSP( __get_PSP( ) ) ;
+  		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_SPSEL_Msk ) ;
+	}
+
+	SCB->VTOR = ( uint32_t )addr;
+	//MSC->CACHECMD = MSC_CACHECMD_INVCACHE;
+
+	BootJumpASM( sp, pc);
+}
+
+
+static int miso_putc(char c, FILE *file)
+{
+	(void)file;
+	
+	(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
+
+	return 1;
+}
+
+static int miso_getc(FILE *file)
+{
+	char c = EOF;
+	(void)file;
+	(void) sl_iostream_getchar(SL_IOSTREAM_STDIN, &c);
+
+	return c;
+}
+
+static int miso_flush(FILE *file)
+{
+	(void)file;
+
+	return 0;
+}
+
+static FILE __stdio = FDEV_SETUP_STREAM(miso_putc, miso_getc, miso_flush, _FDEV_SETUP_RW);
+
+
+#ifdef __strong_reference
+#define STDIO_ALIAS(x) __strong_reference(stdin, x);
+#else
+#define STDIO_ALIAS(x) FILE *const x = &__stdio;
+#endif
+
+FILE *const stdin = &__stdio;
+STDIO_ALIAS(stdout);
+STDIO_ALIAS(stderr);
+
+int write(int handle, const unsigned char * buffer, size_t size)
+{
+	(void)handle;
+
+	for (size_t i = 0; i < size; i++)
+	{
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, buffer[i]);
+	}
+
+	return size;
 }

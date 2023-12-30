@@ -89,7 +89,6 @@ const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
 connection: connection,
 connectionCounter: usize,
 disconnectionCounter: usize,
-//rxQueue: freertos.Queue,
 
 pingTimer: freertos.Timer,
 pubTimer: freertos.Timer, // delete this!

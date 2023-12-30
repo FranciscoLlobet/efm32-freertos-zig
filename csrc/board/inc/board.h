@@ -301,6 +301,8 @@ void BOARD_msDelay(uint32_t delay_in_ms);
 
 /* Perform the MCU Reset */
 void BOARD_MCU_Reset(void);
+__attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr);
+
 
 uint32_t BOARD_MCU_GetResetCause(void);
 
@@ -333,6 +335,7 @@ void BOARD_EM9301_Disable(void);
 void BOARD_EM9301_Wakeup(bool wakeup);
 
 void BOARD_USB_Init(void);
+void BOARD_USB_Deinit(void);
 
 /* Button group */
 extern sl_button_t button1;

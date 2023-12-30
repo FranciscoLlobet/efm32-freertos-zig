@@ -47,7 +47,11 @@ Download and install the Zig Compiler
 
 #### Install the Arm GNU Toolchain
 
-- [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+> The Arm GNU Toolchain is now optional since `miso`'s move to `picolibc`.
+
+### Picolibc
+
+Picolibc is provided precompiled using the clang compiler on Ubuntu WSL. Since moving to picolibc, the ARM GNU Toolchain should be optional.
 
 ### Code Checkout
 
@@ -72,6 +76,7 @@ zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex
 
 - [MicroZig](https://github.com/ZigEmbeddedGroup/microzig)
 - [regz](https://github.com/ZigEmbeddedGroup/regz)
+- [picolibc](https://keithp.com/picolibc/)
 
 ### MCAL and MCU peripheral services
 

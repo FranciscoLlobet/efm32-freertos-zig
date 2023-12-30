@@ -12,6 +12,7 @@ const build_mbedts = @import("build_mbedtls.zig");
 const build_wakaama = @import("build_wakaama.zig");
 const build_mqtt = @import("build_mqtt.zig");
 const build_picohttpparser = @import("build_picohttpparser.zig");
+const build_mcuboot = @import("build_mcuboot.zig");
 const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) !void {
@@ -32,12 +33,6 @@ pub fn build(b: *std.Build) !void {
         "csrc/utils/jsmn",
     };
     const src_paths = [_][]const u8{
-        // Newlib adapter
-        //"csrc/system/newlib/assert.c",
-        //"csrc/system/newlib/exit.c",
-        //"csrc/system/newlib/sbrk.c",
-        //"csrc/system/newlib/syscalls.c",
-
         // Board (support) package
         "csrc/board/src/system_efm32gg.c",
         "csrc/board/src/board.c",
@@ -70,16 +65,31 @@ pub fn build(b: *std.Build) !void {
 
     const optimize = b.standardOptimizeOption(.{});
 
-    const firmware = microzig.addFirmware(b, .{
+    const bootloader_target = .{
         .name = "miso",
-        .target = .{ .preferred_format = .elf, .chip = chips.efm32gg390f1024, .board = boards.xdk110 },
+        .target = .{
+            .preferred_format = .elf,
+            .chip = chips.bootloader,
+            .board = boards.xdk110,
+        },
         .optimize = optimize,
         .source_file = .{ .path = "src/main.zig" },
-    });
+    };
 
-    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\arm-none-eabi\\include" });
-    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libc_nano.a" });
-    firmware.addObjectFile(.{ .cwd_relative = "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\12.2 mpacbti-rel1\\lib\\gcc\\arm-none-eabi\\12.2.1\\thumb\\v7-m\\nofp\\libgcc.a" });
+    const application_target = .{
+        .name = "app",
+        .target = .{
+            .preferred_format = .elf,
+            .chip = chips.application,
+            .board = boards.xdk110,
+        },
+        .optimize = optimize,
+        .source_file = .{ .path = "src/main.zig" },
+    };
+
+    const firmware = microzig.addFirmware(b, bootloader_target);
+    firmware.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
+    firmware.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
     firmware.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
@@ -99,7 +109,37 @@ pub fn build(b: *std.Build) !void {
     build_wakaama.aggregate(firmware);
     build_mqtt.aggregate(firmware);
     build_picohttpparser.aggregate(firmware);
+    build_mcuboot.aggregate(firmware);
 
-    microzig.installFirmware(b, firmware, .{});
+    const application = microzig.addFirmware(b, application_target);
+
+    application.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
+    application.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
+    application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+
+    for (include_path_array) |path| {
+        application.addIncludePath(.{ .path = path });
+    }
+
+    for (src_paths) |path| {
+        application.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
+    }
+
+    build_ff.build_ff(application);
+    build_gecko_sdk.aggregate(application);
+    build_freertos.aggregate(application);
+    build_sensors.aggregate(application);
+    build_cc3100_sdk.aggregate(application);
+    build_mbedts.aggregate(application);
+    build_wakaama.aggregate(application);
+    build_mqtt.aggregate(application);
+    build_picohttpparser.aggregate(application);
+    build_mcuboot.aggregate(application);
+
+    microzig.installFirmware(b, firmware, .{ .format = .elf });
     microzig.installFirmware(b, firmware, .{ .format = .bin });
+    microzig.installFirmware(b, firmware, .{ .format = .hex });
+    microzig.installFirmware(b, application, .{ .format = .elf });
+    microzig.installFirmware(b, application, .{ .format = .hex });
+    microzig.installFirmware(b, application, .{ .format = .bin });
 }

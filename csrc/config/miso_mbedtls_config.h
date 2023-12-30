@@ -28,6 +28,7 @@
 #include "FreeRTOS.h"
 #include <time.h>
 
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS    (1)
 
 /**
  * This is an optional version symbol that enables compatibility handling of

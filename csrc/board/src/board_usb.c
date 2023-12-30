@@ -64,3 +64,8 @@ void BOARD_USB_Init(void)
 	usbx.useFifo = 0;
 	USBX_init(&usbx);
 }
+
+void BOARD_USB_Deinit(void)
+{
+	USBX_disable();
+}

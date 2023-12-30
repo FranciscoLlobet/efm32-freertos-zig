@@ -146,7 +146,8 @@ extern "C" {
 #define configQUEUE_REGISTRY_SIZE				( 10 )
 #define configUSE_QUEUE_SETS					( 0 )
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      ( 1 )
-#define configUSE_NEWLIB_REENTRANT              ( 1 )
+//#define configUSE_NEWLIB_REENTRANT              ( 1 )
+#define configUSE_PICOLIBC_TLS				   ( 0 )
 #define configTASK_NOTIFICATION_ARRAY_ENTRIES   ( 2 ) /* Adding task notification array */
 
 /* Run time stats gathering related definitions. */

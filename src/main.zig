@@ -16,7 +16,7 @@ const nvm = @import("nvm.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
-    @cInclude("sl_simple_led.h");
+    // @cInclude("sl_simple_led.h");
     @cInclude("miso_config.h");
 });
 
@@ -27,6 +27,10 @@ extern fn xPortSysTickHandler() callconv(.C) void;
 export fn vApplicationIdleHook() void {
     board.watchdogFeed();
 }
+
+/// Export the NVM3 handle
+pub export const miso_nvm3_handle = &nvm.miso_nvm3;
+pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
 var timerTask: freertos.StaticTask(config.rtos_stack_depth_timer_task) = undefined;
 var idleTask: freertos.StaticTask(config.rtos_stack_depth_idle_task) = undefined;
@@ -44,31 +48,7 @@ export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticT
 }
 
 export fn vApplicationDaemonTaskStartupHook() void {
-    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
-
-    leds.red.on();
-
-    board.msDelay(500);
-
-    leds.orange.on();
-
-    board.msDelay(500);
-
-    leds.yellow.on();
-
-    board.msDelay(500);
-
-    leds.red.off();
-
-    board.msDelay(500);
-
-    leds.orange.off();
-
-    board.msDelay(500);
-
-    leds.yellow.off();
-
-    board.watchdogEnable();
+    appStart();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -146,19 +126,18 @@ pub const microzig_options = struct {
         pub fn SVCall() callconv(.Naked) void {
             // Copy pasta the assembler code since the call to the naked function was not working
             asm volatile (
-                \\ldr r3, pxCurrentTCBConst2  /* Restore the context. */
-                \\ldr r1, [r3]                /* Use pxCurrentTCBConst to get the pxCurrentTCB address. */
-                \\ldr r0, [r1]                /* The first item in pxCurrentTCB is the task top of stack. */
-                \\ldmia r0!, {r4-r11}         /* Pop the registers that are not automatically saved on exception entry and the critical nesting count. */
-                \\msr psp, r0                 /* Restore the task stack pointer. */
-                \\isb                         
-                \\mov r0, #0                  
-                \\msr basepri, r0             
-                \\orr r14, #0xd               
-                \\bx r14                      
-                \\                            
-                \\.align 4                  
-                \\pxCurrentTCBConst2: .word pxCurrentTCB
+                \\ tst lr, #4                
+                \\ ite eq                    
+                \\ mrseq r0, msp             
+                \\ mrsne r0, psp             
+                \\ ldr r1, [r0, #24]   
+                \\ ldrb r1, [r1, #-2]  
+                \\ cmp r1, #0
+                \\ beq SVC_Handler
+                \\ cmp r1, #7
+                \\ beq SVC7_Handler
+                \\
+                \\ bx lr
             );
         }
         pub fn HardFault() void {
@@ -175,6 +154,76 @@ pub const microzig_options = struct {
         }
     };
 };
+
+pub export fn SVC7_Handler() callconv(.Naked) void {
+    asm volatile (
+        \\nop
+    );
+}
+
+pub export fn system_reset() callconv(.C) void {
+    system.reset();
+}
+
+pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
+    user.user_task.task.notify(event, .eSetBits) catch {};
+}
+
+/// Application entry point
+pub export fn main() noreturn {
+    board.init();
+
+    const appCounter = nvm.incrementAppCounter() catch 0;
+
+    user.user_task.create();
+
+    sensors.service.init() catch unreachable;
+
+    network.start();
+
+    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
+
+    // Start the FreeRTOS scheduler
+    freertos.vTaskStartScheduler();
+
+    unreachable;
+}
+
+pub export fn appStart() void {
+    _ = c.printf("--- FreeRTOS Scheduler Started ---\n\rReset Cause: %d\n\r", board.getResetCause());
+
+    leds.red.on();
+
+    board.msDelay(500);
+
+    leds.orange.on();
+
+    board.msDelay(500);
+
+    leds.yellow.on();
+
+    board.msDelay(500);
+
+    leds.red.off();
+
+    board.msDelay(500);
+
+    leds.orange.off();
+
+    board.msDelay(500);
+
+    leds.yellow.off();
+
+    board.watchdogEnable();
+}
+
+// Initialisation of the C runtime.
+
+extern fn __libc_init_array() callconv(.C) void;
+
+pub export fn init() void {
+    __libc_init_array();
+}
 
 // Button On-Change Callback
 pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
@@ -204,56 +253,4 @@ pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) vo
             }
         },
     }
-}
-
-pub export fn system_reset() callconv(.C) void {
-    system.reset();
-}
-
-pub export const miso_nvm3_handle = &nvm.miso_nvm3;
-pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
-
-pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
-    user.user_task.task.notify(event, .eSetBits) catch {};
-}
-
-pub export fn main() void {
-    board.init();
-
-    const appCounter = nvm.incrementAppCounter() catch 0;
-
-    user.user_task.create();
-
-    sensors.service.init() catch unreachable;
-
-    network.start();
-
-    _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
-
-    freertos.vTaskStartScheduler();
-
-    unreachable;
-}
-
-/// Mini heap used for sbrk. Mainly used by printf()
-var mini_heap: [1050]u8 align(@alignOf(u32)) = undefined;
-var heap_end align(@alignOf(u32)) = &mini_heap[0];
-
-/// Current Zig-based implementation of the sbrk() function
-pub export fn _sbrk(inc: isize) callconv(.C) ?*anyopaque {
-    if (heap_end == undefined) {
-        heap_end = &mini_heap[0];
-    }
-
-    const prev_heap_end: isize = @intCast(@intFromPtr(heap_end));
-    const new_heap_end: isize = prev_heap_end + inc;
-
-    if (new_heap_end > @as(isize, @intCast(@intFromPtr(&mini_heap[mini_heap.len - 1])))) {
-        return null;
-    }
-
-    // Update the heap end
-    heap_end = @ptrFromInt(@as(usize, @intCast(new_heap_end)));
-
-    return @as(*anyopaque, @ptrCast(@as(@TypeOf(heap_end), @ptrFromInt(@as(usize, @intCast(prev_heap_end))))));
 }

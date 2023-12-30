@@ -26,6 +26,9 @@ pub const enable_lwm2m = false;
 pub const enable_mqtt = true;
 pub const enable_http = true;
 
+pub const rtos_prio_boot_app = @intFromEnum(task_priorities.rtos_prio_highest);
+
+// SENSOR TASK
 pub const rtos_prio_sensor = @intFromEnum(task_priorities.rtos_prio_low);
 pub const rtos_stack_depth_sensor: u16 = 440;
 
@@ -85,7 +88,7 @@ fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) !void {
     var key_file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
     defer key_file.close() catch {};
 
-    const key = try allocator.alloc(u8, key_file.size() + 1);
+    const key = try allocator.alloc(u8, key_file.size());
     defer allocator.free(key);
 
     @memset(key, 0);
