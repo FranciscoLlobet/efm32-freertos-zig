@@ -88,9 +88,10 @@ pub fn build(b: *std.Build) !void {
     };
 
     const firmware = microzig.addFirmware(b, bootloader_target);
-
-    firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\include" });
-    firmware.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
+    firmware.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
+    firmware.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
+    //firmware.addSystemIncludePath(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\include" });
+    //firmware.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
     firmware.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
@@ -114,8 +115,8 @@ pub fn build(b: *std.Build) !void {
 
     const application = microzig.addFirmware(b, application_target);
 
-    application.addSystemIncludePath(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\include" });
-    application.addObjectFile(.{ .cwd_relative = "C:\\Zig\\picolibc\\picolibc-1.8.4-12.3.rel1\\arm-none-eabi\\picolibc\\arm-none-eabi\\lib\\thumb\\v7-m\\nofp\\libc.a" });
+    application.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
+    application.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
     application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
