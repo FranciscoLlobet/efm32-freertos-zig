@@ -40,7 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "freertos.h"
+#include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
 #include "portmacro.h"
