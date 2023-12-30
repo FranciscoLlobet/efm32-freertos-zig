@@ -107,8 +107,8 @@ pub export const miso_nvm3_init: c.nvm3_Init_t = .{ .nvmAdr = nvm_initial_addres
 var cache: [cache_len]c.nvm3_CacheEntry_t align(@alignOf(u32)) = undefined;
 
 pub fn init() !u32 {
-    const default_uuid: [36]u8 = .{0xFF} ** 36;
-    const default_sha256: [32]u8 = .{0xFF} ** 32;
+    const default_uuid: [36]u8 align(@alignOf(u32)) = .{0xFF} ** 36;
+    const default_sha256: [32]u8 align(@alignOf(u32)) = .{0xFF} ** 32;
 
     var num_objects: usize = countObjects();
 
