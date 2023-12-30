@@ -2,6 +2,12 @@
 
 `MISO` is an example application that combines the power of the [Zig programming language](http://www.ziglang.org) together with a curated selection of services supported by the XDK110 sensor.
 
+## Status
+
+[![zig-build](https://github.com/FranciscoLlobet/efm32-freertos-zig/actions/workflows/zig-build.yml/badge.svg)](https://github.com/FranciscoLlobet/efm32-freertos-zig/actions/workflows/zig-build.yml)
+
+> zig-build passing means that a binary build is possible. Further testing on target is necessary.
+
 ## Disclaimers
 
 `MISO` is not affiliated with LEGIC Identsystems Ltd, the LEGIC XDK Secure Sensor Evaluation Kit, the Rust Foundation or the Rust Project. Furthermore, it's important to note that this codebase should not be used in use cases which have strict safety and/or availability requirements.
