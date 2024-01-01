@@ -22,7 +22,7 @@ fn tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 fn sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
     const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
 
-    bme280.sensor.init() catch unreachable;
+    var bme280_sensor = bme280.init(bme280.bme280_dev) catch unreachable;
     bma280.sensor.init();
 
     while (true) {
@@ -30,7 +30,7 @@ fn sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
 
         if (self.task.waitForNotify(0, 0xFFFFFFFF, freertos.portMAX_DELAY) catch unreachable) |notification_value| {
             if (notification_value == 1) {
-                bme280.sensor.readInForcedMode(&temp_data) catch unreachable;
+                bme280_sensor.readInForcedMode(&temp_data) catch unreachable;
                 // Notify to event system
                 _ = c.printf("Temp: %d, Stack: %d\n\r", @as(i32, @intFromFloat(100.0 * temp_data.temperature)), self.task.getStackHighWaterMark());
 

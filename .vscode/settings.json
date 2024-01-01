@@ -68,6 +68,7 @@
         "fault_injection_hardening.h": "c",
         "bootutil_priv.h": "c",
         "private_access.h": "c",
-        "miso_mbedtls_config.h": "c"
+        "miso_mbedtls_config.h": "c",
+        "freertos.h": "c"
     }
 }
