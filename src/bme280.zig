@@ -12,10 +12,16 @@ pub const sensor_errors = error{
 };
 
 pub const bme280_data = c.struct_bme280_data;
+pub const bme280_handle = *c.bme280_dev;
 
-handle: *c.bme280_dev,
+// Device Handle. Should be in board
+pub const bme280_dev: bme280_handle = &c.board_bme280;
 
-pub fn init(self: *const @This()) !void {
+handle: bme280_handle = undefined,
+
+pub fn init(handle: bme280_handle) !@This() {
+    var self: @This() = .{ .handle = handle };
+
     var ret: i32 = -1;
 
     c.board_bme280_enable();
@@ -40,7 +46,7 @@ pub fn init(self: *const @This()) !void {
         }
     }
 
-    if (ret != 0) return sensor_errors.bme280_init_error;
+    return if (ret == 0) self else sensor_errors.bme280_init_error;
 }
 pub fn readInForcedMode(self: *const @This(), data: *bme280_data) !void {
     var ret: i32 = -1;
@@ -56,5 +62,3 @@ pub fn readInForcedMode(self: *const @This(), data: *bme280_data) !void {
 
     if (ret != 0) return sensor_errors.bme280_forced_read_error;
 }
-
-pub const sensor = @This(){ .handle = &c.board_bme280 };
