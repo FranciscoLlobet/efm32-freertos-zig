@@ -3,6 +3,7 @@ const microzig = @import("microzig");
 pub const c = @cImport({
     @cInclude("board.h");
     @cInclude("simplelink.h");
+    @cInclude("board_i2c_sensors.h");
 });
 
 pub const cpu_frequency = 48_000_000; // 48MHz
@@ -44,3 +45,16 @@ pub fn watchdogEnable() void {
 pub fn watchdogFeed() void {
     c.BOARD_Watchdog_Feed();
 }
+
+pub const bma280_dev = &c.board_bma280;
+pub const bme280_dev = &c.board_bme280;
+pub const bmg160_dev = &c.board_bmg160;
+pub const bmi160_dev = &c.board_bmi160;
+pub const bmm150_dev = &c.board_bmm150;
+
+pub const button1 = &c.button1;
+pub const button2 = &c.button2;
+
+pub const led_red = &c.led_red;
+pub const led_orange = &c.led_orange;
+pub const led_yellow = &c.led_yellow;

@@ -1,15 +1,16 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const board = microzig.board;
 const c = @cImport({
     @cInclude("board.h");
 });
 
-pub const led_handle = [*c]const c.sl_led_t;
-
 // Led instances
-pub const yellow = @This().createFromHandle(&c.led_yellow);
-pub const orange = @This().createFromHandle(&c.led_orange);
-pub const red = @This().createFromHandle(&c.led_red);
+pub const yellow = @This().createFromHandle(@ptrCast(board.led_yellow));
+pub const orange = @This().createFromHandle(@ptrCast(board.led_orange));
+pub const red = @This().createFromHandle(@ptrCast(board.led_red));
+
+const led_handle = [*c]const c.sl_led_t;
 
 // LED stuff
 handle: led_handle,

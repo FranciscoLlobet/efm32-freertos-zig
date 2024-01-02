@@ -220,9 +220,12 @@ pub export fn appStart() void {
 // Initialisation of the C runtime.
 
 extern fn __libc_init_array() callconv(.C) void;
+extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
     __libc_init_array();
+
+    SystemInit();
 }
 
 // Button On-Change Callback

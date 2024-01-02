@@ -19,7 +19,21 @@
             "rtos": "FreeRTOS",
             "swoConfig": { "cpuFrequency": 48000000, "swoFrequency": 875000, "enabled": true, "source": "socket", "decoders": [{"port": 0, "type": "console", "encoding": "ascii", "label": "Output"}]},
         },
-
+        {
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceRoot}/zig-out/firmware/app.elf",
+            "name": "Debug Main with JLink MacOs",
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "ResetHandler",
+            "showDevDebugOutput": "none",
+            "servertype": "jlink",
+            "device": "EFM32GG390F1024",
+            "interface": "swd",
+            "svdFile": "${workspaceRoot}/src/chips/EFM32GG390F1024.svd",
+            "rtos": "FreeRTOS",
+            "swoConfig": { "cpuFrequency": 48000000, "swoFrequency": 875000, "enabled": true, "source": "socket", "decoders": [{"port": 0, "type": "console", "encoding": "ascii", "label": "Output"}]},
+        },
         {
             "cwd": "${workspaceRoot}",
             "executable": "${workspaceRoot}/zig-out/firmware/miso.elf",
