@@ -81,7 +81,7 @@ pub const microzig_options = struct {
             c.I2C0_IRQHandler();
         }
         pub fn USB() void {
-            c.USB_IRQHandler();
+            //c.USB_IRQHandler();
         }
         pub fn TIMER0() void {
             c.TIMER0_IRQHandler();

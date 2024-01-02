@@ -49,19 +49,29 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) build.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) and macOS (via brew) builds.
 
 #### Install the Arm GNU Toolchain
 
-> The Arm GNU Toolchain is now optional since `miso`'s move to `picolibc`.
+> The Arm GNU Toolchain is now optional for building since `miso`'s move to `picolibc`.
+
+https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 
 ### Picolibc
 
-Picolibc is provided precompiled using the clang compiler on Ubuntu WSL. Since moving to picolibc, the ARM GNU Toolchain should be optional.
+Picolibc is provided precompiled using the clang compiler on Ubuntu WSL.
 
 ### Code Checkout
 
-```powershell
+Perform a recursive clone:
+
+```shell
+git clone --recursive https://github.com/FranciscoLlobet/efm32-freertos-zig.git
+```
+
+Alternatively clone and update submodules:
+
+```shell
 git clone https://github.com/FranciscoLlobet/efm32-freertos-zig.git
 cd .\efm32-freertos-zig\
 git submodule init
@@ -72,8 +82,6 @@ git submodule update
 
 ```powershell
 zig build
-zig objcopy -O binary .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.bin 
-zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex 
 ```
 
 ## Used 3rd party software
@@ -125,7 +133,6 @@ zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex
 ## Configuration fields
 
 Configuration can be loaded via SD card by `config.txt`
-
 
 ```json
 {

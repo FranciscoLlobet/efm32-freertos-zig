@@ -175,13 +175,13 @@ void BOARD_Init(void)
 
 	RMU_ResetCauseClear();
 
-	BOARD_USB_Init();
+	//BOARD_USB_Init();
 }
 
 
 void BOARD_MCU_Reset(void)
 {
-	USBX_disable();
+	//USBX_disable();
 
 	/* Disable the IRQs that may interfere now */
 	__disable_irq();
