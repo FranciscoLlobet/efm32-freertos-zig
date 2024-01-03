@@ -37,6 +37,9 @@ char config_mqtt_psk_id[128] __attribute__ ((aligned (4)))  = {0};
 char config_mqtt_psk_key[64] __attribute__ ((aligned (4))) = {0};
 
 char config_http_uri[128] __attribute__ ((aligned (4))) = {0};
+char config_http_sig_uri[128] __attribute__ ((aligned (4))) = {0};
+char config_http_key[256] __attribute__ ((aligned (4))) = {0};
+
 char config_config_uri[128] __attribute__ ((aligned (4))) = {0};
 
 void config_set_wifi_ssid(char *ssid) {
@@ -95,6 +98,16 @@ void config_set_config_uri(char *uri) {
     strncpy(config_config_uri, uri, sizeof(config_config_uri));
 }
 
+void config_set_http_sig_uri(char * sig_uri)
+{
+	strncpy(config_http_sig_uri, sig_uri, sizeof(config_http_sig_uri));
+}
+
+void config_set_http_sig_key(char * key)
+{
+	strncpy(config_http_key, key, sizeof(config_http_key));
+}
+
 char * const config_get_wifi_ssid(void)
 {
 	return (char *)&config_wifi_ssid[0];
@@ -149,6 +162,17 @@ char *const config_get_http_uri(void)
 {
 	return (char *)&config_http_uri[0];
 }
+
+char *const config_get_http_sig_uri(void)
+{
+	return (char *)&config_http_sig_uri[0];
+}
+
+char *const config_get_http_sig_key(void)
+{
+	return (char *)&config_http_key[0];
+}
+
 
 char * const config_get_config_uri(void)
 {
@@ -442,9 +466,15 @@ void miso_load_config(void)
 					dest_ptr = &config_http_uri[0];
 					dest_len = sizeof(config_http_uri);
 				}
-				else if (0 == strncmp(json_key, "psk", strlen("psk")))
+				if((0 == strncmp(json_key, "sig", strlen("sig"))) || (0 == strncmp(json_key, "sig_uri", strlen("sig_uri"))))
 				{
-
+					dest_ptr = (char *)&config_http_sig_uri[0];
+					dest_len = sizeof(config_http_sig_uri);
+				}
+				else if (0 == strncmp(json_key, "key", strlen("key")))
+				{
+					dest_ptr = (char *)&config_http_key[0];
+					dest_len = sizeof(config_http_key);
 				}
 				else if (0 == strncmp(json_key, "cert", strlen("cert")))
 				{

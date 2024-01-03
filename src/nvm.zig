@@ -11,7 +11,7 @@ const c = @cImport({
 ///
 pub const app_nvm_keys = enum(u20) {
     /// APP Start Counter
-    start_counter = 0x00000,
+    start_counter = 0x00000, // Boot Counter
 
     /// APP Reset Counter
     reset_counter = 0x00001,
@@ -27,7 +27,9 @@ pub const app_nvm_keys = enum(u20) {
     wifi_ssid,
     wifi_psk,
 
+    /// NTP URI in format: sntp://host:port
     ntp_uri,
+    // Secondary NTP uri
 
     /// MQTT URI in format: mqtt(s)://host:port
     mqtt_uri,
@@ -41,8 +43,15 @@ pub const app_nvm_keys = enum(u20) {
     /// Device ID
     mqtt_device_id,
 
-    // Firmware download URI
+    /// HTTP Firmware URI
     http_uri,
+
+    /// HTTP Firmware sig
+    http_sig_uri,
+
+    /// HTTP Firmware public key
+    http_sig_key,
+
     http_psk_id,
     http_psk_key,
 
@@ -64,7 +73,14 @@ pub const app_nvm_keys = enum(u20) {
     // Config uri
     config_uri,
 
+    // Bootloader
+    update_flag,
+
     max_key = 0x0FFFF,
+
+    fn toInt(self: @This()) u32 {
+        return @as(u32, @intFromEnum(self));
+    }
 };
 
 const nvmError = error{
@@ -138,7 +154,7 @@ pub fn getObjectInfo(key: app_nvm_keys) !struct { object_type: objectType, objec
     var len: usize = 0;
     var obj_type: u32 = 0;
 
-    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, @intFromEnum(key), &obj_type, &len));
+    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, key.toInt(), &obj_type, &len));
 
     return .{ .object_type = @as(objectType, @enumFromInt(obj_type)), .object_len = len };
 }
@@ -156,14 +172,14 @@ pub fn readData(key: app_nvm_keys, buffer: []u8) ![]u8 {
     var len: usize = 0;
     var object_type: u32 = undefined;
 
-    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, @intFromEnum(key), &object_type, &len));
+    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, key.toInt(), &object_type, &len));
     if (len > buffer.len) {
         return nvmError.buffer_size_error;
     } else if (object_type != @intFromEnum(objectType.data)) {
         return nvmError.invalid_object_type;
     }
 
-    try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), buffer.ptr, len));
+    try ret.check(c.nvm3_readData(&miso_nvm3, key.toInt(), buffer.ptr, len));
 
     return buffer[0..len];
 }
@@ -172,34 +188,34 @@ pub fn readCString(key: app_nvm_keys, value: [*c]u8) !void {
     var len: usize = 0;
     var object_type: u32 = undefined;
 
-    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, @intFromEnum(key), &object_type, &len));
+    try ret.check(c.nvm3_getObjectInfo(&miso_nvm3, key.toInt(), &object_type, &len));
     if (object_type != @intFromEnum(objectType.data)) {
         return nvmError.invalid_object_type;
     }
 
-    try ret.check(c.nvm3_readData(&miso_nvm3, @intFromEnum(key), value, len));
+    try ret.check(c.nvm3_readData(&miso_nvm3, key.toInt(), value, len));
 }
 
 /// Write data into NVM using Zig slices
 pub fn writeData(key: app_nvm_keys, value: []const u8) !void {
-    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), @ptrCast(value), value.len));
+    try ret.check(c.nvm3_writeData(&miso_nvm3, key.toInt(), @ptrCast(value), value.len));
 }
 
 /// Write a C-String into NVM
 pub fn writeDataCString(key: app_nvm_keys, value: [*c]const u8) !void {
     const len: usize = c.strlen(value) + @as(usize, 1);
-    try ret.check(c.nvm3_writeData(&miso_nvm3, @intFromEnum(key), value, len));
+    try ret.check(c.nvm3_writeData(&miso_nvm3, key.toInt(), value, len));
 }
 
 /// Write a 32-Bit counter value
 fn writeCounter(key: app_nvm_keys, value: u32) !void {
-    try ret.check(c.nvm3_writeCounter(&miso_nvm3, @intFromEnum(key), value));
+    try ret.check(c.nvm3_writeCounter(&miso_nvm3, key.toInt(), value));
 }
 
 /// Increment counter value
 fn incrementCounter(key: app_nvm_keys) !u32 {
     var newValue: u32 = 0;
-    try ret.check(c.nvm3_incrementCounter(&miso_nvm3, @intFromEnum(key), &newValue));
+    try ret.check(c.nvm3_incrementCounter(&miso_nvm3, key.toInt(), &newValue));
 
     return newValue;
 }

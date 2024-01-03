@@ -9,15 +9,13 @@ const c = @cImport({
     @cInclude("miso_config.h");
     @cInclude("wifi_service.h");
 });
+const pk = @import("pk.zig");
 const sha256 = @import("sha256.zig");
 const http = @import("http.zig");
 const mqtt = @import("mqtt.zig");
 const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
-
-const fw_file_name = "SD:FW.BIN";
-const config_file_name = "SD:CONFIG.TXT";
 
 const state = enum(usize) {
     verify_config = 0,
@@ -39,6 +37,7 @@ const state = enum(usize) {
         };
     }
 };
+
 task: freertos.StaticTask(config.rtos_stack_depth_user_task),
 timer: freertos.Timer,
 state: state,
@@ -68,7 +67,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             };
 
             //board.watchdogFeed();
-            _ = config.open_config_file(config_file_name) catch {
+            _ = config.open_config_file(config.config_file_name) catch {
                 _ = c.printf("Failure!!\n\r");
             };
 
@@ -92,13 +91,15 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
         } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
                 // get eTag from the NVM
+                if (downloadAndVerify()) |_| {
+                    // Happy path
 
-                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], fw_file_name, 512) catch |err| {
-                    _ = c.printf("Failure to download!!: %s\n\r", @errorName(err).ptr);
-                };
+                    _ = c.printf("Firmware download complete\r\n");
+                } else |_| {
+                    _ = c.printf("Failure to download!!\n\r");
+                }
             }
 
-            _ = c.printf("Firmware download complete\r\n");
             // perform HTTP download
             if (comptime config.enable_lwm2m) {
                 self.state = .start_lwm2m;
@@ -127,6 +128,22 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             }
         }
     }
+}
+
+fn downloadAndVerify() !bool {
+    const http_uri = c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())];
+    const http_sig_uri = c.config_get_http_sig_uri()[0..c.strlen(c.config_get_http_sig_uri())];
+    const http_sig_key: []u8 = c.config_get_http_sig_key()[0..c.strlen(c.config_get_http_sig_key())];
+
+    // Download the firmware
+    try http.service.filedownload(http_uri, config.fw_file_name, 512, 1024 * 1024);
+
+    // Download the signature
+    try http.service.filedownload(http_sig_uri, config.fw_sig_file_name, 512, 1024 * 1024);
+
+    try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, http_sig_key);
+
+    return true;
 }
 
 pub fn create(self: *@This()) void {

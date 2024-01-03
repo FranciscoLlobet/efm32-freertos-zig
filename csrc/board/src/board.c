@@ -253,20 +253,13 @@ int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 	return 0;
 }
 
-__attribute__( (naked, noreturn) ) void BootJumpASM(uint32_t SP, uint32_t PC) {
-  __asm("MSR      MSP,r0");
-//  __asm("MSR	  PSP,r0");
-  __asm("MOV      PC,r1");
-};
-
 typedef void (*jumpFunction)(void);
 
-volatile jumpFunction jump = NULL;
+// Jump is assigned outside of the stack
+static jumpFunction jump = NULL;
 
 void BOARD_JumpToAddress(uint32_t * addr)
 {
-	volatile uint32_t sp = addr[0];
-
 	jump = (jumpFunction)(addr[1]);
 
 	BOARD_DeInit();
@@ -277,7 +270,7 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	// Set to privileged mode
 	if( CONTROL_nPRIV_Msk & __get_CONTROL( ) )
 	{
-		__ASM volatile ("svc 0x07");
+		//__ASM volatile ("svc 0x07");
 	}
 
 	__ISB();
@@ -306,6 +299,7 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	__DSB();
 	__ISB();
 
+	// Set some of the peripherals to reset values
 	RTC->CTRL         = _RTC_CTRL_RESETVALUE;
 	RTC->COMP0        = _RTC_COMP0_RESETVALUE;
 	RTC->IEN          = _RTC_IEN_RESETVALUE;
@@ -322,7 +316,7 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	
 	// Disable the SysTick
 	SysTick->CTRL = 0 ;
-	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk ;BOARD_SysTick_Disable();
+	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
 
 	__DSB();
 	__ISB();
@@ -339,15 +333,23 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	__DSB();
 	__ISB();
 	
+	// Set the vector table offset
 	SCB->VTOR = ( uint32_t )addr;
 	
-	__set_MSP(sp);
+	// Set the main stack pointer
+	// From here we lose the variables in stack
+	__set_MSP(addr[0]);
 	__set_PSP(__get_MSP());
 
-	if(jump != NULL)
+	// Perform the Jump using the C-Style function pointer
+	if(NULL != jump)
 	{
+		__set_CONTROL(0x00);
+		__ISB();
+		
 		jump();
 	}
+	// unreachable
 }
 
 

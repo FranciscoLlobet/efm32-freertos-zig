@@ -1,5 +1,5 @@
 const std = @import("std");
-const freertos = @import("freertos.zig");
+//const freertos = @import("freertos.zig");
 const connection = @import("connection.zig");
 pub const c = @cImport({
     @cDefine("MBEDTLS_CONFIG_FILE", "\"miso_mbedtls_config.h\"");

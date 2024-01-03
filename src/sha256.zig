@@ -23,20 +23,20 @@ pub fn init() @This() {
     return self;
 }
 
-pub fn initCtx(self: *@This()) void {
+inline fn initCtx(self: *@This()) void {
     c.mbedtls_sha256_init(&self.ctx);
 }
 
 pub fn start(self: *@This()) !void {
-    return if (0 != c.mbedtls_sha256_starts(&self.ctx, 0)) sha256_error.start_error else {};
+    if (0 != c.mbedtls_sha256_starts(&self.ctx, 0)) return sha256_error.start_error;
 }
 
 pub fn update(self: *@This(), buffer: []u8) !void {
-    return if (0 != c.mbedtls_sha256_update(&self.ctx, buffer.ptr, buffer.len)) sha256_error.update_error else {};
+    if (0 != c.mbedtls_sha256_update(&self.ctx, buffer.ptr, buffer.len)) return sha256_error.update_error;
 }
 
 pub fn finish(self: *@This(), output: *[32]u8) !void {
-    return if (0 != c.mbedtls_sha256_finish(&self.ctx, output)) sha256_error.finish_error else {};
+    if (0 != c.mbedtls_sha256_finish(&self.ctx, output)) return sha256_error.finish_error;
 }
 
 pub fn free(self: *@This()) void {

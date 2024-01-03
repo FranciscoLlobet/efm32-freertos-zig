@@ -48,10 +48,19 @@ void config_set_mqtt_psk_key(char * key);
 // Set the HTTP server URI.
 void config_set_http_uri(char * uri);
 
+// Set the HTTP signature URI
+void config_set_http_sig_uri(char * uri);
+
+// Set the HTTP signature key
+void config_set_http_sig_key(char * key);
+
 // Set the config server URI.
 void config_set_config_uri(char * uri);
 
-void miso_load_config(void);
+
+
+
+
 
 char * const config_get_wifi_ssid(void);
 
@@ -75,6 +84,12 @@ char * const config_get_mqtt_psk_key(void);
 
 char * const config_get_http_uri(void);
 
+char *const config_get_http_sig_uri(void);
+
+char *const config_get_http_sig_key(void);
+
 char * const config_get_config_uri(void);
+
+void miso_load_config(void);
 
 #endif /* UISO_CONFIG_H_ */

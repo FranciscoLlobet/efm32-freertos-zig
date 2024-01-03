@@ -12,7 +12,7 @@ const usb = @import("usb.zig");
 //const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
-const boot_app = @import("boot_app.zig");
+const app = @import("boot/app.zig");
 
 const c = @cImport({
     @cInclude("board.h");
@@ -171,9 +171,7 @@ pub export fn main() noreturn {
 
     _ = c.printf("--- BOOT starting FreeRTOS %d---\n\r", appCounter);
 
-    //boot_app.boot_app.init();
-
-    boot_app.prepareJump();
+    app.app.init();
 
     // Start the FreeRTOS scheduler
     freertos.vTaskStartScheduler();
@@ -206,9 +204,7 @@ pub export fn appStart() void {
 
     leds.yellow.off();
 
-    boot_app.boot_app.task.resumeTask();
-
-    // board.watchdogEnable();
+    app.app.task.resumeTask();
 }
 
 extern fn __libc_init_array() callconv(.C) void;
