@@ -25,23 +25,40 @@ fn prepareJump() void {
 
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
+    _ = self;
 
     _ = nvm.init() catch 0;
-
-    fatfs.mount("SD") catch unreachable;
 
     config.load_config_from_nvm() catch {
         _ = c.printf("Failed to load config from NVM\n");
     };
 
-    // Load file
-    firmware.checkFirmwareImage() catch {
-        _ = c.printf("Failed to load firmware image\n");
-    };
-
     while (true) {
-        leds.red.on();
-        self.task.delayTask(1);
+        if (false) {
+            //
+        } else if (nvm.isUpdateRequested() catch false) {
+            fatfs.mount("SD") catch unreachable;
+            defer {
+                fatfs.unmount("SD") catch {};
+            }
+
+            // Load file
+            firmware.checkFirmwareImage() catch {
+                _ = c.printf("Failed to load firmware image\n");
+            };
+
+            // Backup current image
+            firmware.backupFirmware() catch {
+                _ = c.printf("Failed to backup current image\n");
+            };
+
+            // Write new image
+
+            //
+            nvm.clearUpdateRequest() catch unreachable;
+            //nvm.setBootRequest() catch unreachable;
+        }
+
         prepareJump();
     }
 }

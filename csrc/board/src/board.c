@@ -189,7 +189,8 @@ void BOARD_Init(void)
 void BOARD_MCU_Reset(void)
 {
 	//USBX_disable();
-
+	BOARD_DeInit();
+	
 	/* Disable the IRQs that may interfere now */
 	__disable_irq();
 

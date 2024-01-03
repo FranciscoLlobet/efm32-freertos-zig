@@ -84,6 +84,19 @@ pub const config_error = (fatfs.frError || sha256.sha256_error || std.mem.Alloca
 /// Const File block Size
 const file_block_size: usize = 512;
 
+/// Helper Getters
+pub inline fn getHttpSigKey() []u8 {
+    return c.config_get_http_sig_key()[0..c.strlen(c.config_get_http_sig_key())];
+}
+
+pub inline fn getHttpFwUri() []u8 {
+    return c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())];
+}
+
+pub inline fn getHttpSigUri() []u8 {
+    return c.config_get_http_sig_uri()[0..c.strlen(c.config_get_http_sig_uri())];
+}
+
 /// Open file and calculate SHA256 hash
 /// Precondition: The File System has been mounted (!)
 pub fn calculateFileHash(path: [*:0]const u8, hash: *[32]u8) config_error![]u8 {
@@ -234,7 +247,6 @@ pub fn store_config_in_nvm() !void {
 }
 
 pub fn load_config_from_nvm() !void {
-
     // Wifi
     nvm.readCString(.wifi_ssid, c.config_get_wifi_ssid()) catch {};
     nvm.readCString(.wifi_psk, c.config_get_wifi_key()) catch {};

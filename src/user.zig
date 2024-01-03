@@ -16,6 +16,7 @@ const mqtt = @import("mqtt.zig");
 const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
+const system = @import("system.zig");
 
 const state = enum(usize) {
     verify_config = 0,
@@ -94,7 +95,13 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 if (downloadAndVerify()) |_| {
                     // Happy path
 
+                    nvm.setUpdateRequest() catch unreachable;
+
                     _ = c.printf("Firmware download complete\r\n");
+
+                    self.task.delayTask(1000);
+
+                    // system.reset();
                 } else |_| {
                     _ = c.printf("Failure to download!!\n\r");
                 }
@@ -131,17 +138,13 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 fn downloadAndVerify() !bool {
-    const http_uri = c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())];
-    const http_sig_uri = c.config_get_http_sig_uri()[0..c.strlen(c.config_get_http_sig_uri())];
-    const http_sig_key: []u8 = c.config_get_http_sig_key()[0..c.strlen(c.config_get_http_sig_key())];
-
     // Download the firmware
-    try http.service.filedownload(http_uri, config.fw_file_name, 512, 1024 * 1024);
+    try http.service.filedownload(config.getHttpFwUri(), config.fw_file_name, 512, 1024 * 1024);
 
     // Download the signature
-    try http.service.filedownload(http_sig_uri, config.fw_sig_file_name, 512, 1024 * 1024);
+    try http.service.filedownload(config.getHttpSigUri(), config.fw_sig_file_name, 512, 1024 * 1024);
 
-    try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, http_sig_key);
+    try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, config.getHttpSigKey());
 
     return true;
 }
