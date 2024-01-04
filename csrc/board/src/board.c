@@ -63,15 +63,23 @@ void BOARD_msDelay(uint32_t delay_in_ms)
 	}
 
 }
+void BOARD_DeInit(void)
+{
+	(void)nvm3_close(miso_nvm3_handle);
+	MSC_Deinit();
+}
+
 
 void BOARD_Init(void)
 {
 	CHIP_Init();
 	MSC_Init();
 
+	reset_cause = RMU_ResetCauseGet();
+
 	/* Initialize mcu peripherals */
 	sl_device_init_nvic();
-	sl_device_init_hfxo();
+	//sl_device_init_hfxo();
 	sl_device_init_hfrco();
 	sl_device_init_lfxo();
 	sl_device_init_emu();
@@ -96,7 +104,6 @@ void BOARD_Init(void)
 
 	CMU_ClockEnable(cmuClock_GPIO, true);
 
-	reset_cause = RMU_ResetCauseGet();
 
 	/* ENABLE SWO */
 	sl_debug_swo_init();
@@ -175,14 +182,15 @@ void BOARD_Init(void)
 
 	RMU_ResetCauseClear();
 
-	BOARD_USB_Init();
+	//BOARD_USB_Init();
 }
 
 
 void BOARD_MCU_Reset(void)
 {
-	USBX_disable();
-
+	//USBX_disable();
+	BOARD_DeInit();
+	
 	/* Disable the IRQs that may interfere now */
 	__disable_irq();
 
@@ -206,12 +214,11 @@ void BOARD_MCU_Reset(void)
 	NVIC->ICPR[6] = 0xFFFFFFFF;
 	NVIC->ICPR[7] = 0xFFFFFFFF;
 
-	BOARD_SysTick_Disable();
-
-	/* Data Synch Barrier */
+	//BOARD_SysTick_Disable();
+	SysTick->CTRL = 0 ;
+	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk ;
+	
 	__DSB();
-
-	/* Instruction Synch Barrier */
 	__ISB();
 
 	/* Perform Chip Reset*/
@@ -247,26 +254,16 @@ int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 	return 0;
 }
 
-__attribute__( (naked, noreturn, section(".ramfunc"))) void BootJumpASM(uint32_t SP, uint32_t PC) {
-  __asm("MSR      MSP,r0");
-  __asm("MSR	  PSP,r0");
-  __asm("MOV      PC,r1");
-};
-
 typedef void (*jumpFunction)(void);
 
+// Jump is assigned outside of the stack
+static jumpFunction jump = NULL;
 
-__attribute__((packed)) struct vector_table {
-	uint32_t msp;
-	uint32_t reset;
-};
-
- __attribute__((noreturn, section(".ramfunc"))) void BOARD_JumpToAddress(uint32_t * addr)
+void BOARD_JumpToAddress(uint32_t * addr)
 {
-	uint32_t sp = addr[0];
-	uint32_t pc = addr[1];
+	jump = (jumpFunction)(addr[1]);
 
-	BOARD_USB_Deinit();
+	BOARD_DeInit();
 
 	__DSB();
 	__ISB();
@@ -274,21 +271,36 @@ __attribute__((packed)) struct vector_table {
 	// Set to privileged mode
 	if( CONTROL_nPRIV_Msk & __get_CONTROL( ) )
 	{
-		__ASM volatile ("svc 0x07");
+		//__ASM volatile ("svc 0x07");
 	}
 
 	__ISB();
 	__disable_irq();
 
-   // Disable and clear NVIC interrupts
-    for (uint32_t i = 0; i < 8; i++) {
-        NVIC->ICER[i] = 0xFFFFFFFF;
-        NVIC->ICPR[i] = 0xFFFFFFFF;
-    }
+	// Disable all interrupts
+	NVIC->ICER[0] = 0xFFFFFFFF;
+	NVIC->ICER[1] = 0xFFFFFFFF;
+	NVIC->ICER[2] = 0xFFFFFFFF;
+	NVIC->ICER[3] = 0xFFFFFFFF;
+	NVIC->ICER[4] = 0xFFFFFFFF;
+	NVIC->ICER[5] = 0xFFFFFFFF;
+	NVIC->ICER[6] = 0xFFFFFFFF;
+	NVIC->ICER[7] = 0xFFFFFFFF;
+
+	// Clear all pending interrupts
+	NVIC->ICPR[0] = 0xFFFFFFFF;
+	NVIC->ICPR[1] = 0xFFFFFFFF;
+	NVIC->ICPR[2] = 0xFFFFFFFF;
+	NVIC->ICPR[3] = 0xFFFFFFFF;
+	NVIC->ICPR[4] = 0xFFFFFFFF;
+	NVIC->ICPR[5] = 0xFFFFFFFF;
+	NVIC->ICPR[6] = 0xFFFFFFFF;
+	NVIC->ICPR[7] = 0xFFFFFFFF;
 
 	__DSB();
 	__ISB();
 
+	// Set some of the peripherals to reset values
 	RTC->CTRL         = _RTC_CTRL_RESETVALUE;
 	RTC->COMP0        = _RTC_COMP0_RESETVALUE;
 	RTC->IEN          = _RTC_IEN_RESETVALUE;
@@ -302,9 +314,10 @@ __attribute__((packed)) struct vector_table {
 	/* Reset clocks */
 	CMU->HFPERCLKDIV  = _CMU_HFPERCLKDIV_RESETVALUE;
 	CMU->HFPERCLKEN0  = _CMU_HFPERCLKEN0_RESETVALUE;
-
+	
 	// Disable the SysTick
-	BOARD_SysTick_Disable();
+	SysTick->CTRL = 0 ;
+	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
 
 	__DSB();
 	__ISB();
@@ -318,10 +331,26 @@ __attribute__((packed)) struct vector_table {
   		__set_CONTROL( __get_CONTROL( ) & ~CONTROL_SPSEL_Msk ) ;
 	}
 
+	__DSB();
+	__ISB();
+	
+	// Set the vector table offset
 	SCB->VTOR = ( uint32_t )addr;
-	//MSC->CACHECMD = MSC_CACHECMD_INVCACHE;
+	
+	// Set the main stack pointer
+	// From here we lose the variables in stack
+	__set_MSP(addr[0]);
+	__set_PSP(__get_MSP());
 
-	BootJumpASM( sp, pc);
+	// Perform the Jump using the C-Style function pointer
+	if(NULL != jump)
+	{
+		__set_CONTROL(0x00);
+		__ISB();
+		
+		jump();
+	}
+	// unreachable
 }
 
 

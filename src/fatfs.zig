@@ -160,12 +160,13 @@ pub const file = struct {
 
     /// Write a slice of bytes to the current file
     /// Returns the number of bytes written, or an error.
+    /// Checks the number of bytes written and returns error if more bytes were written than requested.
     pub fn write(self: *@This(), buf: []const u8) frError!usize {
         var bytesWritten: usize = 0;
 
         try fRet.check(c.f_write(&self.handle, buf.ptr, buf.len, &bytesWritten));
 
-        return bytesWritten;
+        return if (bytesWritten > buf.len) frError.buffer_overflow else bytesWritten;
     }
 
     /// Perform sync on the current file

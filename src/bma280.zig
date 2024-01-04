@@ -6,9 +6,14 @@ const c = @cImport({
     @cInclude("board_i2c_sensors.h");
 });
 
-handle: *c.bma2_dev,
+/// BMA280 handle type
+pub const bma280_handle = *c.bma2_dev;
 
-pub fn init(self: *const @This()) void {
+handle: bma280_handle,
+
+pub fn init(handle: bma280_handle) !@This() {
+    var self: @This() = .{ .handle = handle };
+
     var ret: i8 = -1;
     var self_test_result: i8 = -1;
 
@@ -26,6 +31,6 @@ pub fn init(self: *const @This()) void {
     if (0 == ret) {
         ret = c.bma2_set_power_mode(0x0C, self.handle);
     }
-}
 
-pub const sensor = @This(){ .handle = &c.board_bma280 };
+    return self;
+}

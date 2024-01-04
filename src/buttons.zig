@@ -1,5 +1,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const board = microzig.board;
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("sl_simple_button.h");
@@ -13,13 +14,17 @@ pub const button_error = error{
 
 handle: button_handle,
 
-pub const name = enum { button1, button2 };
+pub const name = enum(u32) { button1, button2 };
 
 pub const state = enum(u32) {
     disabled = c.SL_SIMPLE_BUTTON_DISABLED,
     pressed = c.SL_SIMPLE_BUTTON_PRESSED,
     released = c.SL_SIMPLE_BUTTON_RELEASED,
 };
+
+fn initFromHandle(comptime handle: button_handle) @This() {
+    return @This(){ .handle = handle };
+}
 
 pub fn getState(self: *const @This()) state {
     return @as(state, @enumFromInt(c.sl_simple_button_get_state(self.handle)));
@@ -48,5 +53,5 @@ pub fn getName(self: *const @This()) name {
     }
 }
 
-pub const button1 = @This(){ .handle = &c.button1 };
-pub const button2 = @This(){ .handle = &c.button2 };
+pub const button1 = @This().initFromHandle(@ptrCast(board.button1));
+pub const button2 = @This().initFromHandle(@ptrCast(board.button2));

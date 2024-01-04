@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) !void {
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1 -D__Vectors=\"VectorTable\"", "-fdata-sections", "-ffunction-sections" };
+    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections" };
 
     const microzig = @import("microzig").init(b, "microzig");
 
@@ -73,7 +73,7 @@ pub fn build(b: *std.Build) !void {
             .board = boards.xdk110,
         },
         .optimize = optimize,
-        .source_file = .{ .path = "src/main.zig" },
+        .source_file = .{ .path = "src/boot.zig" },
     };
 
     const application_target = .{

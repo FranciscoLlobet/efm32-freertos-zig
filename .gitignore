@@ -3,3 +3,11 @@ deps/zig-out
 zig-cache
 zig-out
 .vscode/settings.json
+*.pem
+*.key
+*.b64
+*.dev
+*.pub
+*.bin
+*.sig
+*.der

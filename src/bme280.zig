@@ -14,10 +14,7 @@ pub const sensor_errors = error{
 pub const bme280_data = c.struct_bme280_data;
 pub const bme280_handle = *c.bme280_dev;
 
-// Device Handle. Should be in board
-pub const bme280_dev: bme280_handle = &c.board_bme280;
-
-handle: bme280_handle = undefined,
+handle: bme280_handle,
 
 pub fn init(handle: bme280_handle) !@This() {
     var self: @This() = .{ .handle = handle };

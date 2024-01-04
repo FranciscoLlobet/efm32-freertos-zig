@@ -104,8 +104,8 @@ uint32_t SystemCoreClock = 14000000UL;
 /*---------------------------------------------------------------------------
    Exception / Interrupt Vector table
  *---------------------------------------------------------------------------*/
-extern const tVectorEntry __VECTOR_TABLE[16 + EXT_IRQ_COUNT];
-
+//extern const tVectorEntry __VECTOR_TABLE[16 + EXT_IRQ_COUNT];
+extern const tVectorEntry vector_table[16 + 48];
 /*******************************************************************************
  **************************   GLOBAL FUNCTIONS   *******************************
  ******************************************************************************/
@@ -308,16 +308,16 @@ void SystemHFXOClockSet(uint32_t freq)
  *   and any data has been initialized. For this reason, it cannot do any
  *   initialization of variables ºetc.
  ******************************************************************************/
-//void SystemInit(void)
-//{
-//#if defined (__VTOR_PRESENT) && (__VTOR_PRESENT == 1U)
-//  SCB->VTOR = (uint32_t)(&__VECTOR_TABLE[0]);
-//#endif
+void SystemInit(void)
+{
+#if defined (__VTOR_PRESENT) && (__VTOR_PRESENT == 1U)
+  SCB->VTOR = (uint32_t)(&vector_table[0]);
+#endif
 
-//#if defined(UNALIGNED_SUPPORT_DISABLE)
-//  SCB->CCR |= SCB_CCR_UNALIGN_TRP_Msk;
-//#endif
-//}
+#if defined(UNALIGNED_SUPPORT_DISABLE)
+  SCB->CCR |= SCB_CCR_UNALIGN_TRP_Msk;
+#endif
+}
 
 /***************************************************************************//**
  * @brief

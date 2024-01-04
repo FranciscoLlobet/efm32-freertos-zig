@@ -70,5 +70,6 @@
         "private_access.h": "c",
         "miso_mbedtls_config.h": "c",
         "freertos.h": "c"
-    }
+    },
+    "cmake.configureOnOpen": false
 }

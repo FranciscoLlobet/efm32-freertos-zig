@@ -22,8 +22,9 @@ fn tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 fn sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
     const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
 
-    var bme280_sensor = bme280.init(bme280.bme280_dev) catch unreachable;
-    bma280.sensor.init();
+    var bme280_sensor = bme280.init(@ptrCast(board.bme280_dev)) catch unreachable;
+    var bma280_sensor = bma280.init(@ptrCast(board.bma280_dev)) catch unreachable;
+    _ = bma280_sensor;
 
     while (true) {
         var temp_data: bme280.bme280_data = undefined;

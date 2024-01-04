@@ -9,15 +9,14 @@ const c = @cImport({
     @cInclude("miso_config.h");
     @cInclude("wifi_service.h");
 });
+const pk = @import("pk.zig");
 const sha256 = @import("sha256.zig");
 const http = @import("http.zig");
 const mqtt = @import("mqtt.zig");
 const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
-
-const fw_file_name = "SD:FW.BIN";
-const config_file_name = "SD:CONFIG.TXT";
+const system = @import("system.zig");
 
 const state = enum(usize) {
     verify_config = 0,
@@ -39,6 +38,7 @@ const state = enum(usize) {
         };
     }
 };
+
 task: freertos.StaticTask(config.rtos_stack_depth_user_task),
 timer: freertos.Timer,
 state: state,
@@ -68,11 +68,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             };
 
             //board.watchdogFeed();
-            _ = config.open_config_file(config_file_name) catch {
+            _ = config.open_config_file(config.config_file_name) catch {
                 _ = c.printf("Failure!!\n\r");
             };
-
-            //config.store_config_in_nvm() catch {};
 
             // Next state
             self.state = .start_connectivity;
@@ -81,7 +79,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             // Change this to wait for connectivity
             wifi_task.resumeTask();
 
-            //eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null);
             while ((eventValue & c.miso_connectivity_on) != c.miso_connectivity_on) {
                 if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
                     eventValue = val;
@@ -91,14 +88,24 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             self.state = .perform_firmware_download;
         } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
-                // get eTag from the NVM
+                _ = c.printf("Performing firmware download\r\n");
 
-                http.service.filedownload(c.config_get_http_uri()[0..c.strlen(c.config_get_http_uri())], fw_file_name, 512) catch |err| {
-                    _ = c.printf("Failure to download!!: %s\n\r", @errorName(err).ptr);
-                };
+                // get eTag from the NVM
+                if (downloadAndVerify()) |_| {
+                    // Happy path
+
+                    nvm.setUpdateRequest() catch unreachable;
+
+                    _ = c.printf("Firmware download complete\r\n");
+
+                    self.task.delayTask(1000);
+
+                    // system.reset();
+                } else |_| {
+                    _ = c.printf("Failure to download!!\n\r");
+                }
             }
 
-            _ = c.printf("Firmware download complete\r\n");
             // perform HTTP download
             if (comptime config.enable_lwm2m) {
                 self.state = .start_lwm2m;
@@ -127,6 +134,18 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             }
         }
     }
+}
+
+fn downloadAndVerify() !bool {
+    // Download the firmware
+    try http.service.filedownload(config.getHttpFwUri(), config.fw_file_name, 512, 1024 * 1024);
+
+    // Download the signature
+    try http.service.filedownload(config.getHttpSigUri(), config.fw_sig_file_name, 512, 1024 * 1024);
+
+    try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, config.getHttpSigKey());
+
+    return true;
 }
 
 pub fn create(self: *@This()) void {

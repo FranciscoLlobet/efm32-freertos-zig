@@ -49,19 +49,29 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) build.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) and macOS (via brew) builds.
 
 #### Install the Arm GNU Toolchain
 
-> The Arm GNU Toolchain is now optional since `miso`'s move to `picolibc`.
+> The Arm GNU Toolchain is now optional for building since `miso`'s move to `picolibc`.
+
+https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 
 ### Picolibc
 
-Picolibc is provided precompiled using the clang compiler on Ubuntu WSL. Since moving to picolibc, the ARM GNU Toolchain should be optional.
+Picolibc is provided precompiled using the clang compiler on Ubuntu WSL.
 
 ### Code Checkout
 
-```powershell
+Perform a recursive clone:
+
+```shell
+git clone --recursive https://github.com/FranciscoLlobet/efm32-freertos-zig.git
+```
+
+Alternatively clone and update submodules:
+
+```shell
 git clone https://github.com/FranciscoLlobet/efm32-freertos-zig.git
 cd .\efm32-freertos-zig\
 git submodule init
@@ -72,8 +82,6 @@ git submodule update
 
 ```powershell
 zig build
-zig objcopy -O binary .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.bin 
-zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex 
 ```
 
 ## Used 3rd party software
@@ -126,7 +134,6 @@ zig objcopy -O hex .\zig-out\bin\XDK110.elf .\zig-out\bin\XDK110.hex
 
 Configuration can be loaded via SD card by `config.txt`
 
-
 ```json
 {
     "wifi":{
@@ -134,7 +141,7 @@ Configuration can be loaded via SD card by `config.txt`
         "key":"WIFI_KEY"
     },
     "lwm2m":{
-        "device":"LWM2M_DEVICE_NAME",
+        "endpoint":"LWM2M_DEVICE_NAME",
         "uri":"coaps://leshan.eclipseprojects.io:5684",
         "psk":{
             "id":"LWM2M_PSK_ID",
@@ -150,7 +157,7 @@ Configuration can be loaded via SD card by `config.txt`
         ]
     },
     "mqtt":{
-        "url":"mqtt://localhost:1883",
+        "url":"mqtt://MQTT_BROKER_HOST:1883",
         "device":"MQTT_DEVICE_ID",
         "username": "MQTT_USER_NAME",
         "password": "MQTT_PASSWORD",
@@ -162,8 +169,49 @@ Configuration can be loaded via SD card by `config.txt`
             "client" : "MQTT_CERT",
             "server_ca" : "MQTT_SERVER_CA",
         }
+    },
+    "http":{
+       "url":"http://HTTP_SERVER_HOST:80/XDK110.bin",
     }
 }
+```
+
+## Firmware signature
+
+```console
+openssl ecparam -genkey -name prime256v1 -noout -out fw_private_key.pem
+```
+
+Generate the public key
+
+### PEM Format
+
+```console
+openssl ec -in fw_private_key.pem -pubout -out fw.pub
+```
+
+### DER Format
+
+```console
+openssl ec -in fw_private_key.pem -pubout -outform DER -out fw.der
+```
+
+### Base64 DER
+
+```console
+openssl base64 --in fw.der --out fw.b64
+```
+
+### Generate FW signature
+
+```console
+openssl dgst -sha256 -sign .\fw_private_key.pem -out .\zig-out\firmware\app.sig .\zig-out\firmware\app.bin
+```
+
+Verify against DER pub key
+
+```console
+openssl dgst -sha256 -verify .\fw.der -signature .\zig-out\firmware\app.sig .\zig-out\firmware\app.bin
 ```
 
 ## Configuration signature

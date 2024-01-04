@@ -81,7 +81,7 @@ pub const microzig_options = struct {
             c.I2C0_IRQHandler();
         }
         pub fn USB() void {
-            c.USB_IRQHandler();
+            //c.USB_IRQHandler();
         }
         pub fn TIMER0() void {
             c.TIMER0_IRQHandler();
@@ -220,9 +220,12 @@ pub export fn appStart() void {
 // Initialisation of the C runtime.
 
 extern fn __libc_init_array() callconv(.C) void;
+extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
     __libc_init_array();
+
+    SystemInit();
 }
 
 // Button On-Change Callback
