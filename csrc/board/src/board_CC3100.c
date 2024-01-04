@@ -353,7 +353,7 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
 			break;
 		case SL_DEVICE_DRIVER_TIMEOUT_ASYNC_EVENT:
 			printf("Driver Timeout: Async event not received.\n");
-			// system_reset();
+			system_reset();
 			break;
 		default:
 			break;

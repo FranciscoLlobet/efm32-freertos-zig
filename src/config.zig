@@ -51,7 +51,7 @@ pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1400 else min_task_stack
 pub const rtos_prio_http = @intFromEnum(task_priorities.rtos_prio_normal);
 pub const rtos_stack_depth_http: u16 = if (enable_http) 2000 else min_task_stack_depth;
 
-pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_normal);
+pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_below_normal);
 pub const rtos_stack_depth_user_task: u16 = 1500;
 
 // version
@@ -74,6 +74,9 @@ pub const config_sig_file_name = "SD:CONFIG.SIG";
 
 /// Default Config Public Key Location
 pub const config_pub_key_file_name = "SD:CONFIG.PUB";
+
+/// Default APP backup Firmware Location
+pub const app_backup_file_name = "SD:APP.BAK";
 
 // Allocator used in the application
 pub const allocator = freertos.allocator;
@@ -113,6 +116,29 @@ pub fn calculateFileHash(path: [*:0]const u8, hash: *[32]u8) config_error![]u8 {
 
     while (try file.readEof(mem_block)) |br| {
         try sha256_ctx.update(br);
+    }
+
+    try sha256_ctx.finish(hash);
+
+    return hash[0..];
+}
+
+pub fn calculateMemHash(slice: []u8, hash: *[32]u8) config_error![]u8 {
+    const mem_block = try allocator.alloc(u8, file_block_size);
+    defer allocator.free(mem_block);
+
+    var sha256_ctx = sha256.init();
+    defer sha256_ctx.free();
+
+    try sha256_ctx.start();
+
+    var current_pos: usize = 0;
+    while (current_pos < slice.len) {
+        const start_pos = current_pos;
+        const end_pos: usize = if ((start_pos + mem_block.len) > slice.len) slice.len else (start_pos + mem_block.len);
+
+        try sha256_ctx.update(slice[start_pos..end_pos]);
+        current_pos = end_pos;
     }
 
     try sha256_ctx.finish(hash);

@@ -17,15 +17,88 @@ const c = @cImport({
     @cInclude("miso_config.h");
 });
 
-task: freertos.StaticTask(2000),
-
 fn prepareJump() void {
     board.jumpToApp();
 }
 
+const update_phase = enum(usize) {
+    check,
+    backup,
+    verify_backup,
+    erase_flash,
+    flash,
+    verify_flash,
+    complete,
+};
+
+task: freertos.StaticTask(2000),
+phase: update_phase,
+
+fn firmwareUpdate(self: *@This()) !void {
+    self.phase = update_phase.check;
+    var backup_len: usize = 0;
+    var app_len: usize = 0;
+
+    while (self.phase != update_phase.complete) {
+        switch (self.phase) {
+            update_phase.check => {
+                // Check the firmware image in the SD card
+                _ = c.printf("Checking firmware image\n");
+
+                try firmware.checkFirmwareImage();
+
+                self.phase = update_phase.backup; // next phase
+            },
+            update_phase.backup => {
+                // Backup current image
+                _ = c.printf("Backing up current image\n");
+
+                backup_len = try firmware.backupFirmware(config.app_backup_file_name, null);
+
+                self.phase = update_phase.verify_backup;
+            },
+            update_phase.verify_backup => {
+                // Verify backup
+                _ = c.printf("Verifying backup\n");
+
+                try firmware.verifyBackup(config.app_backup_file_name, backup_len);
+
+                self.phase = update_phase.erase_flash;
+            },
+            update_phase.erase_flash => {
+                // Erase flash
+                _ = c.printf("Erasing flash\n");
+
+                try firmware.eraseFlash(backup_len);
+
+                self.phase = update_phase.flash;
+            },
+            update_phase.flash => {
+                // Write new image
+                _ = c.printf("Writing new image\n");
+
+                app_len = try firmware.flashFirmware(config.fw_file_name, null);
+
+                self.phase = update_phase.verify_flash;
+            },
+            update_phase.verify_flash => {
+                // Verify new image
+                _ = c.printf("Verifying new image\n");
+
+                try firmware.verifyBackup(config.fw_file_name, app_len);
+
+                self.phase = update_phase.complete;
+            },
+            update_phase.complete => {
+                return;
+                //break update_phase.complete;
+            },
+        }
+    }
+}
+
 fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
-    _ = self;
 
     _ = nvm.init() catch 0;
 
@@ -42,21 +115,14 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 fatfs.unmount("SD") catch {};
             }
 
-            // Load file
-            firmware.checkFirmwareImage() catch {
-                _ = c.printf("Failed to load firmware image\n");
-            };
-
-            // Backup current image
-            firmware.backupFirmware() catch {
-                _ = c.printf("Failed to backup current image\n");
-            };
-
-            // Write new image
-
-            //
-            nvm.clearUpdateRequest() catch unreachable;
-            //nvm.setBootRequest() catch unreachable;
+            if (self.firmwareUpdate()) |_| {
+                nvm.clearUpdateRequest() catch unreachable;
+            } else |_| {
+                // Error handling
+                _ = c.printf("Firmware update failed\n");
+                // Rollback
+            }
+            continue;
         }
 
         prepareJump();

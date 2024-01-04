@@ -72,8 +72,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            //config.store_config_in_nvm() catch {};
-
             // Next state
             self.state = .start_connectivity;
         } else if (self.state == .start_connectivity) {
@@ -81,7 +79,6 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             // Change this to wait for connectivity
             wifi_task.resumeTask();
 
-            //eventValue = self.task.waitForNotify(0, 0xFFFFFFFF, null);
             while ((eventValue & c.miso_connectivity_on) != c.miso_connectivity_on) {
                 if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
                     eventValue = val;
@@ -91,6 +88,8 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
             self.state = .perform_firmware_download;
         } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
+                _ = c.printf("Performing firmware download\r\n");
+
                 // get eTag from the NVM
                 if (downloadAndVerify()) |_| {
                     // Happy path

@@ -9,6 +9,7 @@ const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
+const user = @import("user.zig");
 
 const c = @cImport({
     @cDefine("MQTT_CLIENT", "1");
@@ -85,6 +86,10 @@ const MQTTPacket_connectData_initializer = c.MQTTPacket_connectData{
     .username = MQTTString_initializer,
     .password = MQTTString_initializer,
 };
+
+const fw_update_topic = "zig/fw";
+const conf_update_topic = "zig/conf";
+const reset_topic = "zig/reset";
 
 connection: connection,
 connectionCounter: usize,
@@ -610,6 +615,14 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                         var buf: [64]u8 = undefined;
                         @memset(&buf, 0);
 
+                        if (std.mem.eql(u8, publish_response.topic[0..fw_update_topic.len], fw_update_topic)) {
+                            // FW trigger
+                            //try user.user_task.task.notify(0xA, .eSetBits);
+                            system.reset();
+                            //self.task.suspendTask();
+                            break;
+                        }
+
                         var s = try std.fmt.bufPrint(&buf, "publish recieved: {d}, {d} {s} {s}\r\n", .{ packetId, @intFromEnum(publish_response.qos), publish_response.topic, publish_response.payload });
 
                         _ = c.printf("%s", s.ptr);
@@ -754,9 +767,6 @@ fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 
     _ = self.packet.preparePingPacket() catch unreachable;
 }
-
-const fw_update_topic = "zig/fw";
-const conf_update_topic = "zig/conf";
 
 pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS, dup: bool, packetId: ?u16, deadline: u32) !void {
     const ret = try self.packet.preparePublishPacket(topic, payload, qos, dup, packetId);
