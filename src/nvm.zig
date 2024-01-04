@@ -81,6 +81,8 @@ pub const app_nvm_keys = enum(u20) {
     /// and before booting the application. The application should clear this flag
     boot_request, //
 
+    firmware_size,
+
     max_key = 0x0FFFF,
 
     fn toInt(self: @This()) u32 {
@@ -133,7 +135,7 @@ pub fn init() !u32 {
 
     var num_objects: usize = countObjects();
 
-    if (num_objects < 8) {
+    if (num_objects < 9) {
         try eraseAll();
         try writeCounter(.start_counter, 0);
         try writeCounter(.reset_counter, 0);
@@ -144,6 +146,7 @@ pub fn init() !u32 {
 
         try writeCounter(.boot_request, 0);
         try writeCounter(.update_request, 0);
+        try writeCounter(.firmware_size, 0);
     }
 
     return 0;
@@ -273,4 +276,12 @@ pub inline fn clearUpdateRequest() !void {
 
 pub inline fn isUpdateRequested() !bool {
     return (try readCounter(.update_request)) != 0;
+}
+
+pub inline fn setFirmwareSize(size: u32) !void {
+    try writeCounter(.firmware_size, size);
+}
+
+pub inline fn getFirmwareSize() !u32 {
+    return try readCounter(.firmware_size);
 }

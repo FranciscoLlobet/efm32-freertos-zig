@@ -52,8 +52,8 @@ fn firmwareUpdate(self: *@This()) !void {
             update_phase.backup => {
                 // Backup current image
                 _ = c.printf("Backing up current image\n");
-
-                backup_len = try firmware.backupFirmware(config.app_backup_file_name, null);
+                var fw_len = try nvm.getFirmwareSize();
+                backup_len = try firmware.backupFirmware(config.app_backup_file_name, if (fw_len != 0) fw_len else null);
 
                 self.phase = update_phase.verify_backup;
             },
@@ -87,11 +87,12 @@ fn firmwareUpdate(self: *@This()) !void {
 
                 try firmware.verifyBackup(config.fw_file_name, app_len);
 
+                try nvm.setFirmwareSize(app_len);
+
                 self.phase = update_phase.complete;
             },
             update_phase.complete => {
                 return;
-                //break update_phase.complete;
             },
         }
     }
