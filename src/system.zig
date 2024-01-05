@@ -26,9 +26,6 @@ fn performReset(param1: ?*anyopaque, param2: u32) callconv(.C) noreturn {
     leds.yellow.on();
     leds.orange.on();
 
-    // Stop the SimpleLink Driver
-    _ = board.c.sl_Stop(0xFFFF);
-
     // Add code to stop/close the FS
     fatfs.unmount("SD") catch {};
 

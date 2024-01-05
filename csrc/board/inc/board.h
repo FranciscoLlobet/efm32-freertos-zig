@@ -22,6 +22,24 @@
 #define SL_CATALOG_POWER_MANAGER_PRESENT    (1)
 #endif
 
+#ifdef MISO_BOOTLOADER
+#undef MISO_BOOTLOADER
+#define MISO_BOOTLOADER (1)
+#endif
+
+#ifdef MISO_APPLICATION
+#undef MISO_APPLICATION
+#define MISO_APPLICATION (1)
+#endif
+
+#ifndef MISO_BOOTLOADER
+#define MISO_APPLICATION    (1)
+#endif
+
+#if (defined(MISO_BOOTLOADER) && defined(MISO_APPLICATION))
+#error "MISO_BOOTLOADER and MISO_APPLICATION cannot be defined at the same time"
+#endif
+
 #include <stdint.h>
 
 #include "em_device.h"
@@ -301,7 +319,7 @@ void BOARD_msDelay(uint32_t delay_in_ms);
 
 /* Perform the MCU Reset */
 void BOARD_MCU_Reset(void);
-__attribute__((noreturn)) void BOARD_JumpToAddress(uint32_t * addr);
+void BOARD_JumpToAddress(uint32_t * addr);
 
 
 uint32_t BOARD_MCU_GetResetCause(void);

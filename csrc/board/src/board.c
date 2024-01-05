@@ -6,6 +6,8 @@
  */
 
 #include "board.h"
+//#include "simplelink.h"
+
 #include "board_sd_card.h"
 
 #include "timer.h"
@@ -24,8 +26,11 @@
 #include "sl_device_init_hfrco.h"
 #include "sl_device_init_lfxo.h"
 
+/* FreeRTOS */
 #include "FreeRTOS.h"
 #include "task.h"
+
+/* */
 
 extern nvm3_Handle_t * miso_nvm3_handle;
 extern nvm3_Init_t  * miso_nvm3_init_handle;
@@ -63,8 +68,17 @@ void BOARD_msDelay(uint32_t delay_in_ms)
 	}
 
 }
+
+#if(MISO_APPLICATION)
+extern int16_t sl_Stop(const uint16_t timeout);
+#endif
+
 void BOARD_DeInit(void)
 {
+	#if(MISO_APPLICATION)
+	sl_Stop(0xFFFF);
+	#endif
+
 	(void)nvm3_close(miso_nvm3_handle);
 	MSC_Deinit();
 }
@@ -79,7 +93,9 @@ void BOARD_Init(void)
 
 	/* Initialize mcu peripherals */
 	sl_device_init_nvic();
+	#if(MISO_APPLICATION)
 	//sl_device_init_hfxo();
+	#endif
 	sl_device_init_hfrco();
 	sl_device_init_lfxo();
 	sl_device_init_emu();

@@ -107,7 +107,7 @@ const source_path = [_][]const u8{
     "csrc/src/mbedtls_adapter/treading.c",
 };
 
-const c_flags = [_][]const u8{ "-DMBEDTLS_CONFIG_FILE=\"miso_mbedtls_config.h\"", "-DEFM32GG390F1024", "-O2", "-fdata-sections", "-ffunction-sections" };
+const c_flags = [_][]const u8{ "-DMBEDTLS_CONFIG_FILE=\"miso_mbedtls_config.h\"", "-DEFM32GG390F1024", "-Os", "-fdata-sections", "-ffunction-sections" };
 
 pub fn aggregate(exe: *microzig.Firmware) void {
     for (include_path) |path| {

@@ -81,6 +81,7 @@ void board_i2c_init(void)
 	NVIC_ClearPendingIRQ(I2C0_IRQn);
 	NVIC_SetPriority(I2C0_IRQn, (5));
 
+#if(MISO_APPLICATION)
 	if (board_i2c_os_control.i2c0_semaphore == NULL)
 	{
 		board_i2c_os_control.i2c0_semaphore = xQueueCreate(1,
@@ -93,6 +94,7 @@ void board_i2c_init(void)
 	}
 
 	I2CSPM_Init(&init_i2c0);
+#endif
 }
 
 I2C_TransferReturn_TypeDef board_i2c0_transfer(I2C_TransferSeq_TypeDef *seq)

@@ -7,7 +7,7 @@ const system = @import("system.zig");
 const config = @import("config.zig");
 const leds = @import("leds.zig");
 const buttons = @import("buttons.zig");
-const usb = @import("usb.zig");
+//const usb = @import("usb.zig");
 //const user = @import("user.zig");
 //const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
@@ -78,10 +78,10 @@ pub const microzig_options = struct {
             c.DMA_IRQHandler();
         }
         pub fn I2C0() void {
-            c.I2C0_IRQHandler();
+            //c.I2C0_IRQHandler();
         }
         pub fn USB() void {
-            c.USB_IRQHandler();
+            //c.USB_IRQHandler();
         }
         pub fn TIMER0() void {
             c.TIMER0_IRQHandler();
