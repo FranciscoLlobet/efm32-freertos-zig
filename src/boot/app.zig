@@ -36,7 +36,12 @@ const update_phase = enum(usize) {
     erase_flash_before_restore,
     restore_backup,
     verify_backup,
+
+    /// Firmware Update is complete
     complete,
+
+    /// Firmware Update failed, but backup was restored
+    backup_restored,
 };
 
 task: freertos.StaticTask(2000),
@@ -48,6 +53,126 @@ fn firmwareUpdate() !firmware_update_outcome {
 fn firmwareRestore() !firmware_update_outcome {
     return firmwareUpdateStateMachine(update_phase.restore_backup);
 }
+
+fn checkFirmwareCandidate() !update_phase {
+    _ = c.printf("Checking firmware image\n");
+
+    try firmware.checkFirmwareImage(); // If this fails, we can't continue.
+
+    return update_phase.backup; // next phase
+}
+
+fn performFirmwareBackup() !struct {
+    phase: update_phase,
+    backup_len: usize,
+} {
+    const fw_len = nvm.getFirmwareSize() catch 0;
+
+    _ = c.printf("Backing up current image\n");
+
+    const backup_len = try firmware.backupFirmware(config.app_backup_file_name, if (fw_len != 0) fw_len else null);
+
+    _ = c.printf("Verifying backup\n");
+
+    try firmware.verifyBackup(config.app_backup_file_name, backup_len);
+
+    // If we fail here, we can loop for some time and try again to backup the firmware
+    // The current logic would fail the whole process if the backup is not successful, which should be ok
+    return .{ .phase = update_phase.erase_flash, .backup_len = backup_len };
+}
+
+fn eraseFlash(backup_len: usize) !update_phase {
+    _ = c.printf("Erasing flash\n");
+
+    try firmware.eraseFlash(backup_len);
+    return update_phase.flash;
+}
+
+fn eraseFlashBeforeRestore(backup_len: usize) !update_phase {
+    // Erase flash
+    _ = c.printf("Erasing flash\n");
+
+    try firmware.eraseFlash(backup_len); // Erase flash ?
+    return update_phase.restore_backup;
+}
+
+fn restoreBackup() !struct { phase: update_phase, app_len: usize } {
+    var app_len: usize = 0;
+    var phase = update_phase.verify_backup;
+
+    _ = c.printf("Restoring backup\n");
+
+    if (firmware.flashFirmware(config.app_backup_file_name, null)) |val| {
+        app_len = val;
+        phase = update_phase.verify_backup;
+    } else |err| {
+        if (err == firmware.firmware_error.flash_write_error) {
+            phase = update_phase.erase_flash_before_restore;
+        } else {
+            return err;
+        }
+    }
+
+    return .{ .phase = phase, .app_len = app_len };
+}
+
+fn verifyImage(app_len: usize) !update_phase {
+    _ = c.printf("Verifying new image\n");
+
+    firmware.verifyBackup(config.fw_file_name, app_len) catch |err| {
+        if (err == firmware.firmware_error.hash_compare_mismatch) {
+            // go to erase flash
+            return update_phase.erase_flash;
+        } else {
+            return err;
+        }
+    };
+
+    nvm.setFirmwareSize(app_len) catch {};
+
+    return update_phase.complete;
+}
+
+fn verifyBackup(app_len: usize) !update_phase {
+    // Verify backup
+    _ = c.printf("Verifying backup\n");
+
+    firmware.verifyBackup(config.app_backup_file_name, app_len) catch |err| {
+        if (err == firmware.firmware_error.hash_compare_mismatch) {
+            // go to erase flash
+            return update_phase.erase_flash_before_restore;
+        } else {
+            return err;
+        }
+    };
+
+    return update_phase.backup_restored;
+}
+
+fn flashImage() !struct {
+    phase: update_phase,
+    app_len: usize,
+} {
+    var app_len: usize = 0;
+    var phase = update_phase.restore_backup;
+
+    if (firmware.flashFirmware(config.fw_file_name, null)) |val| {
+        app_len = val;
+        phase = update_phase.verify_flash;
+    } else |err| {
+        if (err == firmware.firmware_error.flash_firmware_size_error) {
+            phase = update_phase.restore_backup; // This should not be reachable
+        } else if (err == firmware.firmware_error.flash_write_error) {
+            phase = update_phase.erase_flash;
+        } else {
+            return err;
+        }
+    }
+
+    return .{ .phase = phase, .app_len = app_len };
+}
+
+const update_state = struct { phase: update_phase, app_len: usize, backup_len: usize };
 
 /// This function implements the firmware update state machine.
 /// It is responsible for checking the firmware image in the SD card,
@@ -63,132 +188,46 @@ fn firmwareUpdateStateMachine(start_phase: ?update_phase) !firmware_update_outco
     var backup_len: usize = 0;
     var app_len: usize = 0;
 
-    while (phase != update_phase.complete) {
-        switch (phase) {
-            update_phase.check => {
-                // Check the firmware image in the SD card
-                _ = c.printf("Checking firmware image\n");
+    var state: update_state = .{ .phase = start_phase orelse update_phase.check, .app_len = 0, .backup_len = 0 };
+    _ = state;
 
-                try firmware.checkFirmwareImage(); // If this fails, we can't continue.
-
-                phase = update_phase.backup; // next phase
-            },
-            update_phase.backup => {
+    while (true) {
+        phase = switch (phase) {
+            update_phase.check => try checkFirmwareCandidate(),
+            update_phase.backup => blk: {
                 // Backup current image
-                const fw_len = nvm.getFirmwareSize() catch 0;
+                const res = try performFirmwareBackup();
 
-                _ = c.printf("Backing up current image\n");
-
-                {
-                    backup_len = try firmware.backupFirmware(config.app_backup_file_name, if (fw_len != 0) fw_len else null);
-                    try firmware.verifyBackup(config.app_backup_file_name, backup_len);
-
-                    // If we fail here, we can loop for some time and try again to backup the firmware
-                    // The current logic would fail the whole process if the backup is not successful, which should be ok
-                }
-
-                _ = c.printf("Verifying backup\n");
-                phase = update_phase.erase_flash;
+                backup_len = res.backup_len;
+                break :blk res.phase;
             },
-            update_phase.erase_flash => {
-                // Erase flash
-                _ = c.printf("Erasing flash\n");
-
-                try firmware.eraseFlash(backup_len); // Erase flash ?
-
-                phase = update_phase.flash;
-            },
-            update_phase.flash => {
+            update_phase.erase_flash => try eraseFlash(backup_len),
+            update_phase.flash => blk: {
                 // Write new image
-                _ = c.printf("Writing new image\n");
+                const res = try flashImage();
 
-                if (firmware.flashFirmware(config.fw_file_name, null)) |val| {
-                    app_len = val;
-                } else |err| {
-                    if (err == firmware.firmware_error.flash_firmware_size_error) {
-                        // Restore Backup.
-                        phase = update_phase.restore_backup; // This should not be reachable
-                        continue;
-                    } else if (err == firmware.firmware_error.flash_write_error) {
-                        // Erase flash
-                        // self.phase = update_phase.erase_flash;
-                        // continue;
-                    } else {
-                        // File issues or unknown issues.
-                    }
-                }
-
-                phase = update_phase.verify_flash;
+                app_len = res.app_len;
+                break :blk res.phase;
             },
-            update_phase.verify_flash => {
-                // Verify new image
-                _ = c.printf("Verifying new image\n");
-
-                firmware.verifyBackup(config.fw_file_name, app_len) catch |err| {
-                    if (err == firmware.firmware_error.hash_compare_mismatch) {
-                        // go to erase flash
-                        phase = update_phase.erase_flash;
-                        continue;
-                    } else {
-                        // File issues or unknown issues.
-                    }
-                };
-
-                nvm.setFirmwareSize(app_len) catch {};
-
-                outcome = firmware_update_outcome.success;
-                phase = update_phase.complete;
-            },
-            update_phase.erase_flash_before_restore => {
-                // Erase flash
-                _ = c.printf("Erasing flash\n");
-
-                try firmware.eraseFlash(backup_len); // Erase flash ?
-
-                phase = update_phase.restore_backup;
-            },
-            update_phase.restore_backup => {
+            update_phase.verify_flash => try verifyImage(app_len),
+            update_phase.erase_flash_before_restore => try eraseFlashBeforeRestore(backup_len),
+            update_phase.restore_backup => blk: {
                 // Restore backup
-                _ = c.printf("Restoring backup\n");
+                const res = try restoreBackup();
 
-                if (firmware.flashFirmware(config.app_backup_file_name, null)) |val| {
-                    app_len = val;
-                } else |err| {
-                    if (err == firmware.firmware_error.flash_firmware_size_error) {
-                        // This should not be reachable
-                        return err;
-                    } else if (err == firmware.firmware_error.flash_write_error) {
-                        // Erase flash
-                        phase = update_phase.erase_flash_before_restore;
-                        continue;
-                    } else {
-                        // File issues or unknown issues.
-                    }
-                }
-
-                phase = update_phase.complete;
+                app_len = res.app_len;
+                break :blk res.phase;
             },
-            update_phase.verify_backup => {
-                // Verify backup
-                _ = c.printf("Verifying backup\n");
-
-                firmware.verifyBackup(config.app_backup_file_name, app_len) catch |err| {
-                    if (err == firmware.firmware_error.hash_compare_mismatch) {
-                        // go to erase flash
-                        phase = update_phase.erase_flash_before_restore;
-                        continue;
-                    } else {
-                        // File issues or unknown issues.
-                    }
-                };
-                outcome = firmware_update_outcome.backup_restore;
-                phase = update_phase.complete;
-            },
+            update_phase.verify_backup => try verifyBackup(app_len),
             update_phase.complete => {
-                break;
+                return firmware_update_outcome.success;
             },
-        }
+            update_phase.backup_restored => {
+                return firmware_update_outcome.backup_restore;
+            },
+        };
     }
+
     return outcome;
 }
 

@@ -126,7 +126,7 @@ pub fn eraseFlash(app_len: ?usize) !void {
 /// Returns the size of the flashed image
 /// Error Cases:
 /// - If the file size is larger than the allowed firmware size, then `flash_firmware_size_error` is returned
-/// - If the flash erase fails, then `flash_write_error` is returned
+/// - If the flash write fails, then `flash_write_error` is returned
 pub fn flashFirmware(path: [*:0]const u8, app_len: ?usize) !usize {
     const app_fw = fw[0..(app_len orelse fw.len)];
 
