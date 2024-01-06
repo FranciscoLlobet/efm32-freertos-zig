@@ -6,7 +6,7 @@
     "configurations": [
         {
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceRoot}/zig-out/firmware/miso.elf",
+            "executable": "${workspaceRoot}/zig-out/firmware/boot.elf",
             "name": "Debug with JLink MacOs",
             "request": "launch",
             "type": "cortex-debug",
@@ -36,7 +36,7 @@
         },
         {
             "cwd": "${workspaceRoot}",
-            "executable": "${workspaceRoot}/zig-out/firmware/miso.elf",
+            "executable": "${workspaceRoot}/zig-out/firmware/boot.elf",
             "name": "Boot",
             "request": "launch",
             "type": "cortex-debug",

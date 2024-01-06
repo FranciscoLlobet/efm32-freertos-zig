@@ -81,8 +81,12 @@ pub const app_backup_file_name = "SD:APP.BAK";
 // Allocator used in the application
 pub const allocator = freertos.allocator;
 
+pub const config_local_error = error{
+    signature_verification_failed,
+};
+
 /// Error Union in config
-pub const config_error = (fatfs.frError || sha256.sha256_error || std.mem.Allocator.Error || pk.pk_error);
+pub const config_error = (fatfs.frError || sha256.sha256_error || std.mem.Allocator.Error || pk.pk_error || mbedtls.mbedtls_error);
 
 /// Const File block Size
 const file_block_size: usize = 512;
@@ -123,23 +127,24 @@ pub fn calculateFileHash(path: [*:0]const u8, hash: *[32]u8) config_error![]u8 {
     return hash[0..];
 }
 
+/// Calculate SHA256 hash of a slice in memory
 pub fn calculateMemHash(slice: []u8, hash: *[32]u8) config_error![]u8 {
-    const mem_block = try allocator.alloc(u8, file_block_size);
-    defer allocator.free(mem_block);
+    // const mem_block = try allocator.alloc(u8, file_block_size);
+    // defer allocator.free(mem_block);
 
     var sha256_ctx = sha256.init();
     defer sha256_ctx.free();
 
     try sha256_ctx.start();
 
-    var current_pos: usize = 0;
-    while (current_pos < slice.len) {
-        const start_pos = current_pos;
-        const end_pos: usize = if ((start_pos + mem_block.len) > slice.len) slice.len else (start_pos + mem_block.len);
+    //ar current_pos: usize = 0;
+    //while (current_pos < slice.len) {
+    //    const start_pos = current_pos;
+    //    const end_pos: usize = if ((start_pos + mem_block.len) > slice.len) slice.len else (start_pos + mem_block.len);
 
-        try sha256_ctx.update(slice[start_pos..end_pos]);
-        current_pos = end_pos;
-    }
+    try sha256_ctx.update(slice);
+    //    current_pos = end_pos;
+    //}
 
     try sha256_ctx.finish(hash);
 
@@ -147,7 +152,7 @@ pub fn calculateMemHash(slice: []u8, hash: *[32]u8) config_error![]u8 {
 }
 
 /// Load a public key im PEM format into PK context
-fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) !void {
+fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) config_error!void {
     //const allocator = freertos.allocator;
 
     var key_file = try fatfs.file.open(path, @intFromEnum(fatfs.file.fMode.read));
@@ -173,7 +178,12 @@ pub fn load_public_key_from_nvm(nvm_str: []u8, pk_ctx: *pk) !void {
     try pk_ctx.parse(try mbedtls.base64Decode(@ptrCast(nvm_str.ptr), key));
 }
 
-pub fn verifyFirmwareSignature(fw_path: [*:0]const u8, sig_path: [*:0]const u8, nvm_str: []u8) !void {
+/// Verify Firmware Candidate against the signature.
+///
+/// - fw_path : Path to the firmware file in SD card
+/// - sig_path : Path to the signature file in SD card
+/// - nvm_str : NVM string containing the public key in base64DER (stripped PEM) format
+pub fn verifyFirmwareSignature(fw_path: [*:0]const u8, sig_path: [*:0]const u8, nvm_str: []u8) config_error!void {
     var fw_sha256: [32]u8 align(@alignOf(u32)) = undefined;
 
     @memset(&fw_sha256, 0);
