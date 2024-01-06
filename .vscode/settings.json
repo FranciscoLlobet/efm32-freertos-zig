@@ -69,7 +69,8 @@
         "bootutil_priv.h": "c",
         "private_access.h": "c",
         "miso_mbedtls_config.h": "c",
-        "freertos.h": "c"
+        "freertos.h": "c",
+        "freertosconfig.h": "c"
     },
     "cmake.configureOnOpen": false
 }
