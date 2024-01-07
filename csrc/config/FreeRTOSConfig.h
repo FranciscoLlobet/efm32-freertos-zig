@@ -208,6 +208,7 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 /* Stop if an assertion fails. */
 #define configASSERT( x )	if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); for( ;; ); }
 
+#define configCHECK_HANDLER_INSTALLATION    0
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */
 extern void SVC_Handler(void) __attribute__( ( naked ) );

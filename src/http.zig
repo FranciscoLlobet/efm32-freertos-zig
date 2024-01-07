@@ -88,24 +88,35 @@ const rangeResponse = struct {
     /// Optional total size
     total: ?usize,
 
-    // Function to parse the Content-Range header
+    /// Function to parse the Content-Range header
+    ///
+    /// - 206 partial-content: This function is currently parsing correctly a 206 response. Format: {start}-{end}/{total}
+    /// - 416 Requested Range Not Satisfieable. Here the format is */{total} where {total} is the total size.
+    ///
+    /// This function will parse and assume the happy path (206 - Partial Content).
     fn match(header: c.phr_header) !?@This() {
+        // Pre-fill the returned structure with default values
+        var ret: @This() = .{ .start = 0, .end = 0, .total = null };
+
         // Check if the header contains the expected "bytes " string
         if (!std.mem.eql(u8, header.value[0.."bytes ".len], "bytes ")) {
             return @"error".range_response_parse_error; // Does not contain the expected "bytes " string
+        } else if (std.mem.eql(u8, header.value[0.."bytes *".len], "bytes *")) {
+            // Requested Range Not Satisfieable
+            return null;
+        } else {
+            var iter = std.mem.splitAny(u8, header.value["bytes ".len..header.value_len], "-/");
+
+            // Get the start position
+            ret.start = try std.fmt.parseInt(usize, iter.first(), 10);
+            if (iter.next()) |val| {
+                ret.end = try std.fmt.parseInt(usize, val, 10);
+            }
+            if (iter.next()) |val| {
+                ret.total = try std.fmt.parseInt(usize, val, 10);
+            }
         }
 
-        // Pre-fill the returned structure with default values
-        var ret: @This() = .{ .start = 0, .end = 0, .total = null };
-        var iter = std.mem.splitAny(u8, header.value["bytes ".len..header.value_len], "-/");
-
-        ret.start = try std.fmt.parseInt(usize, iter.first(), 10);
-        if (iter.next()) |val| {
-            ret.end = try std.fmt.parseInt(usize, val, 10);
-        }
-        if (iter.next()) |val| {
-            ret.total = try std.fmt.parseInt(usize, val, 10);
-        }
         return ret;
     }
 };

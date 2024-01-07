@@ -84,12 +84,12 @@ pub const dir = struct {
     handle: c.DIR,
 
     /// Rename file
-    pub fn rename(old_name: [*:0]const u8, new_name: [*:0]const u8) frError!void {
+    pub inline fn rename(old_name: [*:0]const u8, new_name: [*:0]const u8) frError!void {
         return fRet.check(c.f_rename(old_name, new_name));
     }
 
     /// Unlink (delete) a file
-    pub fn unlink(path: [*:0]const u8) frError!void {
+    pub inline fn unlink(path: [*:0]const u8) frError!void {
         return fRet.check(c.f_unlink(path));
     }
 
@@ -103,7 +103,7 @@ pub const dir = struct {
     }
 
     /// Close the current directory
-    pub fn close(self: *@This()) frError!void {
+    pub inline fn close(self: *@This()) frError!void {
         try fRet.check(c.f_closedir(&self.handle));
     }
 };
@@ -134,7 +134,7 @@ pub const file = struct {
     }
 
     /// Close the current file
-    pub fn close(self: *@This()) frError!void {
+    pub inline fn close(self: *@This()) frError!void {
         try fRet.check(c.f_close(&self.handle));
     }
 
@@ -171,38 +171,38 @@ pub const file = struct {
 
     /// Perform sync on the current file
     /// Flush cached data
-    pub fn sync(self: *@This()) frError!void {
+    pub inline fn sync(self: *@This()) frError!void {
         return fRet.check(c.f_sync(&self.handle));
     }
 
     /// Get the size of the file
-    pub fn size(self: *@This()) usize {
+    pub inline fn size(self: *@This()) usize {
         return c.f_size(&self.handle);
     }
 
     /// Change the file pointer position
-    pub fn lseek(self: *@This(), offset: usize) frError!void {
+    pub inline fn lseek(self: *@This(), offset: usize) frError!void {
         try fRet.check(c.f_lseek(&self.handle, offset));
     }
 
     /// Tell the current file pointer position
-    pub fn tell(self: *@This()) usize {
+    pub inline fn tell(self: *@This()) usize {
         return c.f_tell(&self.handle);
     }
 
     /// Rewind the file pointer to the beginning
-    pub fn rewind(self: *@This()) frError!void {
+    pub inline fn rewind(self: *@This()) frError!void {
         try self.lseek(0);
     }
 
     /// Test for end-of-file
     /// Returns true if the file pointer is at the end of the file
-    pub fn eof(self: *@This()) bool {
+    pub inline fn eof(self: *@This()) bool {
         return (0 != c.f_eof(&self.handle));
     }
 
     /// Truncate the file to the current file pointer position
-    pub fn truncate(self: *@This()) frError!void {
+    pub inline fn truncate(self: *@This()) frError!void {
         try fRet.check(c.f_truncate(&self.handle));
     }
 };
