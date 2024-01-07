@@ -26,10 +26,10 @@ fn initFromHandle(comptime handle: button_handle) @This() {
     return @This(){ .handle = handle };
 }
 
-pub fn getState(self: *const @This()) state {
+pub inline fn getState(self: *const @This()) state {
     return @as(state, @enumFromInt(c.sl_simple_button_get_state(self.handle)));
 }
-pub fn getHandle(self: *const @This()) button_handle {
+pub inline fn getHandle(self: *const @This()) button_handle {
     return self.handle;
 }
 

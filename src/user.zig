@@ -17,6 +17,7 @@ const lwm2m = @import("lwm2m.zig");
 const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
 const system = @import("system.zig");
+const firmware = @import("boot/firmware.zig");
 
 const state = enum(usize) {
     verify_config = 0,
@@ -101,8 +102,12 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                     self.task.delayTask(1000);
 
                     // system.reset();
-                } else |_| {
-                    _ = c.printf("Failure to download!!\n\r");
+                } else |err| {
+                    if (err == firmware.firmware_error.firmware_already_in_system) {
+                        _ = c.printf("Firmware already in system\n\r");
+                    } else {
+                        _ = c.printf("Failure to download!!\n\r");
+                    }
                 }
             }
 
@@ -143,7 +148,9 @@ fn downloadAndVerify() !bool {
     // Download the signature
     try http.service.filedownload(config.getHttpSigUri(), config.fw_sig_file_name, 512, 1024 * 1024);
 
-    try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, config.getHttpSigKey());
+    try firmware.checkFirmwareImage();
+
+    //try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, config.getHttpSigKey());
 
     return true;
 }

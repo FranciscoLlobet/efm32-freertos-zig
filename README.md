@@ -21,13 +21,15 @@ Our primary aim with `MISO` is to maximize the use of library functions provided
 The current version of `MISO` boasts a set of features, including:
 
 - read configuration files from a SD card,
+- provide configuration persistance using non-volatile memory (NVM),
 - connect to a designated WiFi AP,
-- get a sNTP timestamp from an internet server,
+- get a sNTP timestamp from an internet server and run a real-time clock (RTC),
 - provide a basic secured LWM2M service client with connection management,
-- provide a basic MQTT service client (QOS0 and QOS1 support),
+- provide a basic MQTT service client (QOS0 and QOS1 support, QOS2 experimental),
 - provide a HTTP file download client for configuration and firmware updates
 - mbedTLS PSK and x509 certificate authentication tested with DTLS,
 - Watchdog
+- Bootloader
 
 ## Non-Features
 
@@ -54,6 +56,8 @@ Download and install the Zig Compiler
 #### Install the Arm GNU Toolchain
 
 > The Arm GNU Toolchain is now optional for building since `miso`'s move to `picolibc`.
+
+Install the Arm GNU toolchain if debugging the code is required.
 
 https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 
@@ -106,7 +110,7 @@ zig build
 
 ### Filesystem
 
-- [FatFs 15](http://elm-chan.org/fsw/ff/00index_e.html). The "standard" FatFS driver for embedded devices.
+- [FatFs 15](http://elm-chan.org/fsw/ff/00index_e.html). The standard FatFS driver for embedded devices.
 
 ### Utils
 
@@ -134,73 +138,122 @@ zig build
 
 Configuration can be loaded via SD card by `config.txt`
 
+| Field          | Description            | Type                  |           |
+|----------------|------------------------|-----------------------|-----------|
+| wifi.ssid      | Wifi WPA2 SSID         | String                | Mandadory |
+| wifi.key       | Wifi WPA2 SSID Key     | String                | Mandatory |
+| lwm2m.endpoint | LWM2M endpoint         | String                | If LwM2M is compiled |
+| lwm2m.uri      | LWM2M Server Uri       | URI String            | If LwM2M is compiled |
+| lwm2m.psk.id   | LwM2M DTLS Psk ID      | String                | Optional  |
+| lwm2m.psk.key  | LwM2M DTLS PSK Key     | Base64 encoded String | Optional  |
+| ntp.url[]      | sNTP server URI/URL    | URI String Array      | Mandatory |
+| http.uri       | Firmware image URI     | URI String            | Mandatory |
+| http.sig       | Firmware signature URI | URI String            | Mandatory |
+| http.key       | Firmware public key    | Base64 encoded string | Mandatory |
+
 ```json
 {
-    "wifi":{
-        "ssid":"WIFI_SSID",
-        "key":"WIFI_KEY"
+  "wifi": {
+    "ssid": "WIFI_SSID",
+    "key": "WIFI_KEY"
+  },
+  "lwm2m": {
+    "endpoint": "LWM2M_DEVICE_NAME",
+    "uri": "coaps://leshan.eclipseprojects.io:5684",
+    "psk": {
+      "id": "LWM2M_DTLS_PSK_ID",
+      "key": "LWM2M_DTLS_PSK_KEY_BASE64"
     },
-    "lwm2m":{
-        "endpoint":"LWM2M_DEVICE_NAME",
-        "uri":"coaps://leshan.eclipseprojects.io:5684",
-        "psk":{
-            "id":"LWM2M_PSK_ID",
-            "key":"LWM2M_PSK_KEY"
-        },
-        "bootstrap":false,
-        "server_cert":"LWM2M_SERVER_CERT"
+    "bootstrap": false,
+  },
+  "ntp": {
+    "url": [
+      "0.de.pool.ntp.org",
+      "1.de.pool.ntp.org"
+    ]
+  },
+  "mqtt": {
+    "url": "mqtts://MQTT_BROKER_HOST:8883",
+    "device": "MQTT_DEVICE_ID",
+    "username": "MQTT_USER_NAME",
+    "password": "MQTT_PASSWORD",
+    "psk": {
+      "id": "MQTT_PSK_TLS_ID",
+      "key": "MQTT_PSK_TLS_KEY_BASE64"
     },
-    "ntp":{
-        "url":[
-            "0.de.pool.ntp.org",
-            "1.de.pool.ntp.org"
-        ]
-    },
-    "mqtt":{
-        "url":"mqtt://MQTT_BROKER_HOST:1883",
-        "device":"MQTT_DEVICE_ID",
-        "username": "MQTT_USER_NAME",
-        "password": "MQTT_PASSWORD",
-        "psk" : {
-            "id": "MQTT_PSK_ID",
-            "key":"MQTT_PSK_KEY"
-        },
-        "cert" : {
-            "client" : "MQTT_CERT",
-            "server_ca" : "MQTT_SERVER_CA",
-        }
-    },
-    "http":{
-       "url":"http://HTTP_SERVER_HOST:80/XDK110.bin",
+    "cert": {
+      "client": "MQTT_CERT",
+      "server_cert": "MQTT_SERVER_C"
     }
+  },
+  "http": {
+    "url": "http://192.168.50.133:80/app.bin",
+    "sig": "http://192.168.50.133:80/app.sig",
+    "key": "APP_PUB_KEY_BASE64"
+  }
 }
 ```
 
-## Firmware signature
+## Signature Algorithms
+
+`miso` uses elliptic curve cryptography for signature creation and validation of configuration and firmware images using the ECDSA (*Eliptic Curve Digital Signature Algorithm*).
+
+Parameters:
+
+- `prime256v1` (OpenSSL)/`secp256r1`(mbedTLS)/`P-256` Weierstrass curve
+- `SHA256` hash digest.
+
+> The algorithms have been tested using OpenSSL on host (MacOS, Win11) and mbedTLS on target (EFM32/XDK110)
+
+### Reference
+
+- <https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations>
+
+## Firmware Update
+
+To perform a firmware update, the `miso` application needs to fetch both,
+
+1. a firmware image (in binary plain, non-encrypted format) and
+2. a signature (in binary plain format)
+
+These files can be stored in a HTTP server that must support [range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) for the downloads.
+The public key is provided in the configuration file.
+
+The firmware update process takes the signature, binary and the locally stored public key to perform the validation.
+
+> It should be possible to generate a firmware packet with integrated signature in the future. This, is however not in the current plans.
+
+> FW download has been tested on a non-public (https://nginx.org) server.
+
+### Generate the private key
+
+> This is an example using openssl. Please keep the private key secret and offline.
 
 ```console
 openssl ecparam -genkey -name prime256v1 -noout -out fw_private_key.pem
 ```
 
-Generate the public key
+### Public Key in PEM Format
 
-### PEM Format
+Generate the public key in PEM format.
 
 ```console
 openssl ec -in fw_private_key.pem -pubout -out fw.pub
 ```
 
-### DER Format
+### Public Key in DER Format
 
 ```console
 openssl ec -in fw_private_key.pem -pubout -outform DER -out fw.der
 ```
 
-### Base64 DER
+### Convert DER to Base64
 
 ```console
 openssl base64 --in fw.der --out fw.b64
 ```
+
+Use the base64 output as a one-line string in the config (`http.key`)
 
 ### Generate FW signature
 
@@ -216,7 +269,7 @@ openssl dgst -sha256 -verify .\fw.der -signature .\zig-out\firmware\app.sig .\zi
 
 ## Configuration signature
 
-Sign Configuration
+### Sign Configuration
 
 For signing the configuration, please create a private key
 
@@ -224,7 +277,7 @@ For signing the configuration, please create a private key
 openssl ecparam -genkey -name prime256v1 -noout -out private_key.pem
 ```
 
-Generate the public key
+### Generate the public key
 
 ```console
 openssl ec -in private_key.pem -pubout -out config.pub
