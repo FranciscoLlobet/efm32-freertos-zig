@@ -205,6 +205,29 @@ Parameters:
 
 > The algorithms have been tested using OpenSSL on host (MacOS, Win11) and mbedTLS on target (EFM32/XDK110)
 
+## Encryption Algorithms
+
+### PSK Cyphersuite
+
+AES-Based Suites
+
+- TLS_PSK_WITH_AES_128_GCM_SHA256
+- TLS_PSK_WITH_AES_128_CCM_8
+- TLS_PSK_WITH_AES_128_CCM
+
+ECDHE
+
+- TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8
+- TLS_ECDHE_ECDSA_WITH_AES_128_CCM
+
+Sig algorithms
+
+- TLS1_3_SIG_ECDSA_SECP256R1_SHA256
+
+### Eliptic curves
+
+- MBEDTLS_ECP_DP_SECP256R1_ENABLED
+
 ### Reference
 
 - <https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations>

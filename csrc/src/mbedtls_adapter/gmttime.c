@@ -13,7 +13,7 @@
 #include "mbedtls/platform_time.h"
 
 #include "sl_sleeptimer.h"
-
+#if 0
 struct tm *mbedtls_platform_gmtime_r( const mbedtls_time_t *tt,
                                       struct tm *tm_buf )
 {
@@ -38,3 +38,4 @@ struct tm *mbedtls_platform_gmtime_r( const mbedtls_time_t *tt,
 
     return tm_buf;
 }
+#endif
