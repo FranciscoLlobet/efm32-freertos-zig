@@ -12,10 +12,6 @@
 
 `MISO` is not affiliated with LEGIC Identsystems Ltd, the LEGIC XDK Secure Sensor Evaluation Kit, the Rust Foundation or the Rust Project. Furthermore, it's important to note that this codebase should not be used in use cases which have strict safety and/or availability requirements.
 
-## Design Philososphy
-
-Our primary aim with `MISO` is to maximize the use of library functions provided by established and respected sources. We take great care to ensure simplicity, and we focus on seamless integration of third-party libraries. Our goal is to build a potent yet easy-to-navigate system that leverages the potential of its underlying technology stack.
-
 ## What's inside?
 
 The current version of `MISO` boasts a set of features, including:
@@ -29,7 +25,7 @@ The current version of `MISO` boasts a set of features, including:
 - provide a HTTP file download client for configuration and firmware updates
 - mbedTLS PSK and x509 certificate authentication tested with DTLS,
 - Watchdog
-- Bootloader
+- Bootloader with support for MCUBoot firmware containers
 
 ## Non-Features
 
@@ -55,7 +51,7 @@ Download and install the Zig Compiler
 
 #### Install the Arm GNU Toolchain
 
-> The Arm GNU Toolchain is now optional for building since `miso`'s move to `picolibc`.
+> The Arm GNU Toolchain is now optional for building since `MISO`'s move to `picolibc`.
 
 Install the Arm GNU toolchain if debugging the code is required.
 
@@ -104,6 +100,14 @@ zig build
 
 - [FreeRTOS](https://github.com/FreeRTOS/FreeRTOS-Kernel)
 
+### Firmware Container
+
+- [MCUBoot](https://github.com/mcu-tools/mcuboot)
+
+### Crypto and (D)TLS provider
+
+- [mbedTLS](https://github.com/Mbed-TLS/mbedtls)
+
 ### Wifi Connectivity
 
 - TI Simplelink CC3100-SDK
@@ -115,10 +119,6 @@ zig build
 ### Utils
 
 - [jsmn](https://github.com/zserge/jsmn). Jsmn, a very simple JSON parser.
-
-### Crypto and (D)TLS provider
-
-- [mbedTLS](https://github.com/Mbed-TLS/mbedtls)
 
 ### Protocol Providers
 
@@ -148,7 +148,6 @@ Configuration can be loaded via SD card by `config.txt`
 | lwm2m.psk.key  | LwM2M DTLS PSK Key     | Base64 encoded String | Optional  |
 | ntp.url[]      | sNTP server URI/URL    | URI String Array      | Mandatory |
 | http.uri       | Firmware image URI     | URI String            | Mandatory |
-| http.sig       | Firmware signature URI | URI String            | Mandatory |
 | http.key       | Firmware public key    | Base64 encoded string | Mandatory |
 
 ```json
@@ -188,7 +187,6 @@ Configuration can be loaded via SD card by `config.txt`
   },
   "http": {
     "url": "http://192.168.50.133:80/app.bin",
-    "sig": "http://192.168.50.133:80/app.sig",
     "key": "APP_PUB_KEY_BASE64"
   }
 }
@@ -200,12 +198,14 @@ Configuration can be loaded via SD card by `config.txt`
 
 Parameters:
 
-- `prime256v1` (OpenSSL)/`secp256r1`(mbedTLS)/`P-256` Weierstrass curve
+- `P-256` Weierstrass curve
+  - `prime256v1`(OpenSSL)
+  - `secp256r1`(mbedTLS)
 - `SHA256` hash digest.
 
 > The algorithms have been tested using OpenSSL on host (MacOS, Win11) and mbedTLS on target (EFM32/XDK110)
 
-## Encryption Algorithms
+## Encryption Algorithms and TLS Cyphersuites
 
 ### PSK Cyphersuite
 
@@ -220,10 +220,6 @@ ECDHE
 - TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8
 - TLS_ECDHE_ECDSA_WITH_AES_128_CCM
 
-Sig algorithms
-
-- TLS1_3_SIG_ECDSA_SECP256R1_SHA256
-
 ### Eliptic curves
 
 - MBEDTLS_ECP_DP_SECP256R1_ENABLED
@@ -234,17 +230,12 @@ Sig algorithms
 
 ## Firmware Update
 
-To perform a firmware update, the `miso` application needs to fetch both,
-
-1. a firmware image (in binary plain, non-encrypted format) and
-2. a signature (in binary plain format)
+To perform a firmware update, the `miso` application needs to fetch an unecrypted firmware image signed in a MCUboot container
 
 These files can be stored in a HTTP server that must support [range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) for the downloads.
 The public key is provided in the configuration file.
 
-The firmware update process takes the signature, binary and the locally stored public key to perform the validation.
-
-> It should be possible to generate a firmware packet with integrated signature in the future. This, is however not in the current plans.
+The firmware update process takes the firmware container and the locally stored public key to perform the validation.
 
 > FW download has been tested on a non-public (https://nginx.org) server.
 
@@ -278,16 +269,20 @@ openssl base64 --in fw.der --out fw.b64
 
 Use the base64 output as a one-line string in the config (`http.key`)
 
-### Generate FW signature
+### Generate FW container
+
+Use the MCUBot [`imgtool`](https://docs.mcuboot.com/imgtool.html) script to sign and generate the fw container.
+
+The firmware container header is `0x80` (128) bytes long and the start address is currently `0x7800`
 
 ```console
-openssl dgst -sha256 -sign .\fw_private_key.pem -out .\zig-out\firmware\app.sig .\zig-out\firmware\app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x78000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0x78000 --align 4 .\zig-out\firmware\app.bin app.bin
 ```
 
-Verify against DER pub key
+Verify the content of the firmware container.
 
 ```console
-openssl dgst -sha256 -verify .\fw.der -signature .\zig-out\firmware\app.sig .\zig-out\firmware\app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\app.bin
 ```
 
 ## Configuration signature
@@ -318,18 +313,4 @@ Verify Configuration
 
 ```console
 openssl dgst -sha256 -verify config.pub -signature config.sig config.txt
-```
-
-## mcuboot
-
-```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py getpub -k .\fw_priv.pem
-```
-
-```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x78000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0x78000 --align 4 .\zig-out\firmware\app.bin app.bin
-```
-
-```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\app.bin
 ```
