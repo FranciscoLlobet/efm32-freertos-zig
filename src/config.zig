@@ -137,14 +137,7 @@ pub fn calculateMemHash(slice: []u8, hash: *[32]u8) config_error![]u8 {
 
     try sha256_ctx.start();
 
-    //ar current_pos: usize = 0;
-    //while (current_pos < slice.len) {
-    //    const start_pos = current_pos;
-    //    const end_pos: usize = if ((start_pos + mem_block.len) > slice.len) slice.len else (start_pos + mem_block.len);
-
     try sha256_ctx.update(slice);
-    //    current_pos = end_pos;
-    //}
 
     try sha256_ctx.finish(hash);
 
@@ -166,48 +159,6 @@ fn load_public_key_from_file(path: [*:0]const u8, pk_ctx: *pk) config_error!void
     _ = try key_file.read(key);
 
     try pk_ctx.parse(key);
-}
-
-// Load public key in pseudo-der format into PK context
-pub fn load_public_key_from_nvm(nvm_str: []u8, pk_ctx: *pk) !void {
-    const key = try allocator.alloc(u8, nvm_str.len);
-    defer allocator.free(key);
-
-    @memset(key, 0);
-
-    try pk_ctx.parse(try mbedtls.base64Decode(@ptrCast(nvm_str.ptr), key));
-}
-
-/// Verify Firmware Candidate against the signature.
-///
-/// - fw_path : Path to the firmware file in SD card
-/// - sig_path : Path to the signature file in SD card
-/// - nvm_str : NVM string containing the public key in base64DER (stripped PEM) format
-pub fn verifyFirmwareSignature(fw_path: [*:0]const u8, sig_path: [*:0]const u8, nvm_str: []u8) config_error!void {
-    var fw_sha256: [32]u8 align(@alignOf(u32)) = undefined;
-
-    @memset(&fw_sha256, 0);
-
-    const hash = try calculateFileHash(fw_path, &fw_sha256); // open fw file and calculate the hash
-
-    var sig_file = try fatfs.file.open(sig_path, @intFromEnum(fatfs.file.fMode.read));
-    errdefer sig_file.close() catch {};
-
-    const sig = try allocator.alloc(u8, sig_file.size());
-    defer allocator.free(sig);
-
-    @memset(sig, 0);
-
-    _ = try sig_file.read(sig);
-
-    try sig_file.close();
-
-    var pk_ctx = pk.init();
-    defer pk_ctx.free();
-
-    try load_public_key_from_nvm(nvm_str, &pk_ctx);
-
-    try pk_ctx.verify(hash, sig);
 }
 
 /// Open the configuration file, calculate the hash value and compare it with the nvm reference.

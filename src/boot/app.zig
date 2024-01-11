@@ -24,7 +24,7 @@ const firmware_update_outcome = enum {
 };
 
 fn prepareJump() void {
-    board.jumpToApp();
+    board.jumpToApp(0x78000 + 0x80);
 }
 
 const update_phase = enum(usize) {
@@ -82,17 +82,19 @@ fn performFirmwareBackup() !struct {
 }
 
 fn eraseFlash(backup_len: usize) !update_phase {
+    _ = backup_len;
     _ = c.printf("Erasing flash\n");
 
-    try firmware.eraseFlash(backup_len);
+    try firmware.eraseFlash(null);
     return update_phase.flash;
 }
 
 fn eraseFlashBeforeRestore(backup_len: usize) !update_phase {
+    _ = backup_len;
     // Erase flash
     _ = c.printf("Erasing flash\n");
 
-    try firmware.eraseFlash(backup_len); // Erase flash ?
+    try firmware.eraseFlash(null); // Erase flash ?
     return update_phase.restore_backup;
 }
 

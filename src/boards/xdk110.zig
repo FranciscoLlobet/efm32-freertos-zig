@@ -17,8 +17,8 @@ pub fn mcuReset() noreturn {
     unreachable;
 }
 
-pub fn jumpToApp() noreturn {
-    c.BOARD_JumpToAddress(@as(?*u32, @ptrFromInt(@as(usize, 0x78000))));
+pub fn jumpToApp(addr: usize) noreturn {
+    c.BOARD_JumpToAddress(@as(?*u32, @ptrFromInt(@as(usize, addr))));
     unreachable;
 }
 

@@ -128,6 +128,8 @@
 #undef MCUBOOT_HAVE_LOGGING
 #endif
 
+
+#define MCUBOOT_HW_KEY   1
 /*
  * Assertions
  */

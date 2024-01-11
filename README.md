@@ -319,3 +319,17 @@ Verify Configuration
 ```console
 openssl dgst -sha256 -verify config.pub -signature config.sig config.txt
 ```
+
+## mcuboot
+
+```console
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py getpub -k .\fw_priv.pem
+```
+
+```console
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x78000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0x78000 --align 4 .\zig-out\firmware\app.bin app.bin
+```
+
+```console
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\app.bin
+```
