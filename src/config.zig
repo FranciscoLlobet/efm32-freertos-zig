@@ -89,7 +89,7 @@ pub const config_local_error = error{
 pub const config_error = (fatfs.frError || sha256.sha256_error || std.mem.Allocator.Error || pk.pk_error || mbedtls.mbedtls_error);
 
 /// Const File block Size
-const file_block_size: usize = 512;
+pub const file_block_size: usize = 512;
 
 /// Helper Getters
 pub inline fn getHttpSigKey() []u8 {

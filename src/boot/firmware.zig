@@ -71,17 +71,17 @@ pub fn verifyFirmware(path: [*:0]const u8) !void {
 /// Error Cases:
 /// - If the file size is larger than the allowed firmware size, then `flash_firmware_size_error` is returned
 /// - If the signature verification fails, the process will be aborted and `firmware_candidate_not_valid` is returned
-pub fn checkFirmwareImage() !void {
-    const cand_len = try checkFirmwareCandidateSize(config.fw_file_name, null); // Either the file is not open-able or the size is too large
+pub fn checkFirmwareImage(path: [*:0]const u8) !void {
+    const cand_len = try checkFirmwareCandidateSize(path, null); // Either the file is not open-able or the size is too large
 
-    if (verifyBackup(config.fw_file_name, cand_len)) |_| {
+    if (verifyBackup(path, cand_len)) |_| {
         return firmware_error.firmware_already_in_system;
     } else |err| {
         if (err == firmware_error.hash_compare_mismatch) {
             // Perform the signature verification
             load_global_public_key();
 
-            verifyFirmware(config.fw_file_name) catch {
+            verifyFirmware(path) catch {
                 return firmware_error.firmware_candidate_not_valid;
             };
         }
@@ -215,6 +215,9 @@ pub export fn flash_area_read(fa: [*c]const flash_area, off: u32, dst: ?*anyopaq
 
         fil.lseek(off) catch unreachable;
         _ = fil.read(dst_slice) catch unreachable;
+    } else {
+        // Read from flash is easy using slice-math
+        @memcpy(dst_slice, fw[off..(off + len)]);
     }
 
     return 0;

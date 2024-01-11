@@ -57,7 +57,7 @@ fn firmwareRestore() !firmware_update_outcome {
 fn checkFirmwareCandidate() !update_phase {
     _ = c.printf("Checking firmware image\n");
 
-    try firmware.checkFirmwareImage(); // If this fails, we can't continue.
+    try firmware.checkFirmwareImage(config.fw_file_name); // If this fails, we can't continue.
 
     return update_phase.backup; // next phase
 }
