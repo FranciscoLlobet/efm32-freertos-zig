@@ -45,7 +45,7 @@ pub const application = .{
     .cpu = .cortex_m3,
     .memory_regions = &.{
         .{ .offset = 0x00000000, .length = FLASH_APP_SIZE, .kind = .reserved }, // Main Application
-        .{ .offset = FLASH_APP_SIZE, .length = FLASH_RESERVE_SIZE, .kind = .flash }, // Main Application
+        .{ .offset = FLASH_APP_SIZE + 0x80, .length = FLASH_RESERVE_SIZE - 0x80, .kind = .flash }, // Main Application
         .{ .offset = FLASH_AVAILABLE_SIZE, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
         .{ .offset = 0x20000000, .length = RAM_SIZE, .kind = .ram }, // RAM
     },

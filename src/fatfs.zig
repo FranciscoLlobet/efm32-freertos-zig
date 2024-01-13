@@ -12,6 +12,7 @@ const c = @cImport({
     @cInclude("ff.h");
 });
 
+const FIL = c.FIL;
 const FSIZE_t = c.FSIZE_t;
 const UINT = c.UINT;
 const FR_OK = c.FR_OK;
@@ -111,7 +112,7 @@ pub const dir = struct {
 /// File API
 pub const file = struct {
     /// File handle
-    handle: c.FIL,
+    handle: FIL,
 
     /// File open mode. See documentation for `f_open` in `ff.h`
     pub const fMode = enum(u8) {
@@ -123,6 +124,10 @@ pub const file = struct {
         open_always = c.FA_OPEN_ALWAYS,
         open_append = c.FA_OPEN_APPEND,
     };
+
+    //pub fn initFromHandle(handle: *FIL) @This() {
+    //    return @This(){ .handle = *handle };
+    //}
 
     /// Open a file in given path and with the given mode. See `fMode` for possible modes.
     pub fn open(path: [*:0]const u8, mode: u8) frError!@This() {

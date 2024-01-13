@@ -37,7 +37,9 @@ jobs:
           cache: 'pip'
       # Installs dependencies using pip
       - name: Install deps
-        run: python -m pip install --upgrade pip setuptools wheel -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip setuptools wheel -r requirements.txt
+          python -m pip install --upgrade -r csrc/mcuboot/mcuboot/scripts/requirements.txt 
 
       # Runs the Zig formatter and AST checker
       - name: Run Zig formatter

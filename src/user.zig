@@ -11,6 +11,7 @@ const c = @cImport({
 });
 const pk = @import("pk.zig");
 const sha256 = @import("sha256.zig");
+const mbedtls = @import("mbedtls.zig");
 const http = @import("http.zig");
 const mqtt = @import("mqtt.zig");
 const lwm2m = @import("lwm2m.zig");
@@ -68,12 +69,10 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            //board.watchdogFeed();
             _ = config.open_config_file(config.config_file_name) catch {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            // Next state
             self.state = .start_connectivity;
         } else if (self.state == .start_connectivity) {
 
@@ -143,14 +142,9 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
 fn downloadAndVerify() !bool {
     // Download the firmware
-    try http.service.filedownload(config.getHttpFwUri(), config.fw_file_name, 512, 1024 * 1024);
+    try http.service.filedownload(config.getHttpFwUri(), config.fw_file_name, config.file_block_size, 1024 * 1024);
 
-    // Download the signature
-    try http.service.filedownload(config.getHttpSigUri(), config.fw_sig_file_name, 512, 1024 * 1024);
-
-    try firmware.checkFirmwareImage();
-
-    //try config.verifyFirmwareSignature(config.fw_file_name, config.fw_sig_file_name, config.getHttpSigKey());
+    try firmware.checkFirmwareImage(config.fw_file_name);
 
     return true;
 }
