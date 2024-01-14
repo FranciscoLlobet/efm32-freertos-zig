@@ -32,8 +32,13 @@ export fn vApplicationIdleHook() void {
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-var timerTask: freertos.StaticTask(config.rtos_stack_depth_timer_task) = undefined;
-var idleTask: freertos.StaticTask(config.rtos_stack_depth_idle_task) = undefined;
+var timerTask: freertos.StaticTask(@This(), config.rtos_stack_depth_timer_task, "timer", dummyTask) = undefined;
+var idleTask: freertos.StaticTask(@This(), config.rtos_stack_depth_idle_task, "idle", dummyTask) = undefined;
+
+fn dummyTask(self: *@This()) void {
+    _ = self;
+    unreachable;
+}
 
 export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
     ppxTimerTaskTCBBuffer.* = &timerTask.staticTask;
@@ -155,7 +160,8 @@ pub const microzig_options = struct {
     };
 };
 
-pub export fn SVC7_Handler() callconv(.C) void {
+pub export fn SVC7_Handler() callconv(.Naked) void {
+    asm volatile ("nop");
     //microzig.cpu.regs.CONTROL.modify(.{ .nPRIV = 0 });
 }
 

@@ -114,14 +114,20 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
 }
 
 /// Create a Static Task
-pub fn StaticTask(comptime stackSize: usize) type {
+pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: [*:0]const u8, comptime taskRunnerFn: *const fn (*T) void) type {
     return struct {
+        /// Inner Task object
         task: Task = undefined,
+        /// Static stack
         stack: [stackSize]StackType_t = undefined,
+        /// Static task object for FreeRTOS
         staticTask: StaticTask_t = undefined,
 
-        pub inline fn create(self: *@This(), comptime pxTaskCode: TaskFunction_t, comptime pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !void {
-            self.task = try Task.createStatic(pxTaskCode, pcName, pvParameters, uxPriority, self.stack[0..], &self.staticTask);
+        fn run(pvParameters: ?*anyopaque) callconv(.C) void {
+            taskRunnerFn(@as(*T, @ptrCast(@alignCast(pvParameters))));
+        }
+        pub inline fn create(self: *@This(), pvParameters: *T, uxPriority: UBaseType_t) !void {
+            self.task = try Task.createStatic(run, pcName, @ptrCast(pvParameters), uxPriority, self.stack[0..], &self.staticTask);
         }
         pub inline fn resumeTask(self: *const @This()) void {
             self.task.resumeTask();
@@ -150,7 +156,9 @@ pub fn StaticTask(comptime stackSize: usize) type {
     };
 }
 
+/// FreeRTOS Task wrapper as Zig struct
 pub const Task = struct {
+    /// Notify action
     pub const eNotifyAction = enum(u32) {
         eSetBits = c.eSetBits,
         eIncrement = c.eIncrement,
@@ -159,6 +167,7 @@ pub const Task = struct {
         eNoAction = c.eNoAction,
     };
 
+    /// FreeRTOS task handle
     handle: TaskHandle_t = undefined,
 
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
@@ -171,6 +180,7 @@ pub const Task = struct {
 
         return if (pdPASS == c.xTaskCreate(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, @constCast(&self.handle))) self else FreeRtosError.TaskCreationFailed;
     }
+    /// Create a FreeRTOS task using static memory allocation
     pub fn createStatic(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t, stack: []StackType_t, pxTaskBuffer: *StaticTask_t) !@This() {
         var self = @This(){ .handle = c.xTaskCreateStatic(pxTaskCode, pcName, stack.len, pvParameters, uxPriority, stack.ptr, pxTaskBuffer) };
 
@@ -206,6 +216,7 @@ pub const Task = struct {
     pub inline fn notify(self: *const @This(), ulValue: u32, eAction: eNotifyAction) FreeRtosError!void {
         return if (pdPASS == c.xTaskGenericNotify(self.handle, c.tskDEFAULT_INDEX_TO_NOTIFY, ulValue, @intFromEnum(eAction), null)) return FreeRtosError.TaskNotifyFailed;
     }
+    /// Notify Task from ISR with given value
     pub inline fn notifyFromISR(self: *const @This(), ulValue: u32, eAction: eNotifyAction, pxHigherPriorityTaskWoken: *BaseType_t) bool {
         return (pdPASS == c.xTaskNotifyFromISR(self.handle, ulValue, eAction, pxHigherPriorityTaskWoken));
     }
@@ -307,6 +318,27 @@ pub fn StaticTimer() type {
     return struct {
         timer: Timer = undefined,
         staticTimer: StaticTimer_t = undefined,
+        pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
+            return @This(){ .timer = try Timer.createStatic(pcTimerName, xTimerPeriodInTicks, autoReload, T, pvTimerID, pxCallbackFunction) };
+        }
+        pub inline fn start(self: *const @This(), xTicksToWait: ?TickType_t) !void {
+            return self.timer.start(xTicksToWait);
+        }
+        pub inline fn stop(self: *const @This(), xTicksToWait: ?TickType_t) !void {
+            return self.timer.stop(xTicksToWait);
+        }
+        pub inline fn changePeriod(self: *const @This(), xNewPeriod: TickType_t, xBlockTime: ?TickType_t) !void {
+            return self.timer.changePeriod(xNewPeriod, xBlockTime);
+        }
+        pub inline fn reset(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
+            return self.timer.reset(xTicksToWait);
+        }
+        pub inline fn getId(self: *const @This(), comptime T: type) ?*T {
+            return self.timer.getId(T);
+        }
+        pub inline fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
+            return Timer.getIdFromHandle(T, xTimer);
+        }
     };
 }
 
@@ -315,6 +347,7 @@ pub const Timer = struct {
     handle: TimerHandle_t = undefined,
 
     /// Get the timer ID from the timer handle and cast it into the desired (referenced) type
+    /// This function can be used in the timer callback function to get the timer ID
     pub inline fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
         return @as(*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(xTimer))));
     }
@@ -325,14 +358,14 @@ pub const Timer = struct {
 
         return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
     }
-
+    /// Create a FreeRTOS timer using static memory allocation
     pub inline fn createStatic(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t, pxTimerBuffer: *StaticTimer_t) !@This() {
         var self: @This() = .{ .handle = c.xTimerCreateStatic(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction, pxTimerBuffer) };
 
         return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
     }
 
-    /// Get the timer ID from the own timer
+    /// Get the timer ID from the own timer and cast it into the desired (referenced) type
     pub inline fn getId(self: *const @This(), comptime T: type) ?*T {
         return @as(?*T, @ptrCast(@alignCast(c.pvTimerGetTimerID(self.timer))));
     }

@@ -97,7 +97,7 @@ disconnectionCounter: usize,
 
 pingTimer: freertos.Timer,
 pubTimer: freertos.Timer, // delete this!
-task: freertos.StaticTask(config.rtos_stack_depth_mqtt),
+task: freertos.StaticTask(@This(), config.rtos_stack_depth_mqtt, "mqtt", if (config.enable_mqtt) taskFunction else dummyTaskFunction),
 state: state,
 packet: @This().packet,
 uri_string: [*:0]u8,
@@ -725,9 +725,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     }
 }
 
-fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
-
+fn taskFunction(self: *@This()) void {
     // Clear the buffers
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
@@ -754,9 +752,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     // Go to disconnect phase
 }
 
-fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
-
+fn dummyTaskFunction(self: *@This()) void {
     while (true) {
         self.task.suspendTask();
     }
@@ -780,7 +776,7 @@ fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_mqtt) taskFunction else dummyTaskFunction, "mqtt", self, config.rtos_prio_mqtt) catch unreachable;
+    self.task.create(self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.connection = connection.init(.mqtt, authCallback, null);

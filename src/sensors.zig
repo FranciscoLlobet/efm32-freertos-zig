@@ -12,16 +12,14 @@ const c = @cImport({
     @cInclude("task.h");
 });
 
-task: freertos.StaticTask(config.rtos_stack_depth_sensor) = undefined,
+task: freertos.StaticTask(@This(), config.rtos_stack_depth_sensor, "sensor", sensorSampingTask) = undefined,
 timer: freertos.Timer = undefined,
 
 fn tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     freertos.Timer.getIdFromHandle(@This(), xTimer).task.notify(1, .eSetBits) catch {};
 }
 
-fn sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
-
+fn sensorSampingTask(self: *@This()) void {
     var bme280_sensor = bme280.init(@ptrCast(board.bme280_dev)) catch unreachable;
     var bma280_sensor = bma280.init(@ptrCast(board.bma280_dev)) catch unreachable;
     _ = bma280_sensor;
@@ -42,7 +40,7 @@ fn sensorSampingTask(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 pub fn init(self: *@This()) !void {
-    self.task.create(sensorSampingTask, "tempTask", self, config.rtos_prio_sensor) catch unreachable;
+    self.task.create(self, config.rtos_prio_sensor) catch unreachable;
     self.timer = freertos.Timer.create("tempTimer", 1000, true, @This(), self, tempTimerCallback) catch unreachable;
     self.timer.start(null) catch unreachable;
 }

@@ -41,9 +41,9 @@ const state = enum(usize) {
     }
 };
 
-task: freertos.StaticTask(config.rtos_stack_depth_user_task),
+task: freertos.StaticTask(@This(), config.rtos_stack_depth_user_task, "user task", myUserTaskFunction),
 timer: freertos.Timer,
-state: state,
+stateMachineState: state,
 
 fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
@@ -52,9 +52,7 @@ fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
     self.task.notify(test_var, .eSetBits) catch {};
 }
 
-fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
-
+fn myUserTaskFunction(self: *@This()) void {
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
     _ = nvm.init() catch 0;
@@ -64,7 +62,7 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     while (true) {
         var eventValue: u32 = 0;
 
-        if (self.state == .verify_config) {
+        if (self.stateMachineState == .verify_config) {
             config.load_config_from_nvm() catch {
                 _ = c.printf("Failure!!\n\r");
             };
@@ -73,8 +71,8 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            self.state = .start_connectivity;
-        } else if (self.state == .start_connectivity) {
+            self.stateMachineState = .start_connectivity;
+        } else if (self.stateMachineState == .start_connectivity) {
 
             // Change this to wait for connectivity
             wifi_task.resumeTask();
@@ -85,8 +83,8 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
                 }
             }
 
-            self.state = .perform_firmware_download;
-        } else if (self.state == .perform_firmware_download) {
+            self.stateMachineState = .perform_firmware_download;
+        } else if (self.stateMachineState == .perform_firmware_download) {
             if (config.enable_http) {
                 _ = c.printf("Performing firmware download\r\n");
 
@@ -112,23 +110,23 @@ fn myUserTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 
             // perform HTTP download
             if (comptime config.enable_lwm2m) {
-                self.state = .start_lwm2m;
+                self.stateMachineState = .start_lwm2m;
             } else if (comptime config.enable_mqtt) {
-                self.state = .start_mqtt;
+                self.stateMachineState = .start_mqtt;
             } else {
-                self.state = .working;
+                self.stateMachineState = .working;
             }
-        } else if (self.state == .start_mqtt) {
+        } else if (self.stateMachineState == .start_mqtt) {
             mqtt.service.resumeTask();
 
             self.timer.start(null) catch unreachable;
 
-            self.state = .working;
-        } else if (self.state == .start_lwm2m) {
+            self.stateMachineState = .working;
+        } else if (self.stateMachineState == .start_lwm2m) {
             lwm2m.service.task.resumeTask();
 
-            self.state = .working;
-        } else if (self.state == .working) {
+            self.stateMachineState = .working;
+        } else if (self.stateMachineState == .working) {
             // recieve
 
             if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |_| {
@@ -150,9 +148,9 @@ fn downloadAndVerify() !bool {
 }
 
 pub fn create(self: *@This()) void {
-    self.state = state.verify_config;
-    self.task.create(myUserTaskFunction, "user_task", @constCast(self), config.rtos_prio_user_task) catch unreachable;
+    self.stateMachineState = state.verify_config;
+    self.task.create(self, config.rtos_prio_user_task) catch unreachable;
     self.timer = freertos.Timer.create("user_timer", 2000, true, @This(), self, myTimerFunction) catch unreachable;
 }
 
-pub var user_task: @This() = .{ .timer = undefined, .state = undefined, .task = undefined };
+pub var user_task: @This() = .{ .timer = undefined, .stateMachineState = undefined, .task = undefined };

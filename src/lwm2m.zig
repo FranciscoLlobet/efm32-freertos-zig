@@ -13,12 +13,11 @@ const c = @cImport({
 
 extern fn write_temperature(temperature: f32) callconv(.C) void;
 
-task: freertos.StaticTask(config.rtos_stack_depth_lwm2m),
+task: freertos.StaticTask(@This(), config.rtos_stack_depth_lwm2m, "lwm2m", if (config.enable_lwm2m) taskFunction else dummyTaskFunction),
 reg_update: freertos.Timer,
 timer_update: freertos.Timer,
 
-fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.getAndCastPvParameters(@This(), pvParameters);
+fn taskFunction(self: *@This()) void {
     var ret: i32 = 0;
 
     self.reg_update.start(null) catch unreachable;
@@ -32,9 +31,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
     system.reset();
 }
 
-fn dummyTaskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
-
+fn dummyTaskFunction(self: *@This()) void {
     while (true) {
         self.task.suspendTask();
     }
@@ -49,7 +46,7 @@ fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
 }
 
 pub fn create(self: *@This()) void {
-    self.task.create(if (config.enable_lwm2m) taskFunction else dummyTaskFunction, "lwm2m", self, config.rtos_prio_lwm2m) catch unreachable;
+    self.task.create(self, config.rtos_prio_lwm2m) catch unreachable;
 
     self.task.suspendTask();
 

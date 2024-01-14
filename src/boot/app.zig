@@ -44,7 +44,7 @@ const update_phase = enum(usize) {
     backup_restored,
 };
 
-task: freertos.StaticTask(2000),
+task: freertos.StaticTask(@This(), 2000, "bootApp", taskFunction),
 
 fn firmwareUpdate() !firmware_update_outcome {
     return firmwareUpdateStateMachine(update_phase.check);
@@ -233,8 +233,7 @@ fn firmwareUpdateStateMachine(start_phase: ?update_phase) !firmware_update_outco
     return outcome;
 }
 
-fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
-    const self = freertos.Task.getAndCastPvParameters(@This(), pvParameters);
+fn taskFunction(self: *@This()) void {
     _ = self;
 
     _ = nvm.init() catch 0;
@@ -281,7 +280,7 @@ fn taskFunction(pvParameters: ?*anyopaque) callconv(.C) void {
 }
 
 pub fn init(self: *@This()) void {
-    self.task.create(taskFunction, "BootApp", self, config.rtos_prio_boot_app) catch unreachable;
+    self.task.create(self, config.rtos_prio_boot_app) catch unreachable;
     self.task.suspendTask();
 }
 
