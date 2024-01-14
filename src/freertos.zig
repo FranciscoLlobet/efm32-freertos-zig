@@ -314,12 +314,17 @@ pub const Mutex = struct {
     }
 };
 
-pub fn StaticTimer() type {
+pub fn StaticTimer(comptime T: type, comptime pcTimerName: [*:0]const u8, comptime timerFn: *const fn (self: *T) void) type {
     return struct {
         timer: Timer = undefined,
         staticTimer: StaticTimer_t = undefined,
-        pub fn create(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t) !@This() {
-            return @This(){ .timer = try Timer.createStatic(pcTimerName, xTimerPeriodInTicks, autoReload, T, pvTimerID, pxCallbackFunction) };
+
+        fn run(xTimer: TimerHandle_t) callconv(.C) void {
+            timerFn(Timer.getIdFromHandle(T, xTimer));
+        }
+
+        pub fn create(self: *@This(), xTimerPeriodInTicks: TickType_t, autoReload: bool, pvTimerID: *T) !void {
+            self.timer = try Timer.createStatic(pcTimerName, xTimerPeriodInTicks, autoReload, T, pvTimerID, run, &self.staticTimer);
         }
         pub inline fn start(self: *const @This(), xTicksToWait: ?TickType_t) !void {
             return self.timer.start(xTicksToWait);
@@ -333,17 +338,17 @@ pub fn StaticTimer() type {
         pub inline fn reset(self: *const @This(), xTicksToWait: TickType_t) BaseType_t {
             return self.timer.reset(xTicksToWait);
         }
-        pub inline fn getId(self: *const @This(), comptime T: type) ?*T {
-            return self.timer.getId(T);
+        pub inline fn getId(self: *const @This(), comptime idType: type) ?*T {
+            return self.timer.getId(idType);
         }
-        pub inline fn getIdFromHandle(comptime T: type, xTimer: TimerHandle_t) *T {
-            return Timer.getIdFromHandle(T, xTimer);
+        inline fn getIdFromHandle(comptime idType: type, xTimer: TimerHandle_t) *T {
+            return Timer.getIdFromHandle(idType, xTimer);
         }
     };
 }
 
 /// Timer
-pub const Timer = struct {
+const Timer = struct {
     handle: TimerHandle_t = undefined,
 
     /// Get the timer ID from the timer handle and cast it into the desired (referenced) type

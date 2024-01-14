@@ -95,8 +95,9 @@ connection: connection,
 connectionCounter: usize,
 disconnectionCounter: usize,
 
-pingTimer: freertos.Timer,
-pubTimer: freertos.Timer, // delete this!
+pingTimer: freertos.StaticTimer(@This(), "pingTimer", pingTimer),
+pubTimer: freertos.StaticTimer(@This(), "pubTimer", pubTimer),
+
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_mqtt, "mqtt", if (config.enable_mqtt) taskFunction else dummyTaskFunction),
 state: state,
 packet: @This().packet,
@@ -758,9 +759,7 @@ fn dummyTaskFunction(self: *@This()) void {
     }
 }
 
-fn pingTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
-
+fn pingTimer(self: *@This()) void {
     _ = self.packet.preparePingPacket() catch unreachable;
 }
 
@@ -769,8 +768,7 @@ pub fn publish(self: *@This(), topic: []const u8, payload: []const u8, qos: QoS,
     try self.qosQueue.addPublish(ret, qos, dup, false, topic, payload, deadline);
 }
 
-fn pubTimer(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
+fn pubTimer(self: *@This()) void {
     const payload = "test";
     self.publish("zig/pub", payload, .qos2, false, null, system.time.calculateDeadline(2000)) catch unreachable;
 }
@@ -780,8 +778,8 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.connection = connection.init(.mqtt, authCallback, null);
-        self.pingTimer = freertos.Timer.create("mqttPing", 60000, true, @This(), self, pingTimer) catch unreachable;
-        self.pubTimer = freertos.Timer.create("pubTimer", 10000, true, @This(), self, pubTimer) catch unreachable;
+        self.pingTimer.create(60000, true, self) catch unreachable;
+        self.pubTimer.create(10000, true, self) catch unreachable;
         self.packet.create(&self.connection);
     }
 }

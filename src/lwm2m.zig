@@ -14,8 +14,8 @@ const c = @cImport({
 extern fn write_temperature(temperature: f32) callconv(.C) void;
 
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_lwm2m, "lwm2m", if (config.enable_lwm2m) taskFunction else dummyTaskFunction),
-reg_update: freertos.Timer,
-timer_update: freertos.Timer,
+reg_update: freertos.StaticTimer(@This(), "lwm2m_reg_update", reg_update_function),
+timer_update: freertos.StaticTimer(@This(), "lwm2m_timer_update", timer_update_function),
 
 fn taskFunction(self: *@This()) void {
     var ret: i32 = 0;
@@ -37,12 +37,12 @@ fn dummyTaskFunction(self: *@This()) void {
     }
 }
 
-fn reg_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_registration, .eSetBits) catch unreachable;
+fn reg_update_function(self: *@This()) void {
+    self.task.notify(c.lwm2m_notify_registration, .eSetBits) catch unreachable;
 }
 
-fn timer_update_function(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    freertos.getAndCastTimerID(@This(), xTimer).task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch unreachable;
+fn timer_update_function(self: *@This()) void {
+    self.task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch unreachable;
 }
 
 pub fn create(self: *@This()) void {
@@ -51,8 +51,8 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
-        self.reg_update = freertos.Timer.create("lwm2m_reg_update", (5 * 60 * 1000), freertos.pdTRUE, self, reg_update_function) catch unreachable;
-        self.timer_update = freertos.Timer.create("lwm2m_timer_update", (60 * 1000), freertos.pdTRUE, self, timer_update_function) catch unreachable;
+        self.reg_update.create((5 * 60 * 1000), true, self) catch unreachable;
+        self.timer_update.create((60 * 1000), true, self) catch unreachable;
     }
 }
 

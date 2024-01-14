@@ -13,10 +13,10 @@ const c = @cImport({
 });
 
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_sensor, "sensor", sensorSampingTask) = undefined,
-timer: freertos.Timer = undefined,
+timer: freertos.StaticTimer(@This(), "sensor_timer", tempTimerCallback) = undefined,
 
-fn tempTimerCallback(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    freertos.Timer.getIdFromHandle(@This(), xTimer).task.notify(1, .eSetBits) catch {};
+fn tempTimerCallback(self: *@This()) void {
+    self.task.notify(1, .eSetBits) catch {};
 }
 
 fn sensorSampingTask(self: *@This()) void {
@@ -41,7 +41,7 @@ fn sensorSampingTask(self: *@This()) void {
 
 pub fn init(self: *@This()) !void {
     self.task.create(self, config.rtos_prio_sensor) catch unreachable;
-    self.timer = freertos.Timer.create("tempTimer", 1000, true, @This(), self, tempTimerCallback) catch unreachable;
+    self.timer.create(1000, true, self) catch unreachable;
     self.timer.start(null) catch unreachable;
 }
 

@@ -42,11 +42,10 @@ const state = enum(usize) {
 };
 
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_user_task, "user task", myUserTaskFunction),
-timer: freertos.Timer,
+timer: freertos.StaticTimer(@This(), "user timer", myTimerFunction),
 stateMachineState: state,
 
-fn myTimerFunction(xTimer: freertos.TimerHandle_t) callconv(.C) void {
-    const self = freertos.Timer.getIdFromHandle(@This(), xTimer);
+fn myTimerFunction(self: *@This()) void {
     var test_var: u32 = 0xAA55;
 
     self.task.notify(test_var, .eSetBits) catch {};
@@ -150,7 +149,7 @@ fn downloadAndVerify() !bool {
 pub fn create(self: *@This()) void {
     self.stateMachineState = state.verify_config;
     self.task.create(self, config.rtos_prio_user_task) catch unreachable;
-    self.timer = freertos.Timer.create("user_timer", 2000, true, @This(), self, myTimerFunction) catch unreachable;
+    self.timer.create(2000, true, self) catch unreachable;
 }
 
 pub var user_task: @This() = .{ .timer = undefined, .stateMachineState = undefined, .task = undefined };
