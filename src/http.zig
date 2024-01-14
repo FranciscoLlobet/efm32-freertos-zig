@@ -18,10 +18,10 @@ connection: connection,
 headers: [24]c.phr_header,
 
 /// TX Buffer mutex
-tx_mutex: freertos.Mutex,
+tx_mutex: freertos.StaticMutex(),
 
 /// Rx Buffer mutex
-rx_mutex: freertos.Mutex,
+rx_mutex: freertos.StaticMutex(),
 
 /// TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
@@ -409,8 +409,8 @@ pub fn eTag(self: *@This()) ?[]const u8 {
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
         self.connection = connection.init(.http, authCallback, null);
-        self.tx_mutex = freertos.Mutex.create() catch unreachable;
-        self.rx_mutex = freertos.Mutex.create() catch unreachable;
+        self.tx_mutex.create() catch unreachable;
+        self.rx_mutex.create() catch unreachable;
     }
 }
 

@@ -265,7 +265,7 @@ const QueuedMessgeQueue = struct {
 const packet = struct {
     transport: MQTTTransport,
     packetIdState: u16,
-    workBufferMutex: freertos.Mutex,
+    workBufferMutex: freertos.StaticMutex(),
     txQueue: freertos.StaticMessageBuffer(1024),
 
     /// Publish packet response
@@ -292,7 +292,7 @@ const packet = struct {
     pub fn create(self: *@This(), conn: *connection) void {
         self.transport.sck = @ptrCast(conn);
 
-        self.workBufferMutex = freertos.Mutex.create() catch unreachable;
+        self.workBufferMutex.create() catch unreachable;
 
         self.txQueue.create() catch unreachable; // Create message buffer
     }

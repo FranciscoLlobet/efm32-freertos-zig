@@ -259,6 +259,12 @@ pub const Semaphore = struct {
         return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
 
+    pub fn createBinaryStatic(pxSemaphoreBuffer: *StaticSemaphore_t) !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateBinaryStatic(pxSemaphoreBuffer) };
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
+    }
+
     /// Create a counting semaphore
     pub fn createCountingSemaphore(uxMaxCount: u32, uxInitialCount: u32) !@This() {
         const self = @This(){ .handle = c.xSemaphoreCreateCounting(uxMaxCount, uxInitialCount) };
@@ -266,9 +272,21 @@ pub const Semaphore = struct {
         return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
 
+    pub fn createCountingSemaphoreStatic(uxMaxCount: u32, uxInitialCount: u32, pxSemaphoreBuffer: *StaticSemaphore_t) !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateCountingStatic(uxMaxCount, uxInitialCount, pxSemaphoreBuffer) };
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
+    }
+
     /// Create a mutex
     pub fn createMutex() !@This() {
         const self = @This(){ .handle = c.xSemaphoreCreateMutex() };
+
+        return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
+    }
+
+    pub fn createMutexStatic(pxMutexBuffer: *StaticSemaphore_t) !@This() {
+        const self = @This(){ .handle = c.xSemaphoreCreateMutexStatic(pxMutexBuffer) };
 
         return if (self.handle == null) FreeRtosError.SemaphoreCreationFailed else self;
     }
@@ -293,6 +311,29 @@ pub const Semaphore = struct {
         return @This(){ .handle = handle };
     }
 };
+
+pub fn StaticMutex() type {
+    return struct {
+        semaphore: Semaphore = undefined,
+        staticSemaphore: StaticSemaphore_t = undefined,
+
+        pub inline fn create(self: *@This()) !void {
+            self.semaphore = try Semaphore.createMutexStatic(&self.staticSemaphore);
+        }
+
+        pub inline fn take(self: *const @This(), xTicksToWait: ?TickType_t) !bool {
+            return self.semaphore.take(xTicksToWait);
+        }
+
+        pub inline fn give(self: *const @This()) !void {
+            return self.semaphore.give();
+        }
+
+        pub inline fn giveFromIsr(self: *const @This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
+            return self.semaphore.giveFromIsr(pxHigherPriorityTaskWoken);
+        }
+    };
+}
 
 pub const Mutex = struct {
     semaphore: Semaphore = undefined,
@@ -340,9 +381,6 @@ pub fn StaticTimer(comptime T: type, comptime pcTimerName: [*:0]const u8, compti
         }
         pub inline fn getId(self: *const @This(), comptime idType: type) ?*T {
             return self.timer.getId(idType);
-        }
-        inline fn getIdFromHandle(comptime idType: type, xTimer: TimerHandle_t) *T {
-            return Timer.getIdFromHandle(idType, xTimer);
         }
     };
 }
