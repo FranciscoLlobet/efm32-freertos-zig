@@ -503,12 +503,38 @@ pub const MessageBuffer = struct {
     }
 
     /// Receive a message from the message buffer
+    /// - `rxData`is the buffer to receive the data into
+    /// - `ticks_to_wait` is the optional number of ticks to wait for the message to arrive
+    /// Returns: A slice of the received data or null if no data was received
     pub fn receive(self: *const @This(), rxData: []const u8, ticks_to_wait: ?TickType_t) ?[]u8 {
         const rx_len: usize = c.xMessageBufferReceive(self.handle, @constCast(rxData.ptr), rxData.len, ticks_to_wait orelse portMAX_DELAY);
 
         return if (rx_len != 0) @constCast(rxData)[0..rx_len] else null;
     }
 };
+
+pub fn Queue(comptime itemType: type, comptime numItems: usize) type {
+    return struct {
+        handle: QueueHandle_t = undefined,
+        fn create(self: *@This()) !void {
+            self.handle = c.xQueueCreate(@intCast(numItems), @sizeOf(itemType));
+        }
+        fn send(self: *const @This(), item: *itemType, ticks_to_wait: ?TickType_t) !void {
+            if (pdPASS != c.xQueueSend(self.handle, @ptrCast(item), ticks_to_wait orelse portMAX_DELAY)) return FreeRtosError.QueueSendFailed;
+        }
+        fn recieve(self: *const @This(), ticks_to_wait: ?TickType_t) ?itemType {
+            var item: itemType = undefined;
+            return if (pdPASS == c.xQueueReceive(self.handle, @ptrCast(&item), ticks_to_wait orelse portMAX_DELAY)) item else null;
+        }
+        fn recieveFromIsr(self: *const @This(), pxHigherPriorityTaskWoken: *BaseType_t) ?itemType {
+            var item: itemType = undefined;
+            return if (pdPASS == c.xQueueReceiveFromISR(self.handle, @ptrCast(&item), pxHigherPriorityTaskWoken)) item else null;
+        }
+        fn sendFromIsr(self: *const @This(), item: *itemType, pxHigherPriorityTaskWoken: *BaseType_t) !void {
+            if (pdPASS != c.xQueueSendFromISR(self.handle, @ptrCast(item), pxHigherPriorityTaskWoken)) return FreeRtosError.QueueSendFailed;
+        }
+    };
+}
 
 /// Allocator to use in a FreeRTOS application
 pub const allocator = std.mem.Allocator{ .ptr = undefined, .vtable = &allocator_vtable };
