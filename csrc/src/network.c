@@ -235,7 +235,7 @@ static void select_task(void *param)
 	fd_set write_fd_set;
 	uint32_t notification_counter = 0;
 
-	struct timeout_msg_s timeout_msg;
+	struct timeout_msg_s timeout_msg = {0};
 	BaseType_t ret = pdFALSE;
 
 	while (1)
@@ -303,14 +303,14 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			// The select function is called with a timeout of 20 ms
-			const struct timeval tv =
-				{.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
+			struct timeval tv = {.tv_sec = 0, .tv_usec = 50000}; // Here we have the select cycle time
+			int result = 0;
 
-			(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
-
-			int result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
-
-			(void)xSemaphoreGive(rx_tx_mutex);
+			if(pdTRUE == xSemaphoreTake(rx_tx_mutex, portMAX_DELAY))
+			{
+				result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
+				(void)xSemaphoreGive(rx_tx_mutex);
+			}
 
 			if (result > 0)
 			{
@@ -350,7 +350,7 @@ static void select_task(void *param)
 		}
 		else
 		{
-			// printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
+			 // printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
 
 			// Wait for notifications
 			(void)xTaskGenericNotifyWait(0, 0, UINT32_MAX, &notification_counter, portMAX_DELAY);

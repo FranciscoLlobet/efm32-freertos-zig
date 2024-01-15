@@ -237,11 +237,14 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
 		ecode = SPIDRV_MReceive(&cc3100_usart, pBuff, Len, recieve_callback);
 		if (ECODE_EMDRV_SPIDRV_OK == ecode)
 		{
-			(void) xQueueReceive(rx_semaphore, &transfer_status, portMAX_DELAY);
-			if (ECODE_EMDRV_SPIDRV_OK == transfer_status.transferStatus)
+			if(pdTRUE == xQueueReceive(rx_semaphore, &transfer_status, 2*1000)) // Added rx timeout
 			{
-				retVal = transfer_status.itemsTransferred;
-			} else
+				if (ECODE_EMDRV_SPIDRV_OK == transfer_status.transferStatus)
+				{
+					retVal = transfer_status.itemsTransferred;
+				}
+			}
+			else
 			{
 				retVal = -1;
 			}

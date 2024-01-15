@@ -45,7 +45,7 @@ pub const rtos_stack_depth_lwm2m: u16 = if (enable_lwm2m) 2000 else min_task_sta
 
 // MQTT
 pub const rtos_prio_mqtt = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1400 else min_task_stack_depth;
+pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1450 else min_task_stack_depth;
 
 // HTTP
 pub const rtos_prio_http = @intFromEnum(task_priorities.rtos_prio_normal);
