@@ -10,8 +10,6 @@
 
 #include "board_sd_card.h"
 
-#include "timer.h"
-
 /* Silicon Labs Drivers */
 #include "sl_iostream_debug.h"
 #include "sl_debug_swo.h"
@@ -177,7 +175,7 @@ void BOARD_Init(void)
 
 	BOARD_Watchdog_Init();
 
-	SysTick_Config(SystemCoreClock / TIMER_FREQUENCY_HZ);
+	SysTick_Config(SystemCoreClock / 1000);
 
 	/* Start Services */
 	sl_power_manager_init();

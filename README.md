@@ -23,7 +23,7 @@ The current version of `MISO` boasts a set of features, including:
 - provide a basic secured LWM2M service client with connection management,
 - provide a basic MQTT service client (QOS0 and QOS1 support, QOS2 experimental),
 - provide a HTTP file download client for configuration and firmware updates
-- mbedTLS PSK and x509 certificate authentication tested with DTLS,
+- mbedTLS PSK and x509 certificate authentication tested with TLS (MQTTS) and DTLS (COAPS),
 - Watchdog
 - Bootloader with support for MCUBoot firmware containers
 
@@ -194,7 +194,7 @@ Configuration can be loaded via SD card by `config.txt`
 
 ## Signature Algorithms
 
-`miso` uses elliptic curve cryptography for signature creation and validation of configuration and firmware images using the ECDSA (*Eliptic Curve Digital Signature Algorithm*).
+`MISO` uses elliptic curve cryptography for signature creation and validation of configuration and firmware images using the ECDSA (*Eliptic Curve Digital Signature Algorithm*).
 
 Parameters:
 
@@ -230,7 +230,7 @@ ECDHE
 
 ## Firmware Update
 
-To perform a firmware update, the `miso` application needs to fetch an unecrypted firmware image signed in a MCUboot container
+To perform a firmware update, the `MISO` application needs to fetch an unecrypted firmware image signed in a MCUboot container
 
 These files can be stored in a HTTP server that must support [range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) for the downloads.
 The public key is provided in the configuration file.
@@ -271,7 +271,7 @@ Use the base64 output as a one-line string in the config (`http.key`)
 
 ### Generate FW container
 
-Use the MCUBot [`imgtool`](https://docs.mcuboot.com/imgtool.html) script to sign and generate the fw container.
+Use the MCUBoot [`imgtool`](https://docs.mcuboot.com/imgtool.html) script to sign and generate the fw container.
 
 The firmware container header is `0x80` (128) bytes long and the start address is currently `0x7800`
 
