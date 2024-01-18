@@ -795,7 +795,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         self.connection.close() catch {};
     }
 
-    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.match(uri.scheme).?.getProtocol(), .psk);
+    try self.connection.create(uri, null, .psk);
 
     _ = try self.packet.prepareConnectPacket(self.device_id[0..c.strlen(self.device_id)], null, null);
 

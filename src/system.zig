@@ -13,6 +13,14 @@ pub const time = struct {
         return board.getTime();
     }
 
+    pub fn setTimeFromNtp(timestamp: u32) !void {
+        try board.setTimeFromNtp(timestamp);
+    }
+
+    pub fn getNtpTime() u32 {
+        return board.getNtpTime();
+    }
+
     pub fn calculateDeadline(timeout_s: u32) u32 {
         return now() + timeout_s;
     }

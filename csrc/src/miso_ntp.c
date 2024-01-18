@@ -169,8 +169,7 @@ enum sntp_return_codes_e miso_sntp_request(sntp_server_t *server,
 
 	if (sntp_success == sntp_rcode)
 	{
-		if ((uint64_t) 0
-				== *(uint64_t*) &ntp_packet.transmit_timestamp_seconds[0])
+		if (((uint32_t) 0 == *(uint32_t*) &ntp_packet.transmit_timestamp_seconds[0]) && ((uint32_t) 0 == *(uint32_t*) &ntp_packet.transmit_timestamp_fraction[0]))
 		{
 			sntp_rcode = sntp_server_transmit_zero;
 		}

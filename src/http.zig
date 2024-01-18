@@ -298,7 +298,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
     // Change this to support TLS on HTTP
     const proto = connection.schemes.match(uri.scheme).?.getProtocol();
 
-    try self.connection.create(uri.host.?, uri.port.?, null, proto, if (proto.isSecure()) .psk else null);
+    try self.connection.create(uri, null, if (proto.isSecure()) .psk else null);
     defer {
         self.connection.close() catch {};
     }
@@ -388,7 +388,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
                 // Reconnect logic
                 try self.connection.close();
 
-                try self.connection.create(uri.host.?, uri.port.?, null, proto, if (proto.isSecure()) .psk else null);
+                try self.connection.create(uri, null, if (proto.isSecure()) .psk else null);
             } else {
                 //  Keep Alive
             }

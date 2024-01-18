@@ -113,21 +113,16 @@ ssl: mbedtls,
 
 pub fn init(id: connection_id, credential_callback: ?mbedtls.credential_callback_fn, custom_ssl_init: ?mbedtls.custom_init_callback_fn) @This() {
     // Think about how to rewrite this for non-ssl connections
-    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .proto = undefined, .ssl = mbedtls.create(credential_callback, custom_ssl_init) };
-}
-
-pub fn connect(self: *@This(), uri: std.Uri, local_port: ?u16, proto: ?protocol, mode: ?security_mode) !void {
-    _ = self;
-    _ = uri;
-    _ = local_port;
-    _ = proto;
-    _ = mode;
+    return @This(){ .id = id, .ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id)))), .proto = undefined, .ssl = mbedtls.create(credential_callback, custom_ssl_init, null) };
 }
 
 /// Create a connection to a host
 ///
-pub fn create(self: *@This(), host: []const u8, port: u16, local_port: ?u16, proto: protocol, mode: ?security_mode) !void {
-    self.proto = proto;
+pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16, mode: ?security_mode) !void {
+    self.proto = schemes.match(uri.scheme).?.getProtocol();
+
+    const host = uri.host.?;
+    const port = uri.port.?;
 
     if (self.proto.isSecure()) {
         _ = self.ssl.init(self, self.proto, mode.?) catch {

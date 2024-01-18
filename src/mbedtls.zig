@@ -53,6 +53,7 @@ const mbedtls_nok: i32 = -1;
 
 pub const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
 pub const custom_init_callback_fn = *const fn (*@This(), connection.protocol, connection.security_mode) init_error!void;
+pub const custom_cleanup_callback_fn = *const fn (*@This()) void;
 
 /// Security mode
 mode: connection.security_mode,
@@ -76,6 +77,9 @@ auth_callback: ?credential_callback_fn = defaultAuth,
 /// Custom init callback
 custom_init_callback: ?custom_init_callback_fn = null,
 
+/// Custom cleanup callback
+custom_cleanup_callback: ?custom_cleanup_callback_fn = null,
+
 const tls_read_timeout: u32 = 5000;
 
 pub fn deinit(self: *@This()) i32 {
@@ -94,19 +98,23 @@ fn defaultAuth(self: *@This(), security_mode: connection.security_mode) auth_err
 }
 
 pub fn cleanup(self: *@This()) void {
-    c.miso_mbedtls_deinit_timer(&self.timer);
-    c.mbedtls_ctr_drbg_free(&self.drbg);
-    c.mbedtls_entropy_free(&self.entropy);
-    c.mbedtls_ssl_free(&self.context);
-    c.mbedtls_ssl_config_free(&self.config);
+    if (self.custom_cleanup_callback) |custom| {
+        custom(self);
+    } else {
+        c.miso_mbedtls_deinit_timer(&self.timer);
+        c.mbedtls_ctr_drbg_free(&self.drbg);
+        c.mbedtls_entropy_free(&self.entropy);
+        c.mbedtls_ssl_free(&self.context);
+        c.mbedtls_ssl_config_free(&self.config);
+    }
 }
 
 fn get_ctx(self: *@This()) *c.mbedtls_ssl_context {
     return &self.context;
 }
 
-pub fn create(auth_callback: ?credential_callback_fn, custom_init: ?custom_init_callback_fn) @This() {
-    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+pub fn create(auth_callback: ?credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
+    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
 }
 
 /// Helper function to get the credential callback function in custom init

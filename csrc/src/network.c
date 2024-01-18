@@ -47,8 +47,6 @@ struct miso_sockets_s
 	SlSocklen_t peer_len;
 
 	mbedtls_ssl_context *ssl_context; /* Optional SSL context */
-	// ssl connect callback
-	//int (*ssl_cleanup)(mbedtls_ssl_context *ssl); // optional SSL cleanup function
 
 	uint32_t last_send_time; // Last time we sent a packet
 	uint32_t last_recv_time; // Last time we received a packet

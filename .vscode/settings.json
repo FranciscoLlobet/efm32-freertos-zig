@@ -71,7 +71,12 @@
         "miso_mbedtls_config.h": "c",
         "freertos.h": "c",
         "freertosconfig.h": "c",
-        "os_malloc.h": "c"
+        "os_malloc.h": "c",
+        "trace.h": "c",
+        "timers.h": "c",
+        "semphr.h": "c",
+        "task.h": "c",
+        "miso_ntp.h": "c"
     },
     "cmake.configureOnOpen": false
 }

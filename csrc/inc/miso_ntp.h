@@ -1,12 +1,13 @@
-/*
+/**
  * miso_ntp.h
  *
  * Embedded implementation for sNTP client
  *
- * Implements RFC4430 (2006)
+ * Implements RFC4330 (2006)
  * Simple Network Time Protocol (SNTP) Version 4 for IPv4, IPv6 and OSI
+ * https://www.rfc-editor.org/rfc/rfc4330
  *
- * Also reference SNTP v3
+ * Also references SNTP v3
  * https://www.rfc-editor.org/rfc/rfc1769
  *
  *  Created on: 13 nov 2022
@@ -33,8 +34,8 @@ struct ntp_packet_s
 	uint8_t stratum; /* Stratum Byte */
 	uint8_t poll_interval; /* Poll interval Byte */
 	uint8_t precision; /* Precision Byte */
-	uint8_t root_delay[4]; /* */
-	uint8_t root_dispersion[4];
+	uint8_t root_delay[4]; /* Root Delay (32-Bit) */
+	uint8_t root_dispersion[4]; /* Root dispersion */
 	uint8_t reference_indentifier[4];
 	uint8_t reference_timestamp_seconds[4];
 	uint8_t reference_timestamp_fraction[4];
@@ -44,8 +45,8 @@ struct ntp_packet_s
 	uint8_t recieve_timestamp_fraction[4];
 	uint8_t transmit_timestamp_seconds[4];
 	uint8_t transmit_timestamp_fraction[4];
-	// uint8_t key_identifier[4]; /* Optional */
-	// uint8_t message_digest[16]; /* Optional */
+	// uint8_t key_identifier[4]; /* Optional Key Identifier (v4) */
+	// uint8_t message_digest[16]; /* Message Digest (v4) */
 };
 
 
@@ -68,7 +69,7 @@ struct ntp_packet_s
 
 enum{
 
-	max_timer_interval_s = UINT32_MAX / 1000, // Using 32-Bit timer
+	max_timer_interval_s = (UINT32_MAX - 1) / 1000, // Using 32-Bit timer
 	max_timer_interval_ms = max_timer_interval_s * 1000,
 
 	min_polling_interval_ms = (1 << 4) * 1024,

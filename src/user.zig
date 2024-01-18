@@ -19,6 +19,7 @@ const nvm = @import("nvm.zig");
 const board = @import("microzig").board;
 const system = @import("system.zig");
 const firmware = @import("boot/firmware.zig");
+const ntp = @import("ntp.zig");
 
 const state = enum(usize) {
     verify_config = 0,
@@ -81,6 +82,9 @@ fn myUserTaskFunction(self: *@This()) void {
                     eventValue = val;
                 }
             }
+
+            const ntp_uri: std.Uri = std.Uri.parse("ntp://1.de.pool.ntp.org:123") catch unreachable;
+            ntp.getTimeFromServer(ntp_uri) catch unreachable;
 
             self.stateMachineState = .perform_firmware_download;
         } else if (self.stateMachineState == .perform_firmware_download) {

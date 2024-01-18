@@ -8,8 +8,47 @@ pub const c = @cImport({
 
 pub const cpu_frequency = 48_000_000; // 48MHz
 
+/// Get local time
 pub fn getTime() u32 {
     return c.sl_sleeptimer_get_time();
+}
+
+/// Get local Ntp time
+pub fn getNtpTime() u32 {
+    var ntp_time: u32 = undefined;
+
+    return if (c.SL_STATUS_OK == c.sl_sleeptimer_convert_unix_time_to_ntp(c.sl_sleeptimer_get_time(), &ntp_time)) ntp_time else 0;
+}
+
+/// Set local time from NTP time
+pub fn setTimeFromNtp(ntp_time: u32) !void {
+    var time_stamp: u32 = undefined;
+    //var rc : c.sl_status_t = undefined;
+    if (c.SL_STATUS_OK != c.sl_sleeptimer_convert_ntp_time_to_unix(ntp_time, &time_stamp)) {
+        // return
+    }
+    if (c.SL_STATUS_OK != c.sl_sleeptimer_set_time(time_stamp)) {
+        // return
+    }
+
+    var sl_date: c.sl_sleeptimer_date_t = undefined;
+
+    if (c.SL_STATUS_OK == c.sl_sleeptimer_get_datetime(&sl_date)) {
+        var simple_link_date: c.SlDateTime_t = undefined;
+
+        simple_link_date.sl_tm_day = sl_date.month_day;
+        simple_link_date.sl_tm_mon = sl_date.month + 1;
+        simple_link_date.sl_tm_year = sl_date.year + 1900;
+        simple_link_date.sl_tm_hour = sl_date.hour;
+        simple_link_date.sl_tm_min = sl_date.min;
+        simple_link_date.sl_tm_sec = sl_date.sec;
+
+        if (0 > c.sl_DevSet(c.SL_DEVICE_GENERAL_CONFIGURATION, c.SL_DEVICE_GENERAL_CONFIGURATION_DATE_TIME, @sizeOf(@TypeOf(simple_link_date)), @ptrCast(&simple_link_date))) {
+            //
+        }
+    } else {
+        // return
+    }
 }
 
 pub fn mcuReset() noreturn {
