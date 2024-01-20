@@ -53,8 +53,6 @@ pub fn build(b: *std.Build) !void {
 
         // Core C-source
         "csrc/src/config.c",
-        "csrc/src/miso_ntp.c",
-        "csrc/src/sntp_packet.c",
         "csrc/src/network.c",
         "csrc/src/wifi_service.c",
     };

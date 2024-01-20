@@ -13,6 +13,8 @@ const sntp_error = error{
     invalid_packet,
     invalid_origin_timestamp,
     kiss_of_death,
+    // connectivity issues
+    send_error,
 };
 
 const li = enum(u8) {
@@ -93,6 +95,9 @@ const poll_interval = enum(u8) {
 
 const server_response_mask: u8 = (7 << 3) | (7 << 0);
 
+pub const ntp_response = struct { timestamp_s: u32, timestamp_frac: u32, poll_interval: u32 };
+
+/// Non public sntp v4 packet
 const sntp_v4_packet = packed struct {
     leap_version_mode: u8,
     stratum: u8,
@@ -116,23 +121,26 @@ const sntp_v4_packet = packed struct {
     transmit_timestamp_seconds: u32,
     transmit_timestamp_fraction: u32,
 
-    pub fn createRequest(self: *@This(), originate_timestamp_s: u32, originate_timestamp_frac: u32) []u8 {
+    pub fn createRequest(self: *@This(), originate_timestamp_s: u32, originate_timestamp_frac: u32) !void {
         // Zero the packet using memory magic
         @memset(self.slice(), 0);
 
         self.leap_version_mode = @intFromEnum(client_request.request_v4);
         self.transmit_timestamp_seconds = @byteSwap(originate_timestamp_s);
         self.transmit_timestamp_fraction = @byteSwap(originate_timestamp_frac);
-
-        return self.slice();
     }
 
+    /// Convert the packet to a slice of bytes.
     pub inline fn slice(self: *@This()) []u8 {
         return @as([*]u8, @ptrCast(self))[0..@sizeOf(@This())];
     }
 
+    pub inline fn len() usize {
+        return @sizeOf(@This());
+    }
+
     /// This function is used to process a v4 server response packet.
-    pub fn process_server_packet(self: *@This(), origin_timestamp_s: u32, origin_timestamp_frac: u32) sntp_error!struct { timestamp_s: u32, timestamp_frac: u32, poll_interval: u32 } {
+    pub fn process_server_packet(self: *@This(), origin_timestamp_s: u32, origin_timestamp_frac: u32) sntp_error!ntp_response {
 
         // Check for the server response header
         if ((self.leap_version_mode & server_response_mask) != @intFromEnum(server_response.response_v4)) {
@@ -157,6 +165,7 @@ const sntp_v4_packet = packed struct {
             return sntp_error.invalid_origin_timestamp;
         }
 
+        // convert the poll interval response and conver it to a seconds value
         const next_poll_interval: u32 = @shlExact(@as(u32, 1), @as(u5, if (server_poll_interval < @intFromEnum(poll_interval.interval_16s))
             @intFromEnum(poll_interval.interval_16s)
         else if (server_poll_interval > @intFromEnum(poll_interval.interval_131072s))
@@ -170,7 +179,18 @@ const sntp_v4_packet = packed struct {
 
 var conn: connection = undefined;
 
-pub fn getTimeFromServer(uri: std.Uri) !void {
+/// Send an sNTP packet to the given connection.
+fn send(c: *connection, packet: *sntp_v4_packet) !void {
+    if (c.send(packet.slice())) |len| {
+        if (len != sntp_v4_packet.len()) return sntp_error.send_error;
+    } else |_| {
+        return sntp_error.send_error;
+    }
+}
+
+/// Get the current time from an sNTP server using the given URI.
+///
+pub fn getTimeFromServer(uri: std.Uri) !ntp_response {
     conn = connection.init(.ntp, null, null);
 
     var packet: sntp_v4_packet = undefined;
@@ -183,12 +203,17 @@ pub fn getTimeFromServer(uri: std.Uri) !void {
         conn.close() catch {};
     }
 
-    _ = try conn.send(packet.createRequest(originate_timestamp_s, originate_timestamp_frac));
+    try packet.createRequest(originate_timestamp_s, originate_timestamp_frac);
+
+    try send(&conn, &packet);
 
     _ = conn.waitRx(2);
+
     _ = try conn.recieve(packet.slice());
 
     var server_time = try packet.process_server_packet(originate_timestamp_s, originate_timestamp_frac);
 
     try system.time.setTimeFromNtp(server_time.timestamp_s);
+
+    return server_time;
 }

@@ -24,6 +24,10 @@ const ntp = @import("ntp.zig");
 const state = enum(usize) {
     verify_config = 0,
     start_connectivity,
+    stop_connectivity,
+
+    /// First NTP sync
+    start_ntp_time,
     start_mqtt,
     start_lwm2m,
     get_config,
@@ -31,38 +35,56 @@ const state = enum(usize) {
     verify_firmware_download,
 
     working, // normal work mode
+};
 
-    pub fn newState(currentState: @This()) @This() {
-        return switch (currentState) {
-            .verify_config => .start_connectivity,
-            .start_connectivity => .perform_firmware_download,
-            .perform_firmware_download => .working,
-            .working => .working,
-        };
+const notificationValues = enum(u32) {
+    no = 0,
+
+    connectivity_on = c.miso_connectivity_on,
+    connectivity_off = c.miso_connectivity_off,
+
+    ntp_sync = (1 << 2),
+    user_timer = (1 << 3),
+
+    pub fn isNotification(val: u32, notification: notificationValues) bool {
+        return (val & @intFromEnum(notification)) == @intFromEnum(notification);
     }
 };
 
+/// User task handle
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_user_task, "user task", myUserTaskFunction),
+
+/// User timer
 timer: freertos.StaticTimer(@This(), "user timer", myTimerFunction),
-stateMachineState: state,
+
+/// NTP timer
+ntpTimer: freertos.StaticTimer(@This(), "ntp timer", myNtpTimerFunction),
+ntpSyncTime: u32,
+
+/// User Statemachine state
+state: state,
 
 fn myTimerFunction(self: *@This()) void {
-    var test_var: u32 = 0xAA55;
+    self.task.notify(@intFromEnum(notificationValues.user_timer), .eSetBits) catch {};
+}
 
-    self.task.notify(test_var, .eSetBits) catch {};
+fn myNtpTimerFunction(self: *@This()) void {
+    self.task.notify(0, .eSetBits) catch {};
 }
 
 fn myUserTaskFunction(self: *@This()) void {
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
+    // Initialize the NVM
     _ = nvm.init() catch 0;
 
     fatfs.mount("SD") catch unreachable;
 
+    // State machine pattern
     while (true) {
         var eventValue: u32 = 0;
 
-        if (self.stateMachineState == .verify_config) {
+        if (self.state == .verify_config) {
             config.load_config_from_nvm() catch {
                 _ = c.printf("Failure!!\n\r");
             };
@@ -71,27 +93,49 @@ fn myUserTaskFunction(self: *@This()) void {
                 _ = c.printf("Failure!!\n\r");
             };
 
-            self.stateMachineState = .start_connectivity;
-        } else if (self.stateMachineState == .start_connectivity) {
+            self.state = .start_connectivity;
+        } else if (self.state == .start_connectivity) {
 
             // Change this to wait for connectivity
             wifi_task.resumeTask();
 
-            while ((eventValue & c.miso_connectivity_on) != c.miso_connectivity_on) {
+            // Wait for connectivity
+            while (false == notificationValues.isNotification(eventValue, notificationValues.connectivity_on)) {
                 if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
                     eventValue = val;
                 }
             }
 
-            const ntp_uri: std.Uri = std.Uri.parse("ntp://1.de.pool.ntp.org:123") catch unreachable;
-            ntp.getTimeFromServer(ntp_uri) catch unreachable;
+            self.state = .start_ntp_time;
+        } else if (self.state == .stop_connectivity) {
+            _ = c.printf("Lost connectivity\r\n");
 
-            self.stateMachineState = .perform_firmware_download;
-        } else if (self.stateMachineState == .perform_firmware_download) {
+            self.ntpTimer.stop(null) catch unreachable; // stop NTP timer
+            lwm2m.service.task.suspendTask();
+            mqtt.service.task.suspendTask();
+        } else if (self.state == .start_ntp_time) {
+            // Get time from NTP Server
+
+            const ntp_uri: std.Uri = std.Uri.parse("ntp://1.de.pool.ntp.org:123") catch unreachable;
+
+            if (ntp.getTimeFromServer(ntp_uri)) |ntpResponse| {
+                self.ntpSyncTime = ntpResponse.timestamp_s;
+
+                // Calculate the next time to sync
+                const nextSyncTime: u32 = if (ntpResponse.poll_interval > 60 * 60) @as(u32, 60 * 60 * 1000) else ntpResponse.poll_interval * 1000;
+
+                _ = c.printf("NTP Sync: %d\r\n", system.time.now());
+                self.ntpTimer.changePeriod(nextSyncTime, null) catch unreachable;
+                self.state = .perform_firmware_download;
+            } else |_| {
+                self.ntpSyncTime = 0;
+                self.task.delayTask(16000); // wait for 16
+                self.state = .start_ntp_time;
+            }
+        } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
                 _ = c.printf("Performing firmware download\r\n");
 
-                // get eTag from the NVM
                 if (downloadAndVerify()) |_| {
                     // Happy path
 
@@ -101,7 +145,7 @@ fn myUserTaskFunction(self: *@This()) void {
 
                     self.task.delayTask(1000);
 
-                    // system.reset();
+                    // reset
                 } else |err| {
                     if (err == firmware.firmware_error.firmware_already_in_system) {
                         _ = c.printf("Firmware already in system\n\r");
@@ -113,29 +157,38 @@ fn myUserTaskFunction(self: *@This()) void {
 
             // perform HTTP download
             if (comptime config.enable_lwm2m) {
-                self.stateMachineState = .start_lwm2m;
+                self.state = .start_lwm2m;
             } else if (comptime config.enable_mqtt) {
-                self.stateMachineState = .start_mqtt;
+                self.state = .start_mqtt;
             } else {
-                self.stateMachineState = .working;
+                self.state = .working;
             }
-        } else if (self.stateMachineState == .start_mqtt) {
+        } else if (self.state == .start_mqtt) {
             mqtt.service.resumeTask();
 
             self.timer.start(null) catch unreachable;
 
-            self.stateMachineState = .working;
-        } else if (self.stateMachineState == .start_lwm2m) {
+            self.state = .working;
+        } else if (self.state == .start_lwm2m) {
             lwm2m.service.task.resumeTask();
 
-            self.stateMachineState = .working;
-        } else if (self.stateMachineState == .working) {
+            self.state = .working;
+        } else if (self.state == .working) {
             // recieve
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
+                if (notificationValues.isNotification(val, notificationValues.connectivity_off)) {
+                    // lost connectivity
+                    //
 
-            if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |_| {
-                //_ = val;
-                leds.yellow.toggle();
-                _ = c.printf("UserTask: %d\r\n", self.task.getStackHighWaterMark());
+                } else if (notificationValues.isNotification(val, notificationValues.ntp_sync)) {
+                    // Execute the NTP sync
+
+                    // self.ntpSyncTime = ntp.getTime();
+
+                } else if (notificationValues.isNotification(val, notificationValues.user_timer)) {
+                    leds.yellow.toggle();
+                    _ = c.printf("UserTimer: %d\r\n", self.task.getStackHighWaterMark());
+                }
             }
         }
     }
@@ -151,9 +204,11 @@ fn downloadAndVerify() !bool {
 }
 
 pub fn create(self: *@This()) void {
-    self.stateMachineState = state.verify_config;
+    self.state = state.verify_config;
     self.task.create(self, config.rtos_prio_user_task) catch unreachable;
     self.timer.create(2000, true, self) catch unreachable;
+    self.ntpTimer.create(4000, true, self) catch unreachable;
+    self.ntpSyncTime = 0;
 }
 
-pub var user_task: @This() = .{ .timer = undefined, .stateMachineState = undefined, .task = undefined };
+pub var user_task: @This() = .{ .timer = undefined, .state = undefined, .task = undefined, .ntpTimer = undefined, .ntpSyncTime = 0 };

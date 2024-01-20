@@ -110,11 +110,11 @@ zig build
 
 ### Wifi Connectivity
 
-- TI Simplelink CC3100-SDK
+- [TI Simplelink CC3100-SDK](https://www.ti.com/tool/CC3100SDK)
 
 ### Filesystem
 
-- [FatFs 15](http://elm-chan.org/fsw/ff/00index_e.html). The standard FatFS driver for embedded devices.
+- [FatFs 15](http://elm-chan.org/fsw/ff/00index_e.html).
 
 ### Utils
 
@@ -138,17 +138,17 @@ zig build
 
 Configuration can be loaded via SD card by `config.txt`
 
-| Field          | Description            | Type                  |           |
-|----------------|------------------------|-----------------------|-----------|
-| wifi.ssid      | Wifi WPA2 SSID         | String                | Mandadory |
-| wifi.key       | Wifi WPA2 SSID Key     | String                | Mandatory |
+| Field          | Description            | Type                  |                      |
+|----------------|------------------------|-----------------------|----------------------|
+| wifi.ssid      | Wifi WPA2 SSID         | String                | Mandadory            |
+| wifi.key       | Wifi WPA2 SSID Key     | String                | Mandatory            |
 | lwm2m.endpoint | LWM2M endpoint         | String                | If LwM2M is compiled |
 | lwm2m.uri      | LWM2M Server Uri       | URI String            | If LwM2M is compiled |
-| lwm2m.psk.id   | LwM2M DTLS Psk ID      | String                | Optional  |
-| lwm2m.psk.key  | LwM2M DTLS PSK Key     | Base64 encoded String | Optional  |
-| ntp.url[]      | sNTP server URI/URL    | URI String Array      | Mandatory |
-| http.uri       | Firmware image URI     | URI String            | Mandatory |
-| http.key       | Firmware public key    | Base64 encoded string | Mandatory |
+| lwm2m.psk.id   | LwM2M DTLS Psk ID      | String                | Optional             |
+| lwm2m.psk.key  | LwM2M DTLS PSK Key     | Base64 encoded String | Optional             |
+| ntp.url[]      | sNTP server URI/URL    | URI String Array      | Not implemented      |
+| http.uri       | Firmware image URI     | URI String            | Mandatory            |
+| http.key       | Firmware public key    | Base64 encoded string | Mandatory            |
 
 ```json
 {
@@ -186,7 +186,7 @@ Configuration can be loaded via SD card by `config.txt`
     }
   },
   "http": {
-    "url": "http://192.168.50.133:80/app.bin",
+    "url": "http://HTTP_HOST:80/app.bin",
     "key": "APP_PUB_KEY_BASE64"
   }
 }
