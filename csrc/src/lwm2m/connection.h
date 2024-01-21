@@ -39,8 +39,6 @@ struct connection_s
 		miso_network_ctx_t ctx;
 };
 
-int create_socket(const char *portStr, int ai_family);
-
 connection_t connection_find(connection_t connList, struct sockaddr_in *addr, size_t addrLen);
 connection_t connection_new_incoming(connection_t connList,
 		struct miso_mbedtls_context_s *connection);

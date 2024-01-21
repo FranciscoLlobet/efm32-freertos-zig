@@ -12,7 +12,7 @@ const c = @cImport({
 });
 
 /// Connection instance
-connection: connection,
+connection: connection.Connection(.http, void),
 
 /// Array to store parsed header information
 headers: [24]c.phr_header,
@@ -295,10 +295,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
         self.connection.close() catch {};
     }
 
-    // Change this to support TLS on HTTP
-    const proto = connection.schemes.match(uri.scheme).?.getProtocol();
-
-    try self.connection.create(uri, null, if (proto.isSecure()) .psk else null);
+    try self.connection.create(uri, null);
     defer {
         self.connection.close() catch {};
     }
@@ -388,7 +385,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
                 // Reconnect logic
                 try self.connection.close();
 
-                try self.connection.create(uri, null, if (proto.isSecure()) .psk else null);
+                try self.connection.create(uri, null);
             } else {
                 //  Keep Alive
             }
@@ -408,7 +405,7 @@ pub fn eTag(self: *@This()) ?[]const u8 {
 
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
-        //self.connection = connection.init(.http, authCallback, null); // mem corruption
+        self.connection.init(); // mem corruption
         self.tx_mutex.create() catch unreachable;
         self.rx_mutex.create() catch unreachable;
     }

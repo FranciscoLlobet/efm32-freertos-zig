@@ -177,10 +177,10 @@ const sntp_v4_packet = packed struct {
     }
 };
 
-var conn: connection = undefined;
+var conn: connection.Connection(.ntp, void) = undefined;
 
 /// Send an sNTP packet to the given connection.
-fn send(c: *connection, packet: *sntp_v4_packet) !void {
+fn send(c: *@TypeOf(conn), packet: *sntp_v4_packet) !void {
     if (c.send(packet.slice())) |len| {
         if (len != sntp_v4_packet.len()) return sntp_error.send_error;
     } else |_| {
@@ -191,14 +191,14 @@ fn send(c: *connection, packet: *sntp_v4_packet) !void {
 /// Get the current time from an sNTP server using the given URI.
 ///
 pub fn getTimeFromServer(uri: std.Uri) !ntp_response {
-    conn = connection.init(.ntp, null, null);
+    conn.init();
 
     var packet: sntp_v4_packet = undefined;
 
     const originate_timestamp_s: u32 = system.time.getNtpTime();
     const originate_timestamp_frac: u32 = 0;
 
-    try conn.create(uri, 123, .no_sec);
+    try conn.create(uri, 123);
     defer {
         conn.close() catch {};
     }

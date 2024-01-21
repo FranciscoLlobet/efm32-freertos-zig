@@ -50,162 +50,193 @@ pub const init_error = error{};
 
 const mbedtls_ok: i32 = 0;
 const mbedtls_nok: i32 = -1;
-
-pub const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
-pub const custom_init_callback_fn = *const fn (*@This(), connection.protocol, connection.security_mode) init_error!void;
-pub const custom_cleanup_callback_fn = *const fn (*@This()) void;
-
-/// Security mode
-mode: connection.security_mode,
-
-/// MbedTLS Context
-context: c.mbedtls_ssl_context,
-
-/// MbedTLS Configuration
-config: c.mbedtls_ssl_config,
-
-drbg: c.mbedtls_ctr_drbg_context,
-entropy: c.mbedtls_entropy_context,
-timer: c.miso_mbedtls_timing_delay_t,
-
-/// Entropy Seed
-entropy_seed: u32,
-
-/// Authentication callback
-auth_callback: ?credential_callback_fn = defaultAuth,
-
-/// Custom init callback
-custom_init_callback: ?custom_init_callback_fn = null,
-
-/// Custom cleanup callback
-custom_cleanup_callback: ?custom_cleanup_callback_fn = null,
-
 const tls_read_timeout: u32 = 5000;
+pub const mbedtls_ssl_context = c.mbedtls_ssl_context;
+pub const mbedtls_ssl_config = c.mbedtls_ssl_config;
 
-pub fn deinit(self: *@This()) i32 {
-    var ret: i32 = 0;
+pub fn TlsContext(comptime mode: connection.security_mode) type {
+    // Mbedtls context
 
-    self.cleanup();
+    return struct {
+        const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
+        const custom_init_callback_fn = *const fn (*@This(), connection.security_mode) void;
+        const custom_cleanup_callback_fn = *const fn (*@This()) void;
 
-    return ret;
-}
+        /// MbedTLS Context
+        context: mbedtls_ssl_context,
+        /// MbedTLS Configuration
+        config: mbedtls_ssl_config,
+        /// MbedTLS DRBG
+        drbg: c.mbedtls_ctr_drbg_context,
+        /// MbedTLS Entropy context
+        entropy: c.mbedtls_entropy_context,
+        /// MbedTLS Timer
+        timer: c.miso_mbedtls_timing_delay_t,
 
-fn defaultAuth(self: *@This(), security_mode: connection.security_mode) auth_error!void {
-    _ = self;
-    _ = security_mode;
+        auth_callback: credential_callback_fn,
 
-    return auth_error.default_callback;
-}
+        // Certificate mode
+        ec: if (mode == connection.security_mode.certificate_ec) struct {
+            /// Own CRT Context
+            own_crt: c.mbedtls_x509_crt,
+            /// Peer certificate context
+            peer_crt: c.mbedtls_x509_crt,
+            /// Peer CRL context
+            peer_crl: c.mbedtls_x509_crl,
 
-pub fn cleanup(self: *@This()) void {
-    if (self.custom_cleanup_callback) |custom| {
-        custom(self);
-    } else {
-        c.miso_mbedtls_deinit_timer(&self.timer);
-        c.mbedtls_ctr_drbg_free(&self.drbg);
-        c.mbedtls_entropy_free(&self.entropy);
-        c.mbedtls_ssl_free(&self.context);
-        c.mbedtls_ssl_config_free(&self.config);
-    }
-}
+            /// Own PK
+            own_pk: c.mbedtls_pk_context,
+        } else struct {},
+        /// Entropy Seed
+        entropy_seed: u32,
 
-fn get_ctx(self: *@This()) *c.mbedtls_ssl_context {
-    return &self.context;
-}
+        /// Custom init callback
+        custom_init_callback: ?custom_init_callback_fn = null,
 
-pub fn create(auth_callback: ?credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
-    return @This(){ .auth_callback = auth_callback orelse defaultAuth, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .mode = connection.security_mode.no_sec, .entropy_seed = 0x55555555 };
+        /// Custom cleanup callback
+        custom_cleanup_callback: ?custom_cleanup_callback_fn = null,
+
+        // Default auth callback
+        pub fn create(auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
+            return @This(){ .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined };
+        }
+        pub fn cleanup(self: *@This()) void {
+            if (self.custom_cleanup_callback) |custom| {
+                custom(self);
+            } else {
+                // Free Own PK
+                if (mode == connection.security_mode.certificate_ec) {
+                    c.mbedtls_pk_free(&self.own_pk);
+
+                    // Free Certificate Chains
+                    c.mbedtls_x509_crt_free(&self.ec.own_crt);
+                    c.mbedtls_x509_crt_free(&self.ec.peer_crt);
+                    c.mbedtls_x509_crl_free(&self.ec.peer_crl);
+                }
+
+                c.miso_mbedtls_deinit_timer(&self.timer);
+                c.mbedtls_ctr_drbg_free(&self.drbg);
+                c.mbedtls_entropy_free(&self.entropy);
+                c.mbedtls_ssl_free(&self.context);
+                c.mbedtls_ssl_config_free(&self.config);
+            }
+        }
+        pub fn init(self: *@This(), protocol: connection.protocol) !i32 {
+            var ret: i32 = mbedtls_nok;
+
+            if (!connection.protocol.isSecure(protocol))
+                // Running init on a non secure protocol
+                return mbedtls_nok; // should return a different error code
+
+            // custom init callback
+            if (self.custom_init_callback) |custom| {
+                custom(self, mode);
+            } else {
+                c.miso_mbedtls_init_timer(&self.timer);
+                c.mbedtls_ssl_init(&self.context);
+                c.mbedtls_ssl_config_init(&self.config);
+                c.mbedtls_ctr_drbg_init(&self.drbg);
+                c.mbedtls_entropy_init(&self.entropy);
+
+                if (mode == connection.security_mode.certificate_ec) {
+                    // Initialize the certificate chains
+                    c.mbedtls_x509_crt_init(&self.ec.own_crt);
+                    c.mbedtls_x509_crt_init(&self.ec.peer_crt);
+                    c.mbedtls_x509_crl_init(&self.ec.peer_crl);
+                    c.mbedtls_pk_init(&self.ec.own_pk);
+                }
+
+                const transport: c_int = switch (protocol) {
+                    .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
+                    else => c.MBEDTLS_SSL_TRANSPORT_STREAM,
+                };
+
+                ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
+                if (ret == mbedtls_ok) {
+                    ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
+                }
+                if (ret == mbedtls_ok) {
+                    c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
+                    c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
+                    c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
+                    //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
+                    ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
+                    if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = mbedtls_ok;
+                }
+
+                if (ret == mbedtls_ok) {
+                    if (mode == connection.security_mode.certificate_ec) {
+                        c.mbedtls_ssl_conf_groups(&self.config, &groups[0]);
+                        c.mbedtls_ssl_conf_sig_algs(&self.config, &sig_algorithms[0]);
+                    }
+                }
+
+                if (ret == mbedtls_ok) {
+                    switch (mode) {
+                        .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
+                        .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
+                        else => {
+                            // This authentication mode is not supported yet.
+                            ret = mbedtls_nok;
+                        },
+                    }
+                }
+
+                if (ret == mbedtls_ok) {
+                    c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
+                    c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
+
+                    // In case of DTLS set CID
+                    ret = switch (protocol) {
+                        .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
+                        .tls_ip4, .tls_ip6 => mbedtls_ok, // Probably not necessary
+                        else => mbedtls_nok,
+                    };
+                }
+
+                // Run the auth credentials callback
+                if (ret == mbedtls_ok) {
+                    try self.auth_callback(self, mode);
+                }
+
+                if (ret == mbedtls_ok) {
+                    ret = c.mbedtls_ssl_setup(&self.context, &self.config);
+                }
+
+                if (ret == mbedtls_ok) {
+                    c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
+                }
+            }
+
+            // End the ssl initialization
+            if (ret == mbedtls_ok) {
+                // Invert this (!)
+                //ret = c.miso_network_register_ssl_context(@as(*c.struct_miso_sockets_s, @ptrCast(connection_ctx.ctx)), &self.context);
+            }
+
+            if (ret != mbedtls_ok) {
+                // init failure
+            }
+
+            return ret;
+        }
+        pub fn deinit(self: *@This()) i32 {
+            var ret: i32 = 0;
+
+            self.cleanup();
+
+            return ret;
+        }
+        pub fn confPsk(self: *@This(), psk: []u8, psk_id: [*:0]u8) !void {
+            return if (mbedtls_ok != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
+        }
+    };
 }
 
 /// Helper function to get the credential callback function in custom init
-pub fn getCredentialCallbackFn(self: *@This()) ?credential_callback_fn {
-    return self.auth_callback;
-}
-
-pub fn init(self: *@This(), connection_ctx: *connection, protocol: connection.protocol, mode: connection.security_mode) !i32 {
-    var ret: i32 = mbedtls_nok;
-
-    if (!connection.protocol.isSecure(protocol))
-        // Running init on a non secure protocol
-        return mbedtls_nok; // should return a different error code
-
-    self.mode = mode;
-
-    // custom init callback
-    if (self.custom_init_callback) |custom| {
-        try custom(self, protocol, mode);
-    } else {
-        c.miso_mbedtls_init_timer(&self.timer);
-        c.mbedtls_ssl_init(&self.context);
-        c.mbedtls_ssl_config_init(&self.config);
-        c.mbedtls_ctr_drbg_init(&self.drbg);
-        c.mbedtls_entropy_init(&self.entropy);
-
-        const transport: c_int = switch (protocol) {
-            .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
-            else => c.MBEDTLS_SSL_TRANSPORT_STREAM,
-        };
-
-        ret = c.mbedtls_ssl_config_defaults(&self.config, c.MBEDTLS_SSL_IS_CLIENT, transport, c.MBEDTLS_SSL_PRESET_DEFAULT);
-        if (ret == mbedtls_ok) {
-            ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
-        }
-        if (ret == mbedtls_ok) {
-            c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
-            c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
-            c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
-            //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
-            ret = c.mbedtls_ctr_drbg_seed(&self.drbg, c.mbedtls_entropy_func, &self.entropy, null, 0);
-            if (ret == c.MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED) ret = mbedtls_ok;
-        }
-
-        if (ret == mbedtls_ok) {
-            switch (mode) {
-                .psk => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_psk[0]),
-                .certificate_ec => c.mbedtls_ssl_conf_ciphersuites(&self.config, &ciphersuites_ec[0]),
-                else => {
-                    // This authentication mode is not supported yet.
-                    ret = mbedtls_nok;
-                },
-            }
-        }
-        if (ret == mbedtls_ok) {
-            c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
-            c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
-
-            // In case of DTLS set CID
-            ret = switch (protocol) {
-                .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
-                .tls_ip4, .tls_ip6 => mbedtls_ok, // Probably not necessary
-                else => mbedtls_nok,
-            };
-        }
-
-        // Run the auth credentials callback
-        if (ret == mbedtls_ok) {
-            try self.auth_callback.?(self, self.mode);
-        }
-
-        if (ret == mbedtls_ok) {
-            ret = c.mbedtls_ssl_setup(&self.context, &self.config);
-        }
-
-        if (ret == mbedtls_ok) {
-            c.mbedtls_ssl_set_timer_cb(&self.context, &self.timer, c.miso_mbedtls_timing_set_delay, c.miso_mbedtls_timing_get_delay);
-        }
-    }
-
-    // End the ssl initialization
-    if (ret == mbedtls_ok) {
-        ret = c.miso_network_register_ssl_context(@as(*c.struct_miso_sockets_s, @ptrCast(connection_ctx.ctx)), &self.context);
-    }
-
-    if (ret != mbedtls_ok) {
-        // init failure
-    }
-
-    return ret;
-}
+//pub fn getCredentialCallbackFn(self: *@This()) ?credential_callback_fn {
+//    return self.auth_callback;
+//}
 
 pub fn confPsk(self: *@This(), psk: []u8, psk_id: [*:0]u8) !void {
     return if (mbedtls_ok != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};

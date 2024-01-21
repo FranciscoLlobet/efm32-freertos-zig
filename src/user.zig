@@ -131,7 +131,7 @@ fn myUserTaskFunction(self: *@This()) void {
                 _ = c.printf("NTP Sync: %d\r\n", system.time.now());
                 self.ntpTimer.changePeriod(nextSyncTime, null) catch unreachable;
                 self.state = .perform_firmware_download;
-                self.state = .start_lwm2m;
+                self.state = .start_mqtt;
             } else |_| {
                 self.ntpSyncTime = 0;
                 self.task.delayTask(16000); // wait for 16
