@@ -69,7 +69,7 @@ fn myTimerFunction(self: *@This()) void {
 }
 
 fn myNtpTimerFunction(self: *@This()) void {
-    self.task.notify(0, .eSetBits) catch {};
+    self.task.notify(@intFromEnum(notificationValues.ntp_sync), .eSetBits) catch {};
 }
 
 fn myUserTaskFunction(self: *@This()) void {
@@ -83,6 +83,7 @@ fn myUserTaskFunction(self: *@This()) void {
     // State machine pattern
     while (true) {
         var eventValue: u32 = 0;
+        _ = eventValue;
 
         if (self.state == .verify_config) {
             config.load_config_from_nvm() catch {
@@ -100,9 +101,9 @@ fn myUserTaskFunction(self: *@This()) void {
             wifi_task.resumeTask();
 
             // Wait for connectivity
-            while (false == notificationValues.isNotification(eventValue, notificationValues.connectivity_on)) {
-                if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
-                    eventValue = val;
+            while (self.task.waitForNotify(0, @intFromEnum(notificationValues.connectivity_on), null) catch unreachable) |val| {
+                if (notificationValues.isNotification(val, notificationValues.connectivity_on)) {
+                    break;
                 }
             }
 
@@ -111,8 +112,11 @@ fn myUserTaskFunction(self: *@This()) void {
             _ = c.printf("Lost connectivity\r\n");
 
             self.ntpTimer.stop(null) catch unreachable; // stop NTP timer
+
             lwm2m.service.task.suspendTask();
             mqtt.service.task.suspendTask();
+
+            self.state = .working; // go to the working state (?)
         } else if (self.state == .start_ntp_time) {
             // Get time from NTP Server
 
@@ -127,6 +131,7 @@ fn myUserTaskFunction(self: *@This()) void {
                 _ = c.printf("NTP Sync: %d\r\n", system.time.now());
                 self.ntpTimer.changePeriod(nextSyncTime, null) catch unreachable;
                 self.state = .perform_firmware_download;
+                self.state = .start_lwm2m;
             } else |_| {
                 self.ntpSyncTime = 0;
                 self.task.delayTask(16000); // wait for 16
@@ -176,10 +181,10 @@ fn myUserTaskFunction(self: *@This()) void {
         } else if (self.state == .working) {
             // recieve
             if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
-                if (notificationValues.isNotification(val, notificationValues.connectivity_off)) {
-                    // lost connectivity
-                    //
-
+                if (notificationValues.isNotification(val, notificationValues.connectivity_on)) {
+                    self.state = .start_ntp_time;
+                } else if (notificationValues.isNotification(val, notificationValues.connectivity_off)) {
+                    self.state = .stop_connectivity;
                 } else if (notificationValues.isNotification(val, notificationValues.ntp_sync)) {
                     // Execute the NTP sync
 
@@ -190,7 +195,11 @@ fn myUserTaskFunction(self: *@This()) void {
                     _ = c.printf("UserTimer: %d\r\n", self.task.getStackHighWaterMark());
                 }
             }
+        } else {
+            _ = c.printf("Unknown state\r\n");
         }
+
+        // perform per-cycle checks
     }
 }
 

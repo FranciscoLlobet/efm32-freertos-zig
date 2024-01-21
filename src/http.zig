@@ -408,7 +408,7 @@ pub fn eTag(self: *@This()) ?[]const u8 {
 
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
-        self.connection = connection.init(.http, authCallback, null);
+        //self.connection = connection.init(.http, authCallback, null); // mem corruption
         self.tx_mutex.create() catch unreachable;
         self.rx_mutex.create() catch unreachable;
     }

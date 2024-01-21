@@ -24,7 +24,7 @@ const firmware_update_outcome = enum {
 };
 
 fn prepareJump() void {
-    board.jumpToApp(0x78000 + 0x80);
+    board.jumpToApp(256 * 1024 + 0x80);
 }
 
 const update_phase = enum(usize) {

@@ -78,5 +78,6 @@
         "task.h": "c",
         "miso_ntp.h": "c"
     },
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "cortex-debug.variableUseNaturalFormat": true
 }

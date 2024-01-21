@@ -38,16 +38,15 @@ fn dummyTaskFunction(self: *@This()) void {
 }
 
 fn reg_update_function(self: *@This()) void {
-    self.task.notify(c.lwm2m_notify_registration, .eSetBits) catch unreachable;
+    self.task.notify(c.lwm2m_notify_registration, .eSetBits) catch {};
 }
 
 fn timer_update_function(self: *@This()) void {
-    self.task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch unreachable;
+    self.task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch {};
 }
 
 pub fn create(self: *@This()) void {
     self.task.create(self, config.rtos_prio_lwm2m) catch unreachable;
-
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
