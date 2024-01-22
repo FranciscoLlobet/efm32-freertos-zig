@@ -148,17 +148,13 @@ void wifi_task(void *param)
 	retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION, SL_CONNECTION_POLICY(1, 1, 0, 0, 1), NULL, 0);
 
 	// Think about scan parameters
-
-	/* Start Wifi Connection */
-	wifi_status.connection = wifi_connecting;
+	
 	/*_u8 MacAddr[6] =  0xD0, 0x5F, 0xB8, 0x4B, 0xD3, 0x74 }; */
 	SlSecParams_t secParams;
-	secParams.Key = (signed char*) config_get_wifi_key();
-	secParams.KeyLen = strlen(config_get_wifi_key());
-	secParams.Type = SL_SEC_TYPE_WPA_WPA2;
 
-	retVal = sl_WlanConnect((_i8*) config_get_wifi_ssid(), (_i16) strlen(config_get_wifi_ssid()),
-	NULL, &secParams, NULL);
+	wifi_status.connection = wifi_connecting;
+	/* Start Wifi Connection */
+	xTaskNotify(wifi_task_handle, ((uint32_t )wifi_connecting | WIFI_PENDING_STATE), eSetBits);
 
 	/* Connection manager logic */
 	while(1)
@@ -188,7 +184,22 @@ void wifi_task(void *param)
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Disconnected %x\n\r",
 						ulNotifiedValue);
 				
-				break; // Break the loop
+				wifi_status.connection = wifi_connecting;
+				xTaskNotify(wifi_task_handle, ((uint32_t )wifi_connecting | WIFI_PENDING_STATE), eSetBits);
+				//break; // Break the loop
+			}
+
+			if(ulNotifiedValue & (uint32_t)wifi_connecting)
+			{
+				/*_u8 MacAddr[6] =  0xD0, 0x5F, 0xB8, 0x4B, 0xD3, 0x74 }; */
+				secParams.Key = (signed char*) config_get_wifi_key();
+				secParams.KeyLen = strlen(config_get_wifi_key());
+				secParams.Type = SL_SEC_TYPE_WPA_WPA2;
+
+				if(0 != sl_WlanConnect((_i8*) config_get_wifi_ssid(), (_i16) strlen(config_get_wifi_ssid()), NULL, &secParams, NULL))
+				{
+					break;
+				}
 			}
 
 			if (ulNotifiedValue & (uint32_t) wifi_ip_v4_acquired)
@@ -214,7 +225,21 @@ void wifi_task(void *param)
 			}
 		} else
 		{
+			// Wifi Service House-Keeping
 			sl_iostream_printf(sl_iostream_swo_handle, "No event\n\r");
+			// Wake-up services that need networking for house-keeping
+			if((wifi_status.connection == wifi_connected))
+			{
+				if(eTaskGetState(network_monitor_task_handle) == eSuspended)
+				{
+					vTaskResume(network_monitor_task_handle);
+					miso_notify_event(miso_connectivity_on);
+				}
+			}
+			else
+			{
+				// Reconnection logic
+			}
 		}
 
 	} //while (1);

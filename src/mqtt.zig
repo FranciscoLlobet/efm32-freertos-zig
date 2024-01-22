@@ -9,7 +9,6 @@ const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
-const user = @import("user.zig");
 const mbedtls = @import("mbedtls.zig");
 
 const c = @cImport({
@@ -155,16 +154,16 @@ fn init() @This() {
 }
 
 /// Authentification callback for mbedTLS connections
-fn authCallback(self: *mbedtls.TlsContext(.psk), security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
+fn authCallback(self: *mbedtls.TlsContext(.psk), security_mode: connection.security_mode) mbedtls.auth_error!void {
     if (security_mode == .psk) {
         var psk_buf: [64]u8 = undefined; // Request 64 Bytes for Base64 decoder
 
-        const psk = connection.mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return connection.mbedtls.auth_error.generic_error;
-        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return connection.mbedtls.auth_error.generic_error;
+        const psk = mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return mbedtls.auth_error.generic_error;
+        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return mbedtls.auth_error.generic_error;
 
         @memset(&psk_buf, 0); // Sanitize the buffer to avoid the decoded psk to remain in stack
     } else {
-        return connection.mbedtls.auth_error.unsuported_mode;
+        return mbedtls.auth_error.unsuported_mode;
     }
 }
 
@@ -723,9 +722,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
         } else {
             _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
         }
-
-        // Process the qos1 to 2 tx queue
-
+        // Check if the task has been suspended
     }
 }
 

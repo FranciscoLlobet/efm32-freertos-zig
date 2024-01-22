@@ -83,7 +83,6 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
             peer_crt: c.mbedtls_x509_crt,
             /// Peer CRL context
             peer_crl: c.mbedtls_x509_crl,
-
             /// Own PK
             own_pk: c.mbedtls_pk_context,
         } else struct {},

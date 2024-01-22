@@ -131,7 +131,7 @@ fn myUserTaskFunction(self: *@This()) void {
                 _ = c.printf("NTP Sync: %d\r\n", system.time.now());
                 self.ntpTimer.changePeriod(nextSyncTime, null) catch unreachable;
                 self.state = .perform_firmware_download;
-                self.state = .start_mqtt;
+                //self.state = .start_mqtt;
             } else |_| {
                 self.ntpSyncTime = 0;
                 self.task.delayTask(16000); // wait for 16
@@ -144,7 +144,7 @@ fn myUserTaskFunction(self: *@This()) void {
                 if (downloadAndVerify()) |_| {
                     // Happy path
 
-                    nvm.setUpdateRequest() catch unreachable;
+                    //nvm.setUpdateRequest() catch unreachable;
 
                     _ = c.printf("Firmware download complete\r\n");
 

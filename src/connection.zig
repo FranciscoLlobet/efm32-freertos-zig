@@ -3,7 +3,7 @@ const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
-pub const mbedtls = @import("mbedtls.zig");
+//pub const mbedtls = @import("mbedtls.zig");
 
 const c = @cImport({
     @cInclude("network.h");
@@ -143,7 +143,7 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
                 _ = self.ssl.init(self.proto) catch {
                     return connection_error.ssl_init_error;
                 };
-                _ = mbedtls.c.miso_network_register_ssl_context(@ptrCast(self.ctx), &self.ssl.context);
+                _ = c.miso_network_register_ssl_context(@ptrCast(self.ctx), @ptrCast(&self.ssl.context));
             }
 
             if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(self.proto)))) {
