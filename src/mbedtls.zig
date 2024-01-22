@@ -1,7 +1,7 @@
 const std = @import("std");
 //const freertos = @import("freertos.zig");
 const connection = @import("connection.zig");
-pub const c = @cImport({
+const c = @cImport({
     @cDefine("MBEDTLS_CONFIG_FILE", "\"miso_mbedtls_config.h\"");
     @cInclude("miso_config.h");
     @cInclude("network.h");
@@ -12,7 +12,7 @@ pub const c = @cImport({
     @cInclude("mbedtls/base64.h");
     @cInclude("mbedtls/net_sockets.h");
     @cInclude("mbedtls/entropy.h");
-}); // pub in order to be able to import from client modules
+});
 
 const ciphersuites_psk = [_]c_int{
     c.MBEDTLS_TLS_PSK_WITH_AES_128_GCM_SHA256,
@@ -41,10 +41,7 @@ pub const auth_error = error{
     unsuported_mode,
 };
 
-pub const mbedtls_error = error{
-    psk_conf_error,
-    generic_error,
-};
+pub const mbedtls_error = error{ psk_conf_error, generic_error, init_error, no_sec };
 
 pub const init_error = error{};
 
@@ -96,7 +93,7 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
         custom_cleanup_callback: ?custom_cleanup_callback_fn = null,
 
         // Default auth callback
-        pub fn create(auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
+        pub fn create(comptime auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
             return @This(){ .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined };
         }
         pub fn cleanup(self: *@This()) void {
@@ -120,12 +117,12 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
                 c.mbedtls_ssl_config_free(&self.config);
             }
         }
-        pub fn init(self: *@This(), protocol: connection.protocol) !i32 {
+        pub fn init(self: *@This(), protocol: connection.protocol) !void {
             var ret: i32 = mbedtls_nok;
 
             if (!connection.protocol.isSecure(protocol))
                 // Running init on a non secure protocol
-                return mbedtls_nok; // should return a different error code
+                return mbedtls_error.no_sec;
 
             // custom init callback
             if (self.custom_init_callback) |custom| {
@@ -214,10 +211,8 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
             }
 
             if (ret != mbedtls_ok) {
-                // init failure
+                return mbedtls_error.init_error;
             }
-
-            return ret;
         }
         pub fn deinit(self: *@This()) i32 {
             var ret: i32 = 0;
@@ -230,15 +225,6 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
             return if (mbedtls_ok != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
         }
     };
-}
-
-/// Helper function to get the credential callback function in custom init
-//pub fn getCredentialCallbackFn(self: *@This()) ?credential_callback_fn {
-//    return self.auth_callback;
-//}
-
-pub fn confPsk(self: *@This(), psk: []u8, psk_id: [*:0]u8) !void {
-    return if (mbedtls_ok != c.mbedtls_ssl_conf_psk(&self.config, psk.ptr, psk.len, &psk_id[0], c.strlen(psk_id))) mbedtls_error.psk_conf_error else {};
 }
 
 pub fn base64Decode(input: [*:0]u8, output: []u8) ![]u8 {

@@ -824,13 +824,15 @@ int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t lengt
 	{
 		if ((current_time - ctx->last_send_time) > 120)
 		{
-			/* Attempt re-negotiation */
-			do
-			{
-				ret = mbedtls_ssl_renegotiate(ctx->ssl_context);
-			} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret) || (MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == ret));
+			// Not supported when watchdog is enabled
 
-			if (0 != ret)
+			/* Attempt re-negotiation */
+			//do
+			//{
+			//	ret = mbedtls_ssl_renegotiate(ctx->ssl_context);
+			//} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret) || (MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == ret));
+
+			if (0 == ret)
 			{
 				/* This code tries to handle issues seen when the server does not support renegociation */
 				ret = mbedtls_ssl_close_notify(ctx->ssl_context);
