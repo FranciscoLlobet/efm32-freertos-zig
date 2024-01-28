@@ -46,3 +46,6 @@
 [submodule "csrc/picolibc"]
 	path = csrc/picolibc
 	url = git@github.com:FranciscoLlobet/picolibc.git
+[submodule "toolchain/picolibc"]
+	path = toolchain/picolibc
+	url = https://github.com/FranciscoLlobet/picolibc.git

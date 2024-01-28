@@ -24,6 +24,10 @@ const board = microzig.board;
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
+export fn __stack_chk_fail() callconv(.C) noreturn {
+    microzig.hang();
+}
+
 export fn vApplicationIdleHook() void {
     board.watchdogFeed();
 }
@@ -220,11 +224,14 @@ pub export fn appStart() void {
 // Initialisation of the C runtime.
 
 extern fn __libc_init_array() callconv(.C) void;
+extern fn __stack_chk_init() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
-    __libc_init_array();
-
+    //@setRuntimeSafety(false);
+    //__libc_init_array();
+    __stack_chk_init();
+    //@setRuntimeSafety(true);
     SystemInit();
 }
 

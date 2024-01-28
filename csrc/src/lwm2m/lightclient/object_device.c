@@ -67,8 +67,8 @@
 #include <ctype.h>
 
 
-#define PRV_MANUFACTURER      "Llobetian Tecnologica"
-#define PRV_MODEL_NUMBER      "XDK100 FreeRTOS+Wakaama+mbedTLS"
+#define PRV_MANUFACTURER      "https://github.com/FranciscoLlobet/efm32-freertos-zig"
+#define PRV_MODEL_NUMBER      "miso powered by Zig"
 #define PRV_BINDING_MODE      "U"
 
 // Resource Id's:

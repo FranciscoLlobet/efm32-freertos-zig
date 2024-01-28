@@ -113,7 +113,7 @@ fn myUserTaskFunction(self: *@This()) void {
 
             self.ntpTimer.stop(null) catch unreachable; // stop NTP timer
 
-            lwm2m.service.task.suspendTask();
+            lwm2m.service.suspendTask();
             mqtt.service.task.suspendTask();
 
             self.state = .working; // go to the working state (?)
@@ -177,6 +177,7 @@ fn myUserTaskFunction(self: *@This()) void {
         } else if (self.state == .start_lwm2m) {
             lwm2m.service.task.resumeTask();
 
+            self.timer.start(null) catch unreachable;
             self.state = .working;
         } else if (self.state == .working) {
             // recieve

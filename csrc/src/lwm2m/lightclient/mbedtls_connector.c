@@ -150,7 +150,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	if (0 == ret)
 	{
 		mbedtls_ssl_conf_authmode(&ssl_config, MBEDTLS_SSL_VERIFY_OPTIONAL);
-		mbedtls_ssl_conf_read_timeout(&ssl_config, 5000);
+		mbedtls_ssl_conf_read_timeout(&ssl_config, 1000);
 		mbedtls_ssl_conf_rng(&ssl_config, mbedtls_ctr_drbg_random,
 				&drbg_context);
 		//mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
@@ -225,7 +225,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 		mbedtls_ssl_conf_min_tls_version(&ssl_config,
 				MBEDTLS_SSL_VERSION_TLS1_2);
 		mbedtls_ssl_conf_renegotiation( &ssl_config, MBEDTLS_SSL_RENEGOTIATION_ENABLED );
-		ret = mbedtls_ssl_conf_cid(&ssl_config, 6, MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
+		ret = mbedtls_ssl_conf_cid(&ssl_config, sizeof(own_cid), MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
 	}
 
 	if (0 == ret)
@@ -238,10 +238,10 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	{
 		memset(own_cid, 0, sizeof(own_cid));
 
-		ret = mbedtls_ctr_drbg_random(&drbg_context, own_cid, 8);
-		*((uint64_t*)own_cid) ^= (uint64_t)lwm2m_gettime();
+		ret = mbedtls_ctr_drbg_random(&drbg_context, own_cid, sizeof(own_cid));
+		*((uint32_t*)own_cid) ^= (uint32_t)lwm2m_gettime();
 
-		ret = mbedtls_ssl_set_cid(&ssl_context, MBEDTLS_SSL_CID_DISABLED, NULL, 0);
+		ret = mbedtls_ssl_set_cid(&ssl_context, MBEDTLS_SSL_CID_ENABLED, own_cid, sizeof(own_cid));
 	}
 #endif
 

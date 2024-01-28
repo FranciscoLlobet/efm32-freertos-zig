@@ -491,6 +491,14 @@ int lwm2m_client_task_runner(void *param1)
 							(size_t) numBytes, connP);
 				}
 			}
+			if(notification_value & (uint32_t) lwm2m_notify_suspend)
+			{
+				/* Suspend */
+				vTaskSuspend(xTaskGetCurrentTaskHandle()); // Suspend myself
+				break;
+				//lwm2m_suspend(lwm2mH);
+
+			}
 		}
 		else
 		{
@@ -533,8 +541,6 @@ int lwm2m_client_task_runner(void *param1)
 	free_server_object(objArray[1]);
 	free_object_device(objArray[2]); /* Device object */
 	free_accelerometer_object(objArray[4]); /* Accelerometer */
-	//free_object_device(objArray[3]); /* Temperature */
-	//free_object_device(objArray[4]);
 
 	fprintf(stdout, "\r\n\n");
 

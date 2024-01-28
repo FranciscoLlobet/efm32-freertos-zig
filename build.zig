@@ -57,7 +57,7 @@ pub fn build(b: *std.Build) !void {
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION" };
+    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION", "-fstack-protector-all" };
 
     const c_flags_boot = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_BOOTLOADER" };
 
@@ -88,8 +88,8 @@ pub fn build(b: *std.Build) !void {
     };
 
     const bootloader = microzig.addFirmware(b, bootloader_target);
-    bootloader.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
-    bootloader.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
+    bootloader.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
+    bootloader.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
     bootloader.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
@@ -113,8 +113,8 @@ pub fn build(b: *std.Build) !void {
 
     const application = microzig.addFirmware(b, application_target);
 
-    application.addSystemIncludePath(.{ .path = "toolchain/picolibc/include" });
-    application.addObjectFile(.{ .path = "toolchain/picolibc/libc.a" });
+    application.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
+    application.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
     application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {

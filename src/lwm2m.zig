@@ -62,6 +62,11 @@ pub fn updateTemperature(self: *@This(), temperature_in_celsius: f32) void {
     }
 }
 
+/// Send suspend Task signal to LwM2M task
+pub fn suspendTask(self: *@This()) void {
+    self.task.notify(c.lwm2m_notify_suspend, .eSetBits) catch {};
+}
+
 pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {
     return self.task.getHandle();
 }

@@ -122,6 +122,16 @@ pub const schemes = enum(u32) {
 };
 
 pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
+    // Compile time checks
+    if (sslType != void) {
+        if (@hasDecl(sslType, "init") == false) {
+            @compileError("SSL Type must have an init function");
+        }
+        if (@hasDecl(sslType, "deinit") == false) {
+            @compileError("SSL Type must have a deinit function");
+        }
+    }
+
     return struct {
         ctx: network_ctx,
         proto: protocol,
