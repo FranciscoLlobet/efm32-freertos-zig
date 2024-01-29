@@ -78,7 +78,10 @@
         "task.h": "c",
         "miso_ntp.h": "c",
         "internals.h": "c",
-        "liblwm2m.h": "c"
+        "liblwm2m.h": "c",
+        "__locale": "c",
+        "string": "c",
+        "string_view": "c"
     },
     "cmake.configureOnOpen": false,
     "cortex-debug.variableUseNaturalFormat": true

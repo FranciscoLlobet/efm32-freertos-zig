@@ -74,7 +74,6 @@ static QueueHandle_t tx_queue = NULL;
 
 static void select_task(void *param);
 static void initialize_socket_management(void);
-static void wifi_service_register_rx_socket(miso_network_ctx_t ctx, uint32_t timeout_s);
 static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s);
 
 TaskHandle_t network_monitor_task_handle = NULL;
@@ -109,16 +108,6 @@ static void initialize_socket_management(void)
 	{
 		_initialize_network_ctx(_get_network_ctx((enum wifi_socket_id_e)i));
 	}
-}
-
-static void wifi_service_register_rx_socket(miso_network_ctx_t ctx, uint32_t timeout_s)
-{
-	struct timeout_msg_s msg;
-
-	msg.deadline = timeout_s + sl_sleeptimer_get_time();
-	msg.ctx = ctx;
-
-	(void)xQueueSend(rx_queue, &msg, portMAX_DELAY);
 }
 
 static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s)
@@ -171,7 +160,7 @@ int create_network_mediator(void)
 
 	if (0 == ret)
 	{
-		rx_queue = xQueueCreate((UBaseType_t)wifi_service_max, sizeof(struct timeout_msg_s));
+		rx_queue = xQueueCreate((UBaseType_t)wifi_service_max * 2, sizeof(struct timeout_msg_s));
 		if (NULL == rx_queue)
 			ret = -1;
 	}
@@ -195,14 +184,23 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
 	int ret_value = -1;
 
-	wifi_service_register_rx_socket(ctx, timeout_s);
+	struct timeout_msg_s msg;
+	uint32_t timeout_ms = 1000 * timeout_s;
 
-	(void)xSemaphoreTake(ctx->rx_signal, 0);
-	(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);
+	msg.deadline = timeout_s + sl_sleeptimer_get_time();
+	msg.ctx = ctx;
 
-	if (pdTRUE == xSemaphoreTake(ctx->rx_signal, 1000 * (timeout_s) + 500))
+	if(pdTRUE == xQueueSend(rx_queue, &msg, portMAX_DELAY))
 	{
-		ret_value = 0;
+		// Dummy take
+		(void)xSemaphoreTake(ctx->rx_signal, 0);
+		
+		(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);	
+		
+		if (pdTRUE == xSemaphoreTake(ctx->rx_signal, timeout_ms + 500))
+		{
+			ret_value = 0;
+		}
 	}
 
 	return ret_value;
@@ -301,13 +299,13 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			// The select function is called with a timeout of 20 ms
-			struct timeval tv = {.tv_sec = 0, .tv_usec = 50000}; // Here we have the select cycle time
+			struct timeval tv = {.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
 			int result = 0;
 
-			if(pdTRUE == xSemaphoreTake(rx_tx_mutex, portMAX_DELAY))
+			if(pdTRUE == xSemaphoreTake(conn_mutex, 1000))
 			{
 				result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
-				(void)xSemaphoreGive(rx_tx_mutex);
+				(void)xSemaphoreGive(conn_mutex);
 			}
 
 			if (result > 0)
@@ -489,7 +487,7 @@ static int _send_bio_tcp(miso_network_ctx_t ctx, const unsigned char *buf, size_
 static int _recv_bio_udp(miso_network_ctx_t ctx, unsigned char *buf, size_t len)
 {
 	ctx->peer_len = sizeof(SlSockAddrIn_t);
-	int ret = (int)sl_RecvFrom((_i16)ctx->sd, (void *)buf, (_i16)len, (_i16)0,
+	volatile int ret = (int)sl_RecvFrom((_i16)ctx->sd, (void *)buf, (_i16)len, (_i16)0,
 							   (SlSockAddr_t *)&(ctx->peer), (SlSocklen_t *)&(ctx->peer_len));
 	if (ret == (int)SL_EAGAIN)
 	{
@@ -720,31 +718,16 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 
 static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
-	int numBytes = -1;
-	int result = 0;
+	volatile int numBytes = (int)UISO_NETWORK_OK;
 
-	do
-	{
+	//do
+	//{
 		numBytes = mbedtls_ssl_read(ctx->ssl_context, buffer, length);
-	} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
+	//} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
 
-	if (0 > numBytes)
+	if (numBytes < 0)
 	{
-		/* Close DTLS session and perform handshake */
-		do
-		{
-			result = mbedtls_ssl_close_notify(ctx->ssl_context);
-		} while ((MBEDTLS_ERR_SSL_WANT_READ == result) || (MBEDTLS_ERR_SSL_WANT_WRITE == result));
-
-		result = mbedtls_ssl_session_reset(ctx->ssl_context);
-
-		if (0 == result)
-		{
-			do
-			{
-				result = mbedtls_ssl_handshake(ctx->ssl_context);
-			} while ((MBEDTLS_ERR_SSL_WANT_READ == result) || (MBEDTLS_ERR_SSL_WANT_WRITE == result));
-		}
+		numBytes = (int)MISO_NETWORK_DTLS_RECV_ERROR;
 	}
 
 	return numBytes;
@@ -784,18 +767,26 @@ static int _read_tls(miso_network_ctx_t ctx, unsigned char *buffer, size_t lengt
 
 int miso_network_read(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
-	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
-	int ret = ctx->read_fn(ctx, buffer, length);
-	(void)xSemaphoreGive(rx_tx_mutex);
+	int ret = MISO_NETWORK_RECV_BUSY;
+
+	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000))
+	{
+		ret = ctx->read_fn(ctx, buffer, length);
+		(void)xSemaphoreGive(rx_tx_mutex);
+	}
 
 	return ret;
 }
 
 int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length)
 {
-	(void)xSemaphoreTake(rx_tx_mutex, portMAX_DELAY);
-	int ret = ctx->send_fn(ctx, buffer, length);
-	(void)xSemaphoreGive(rx_tx_mutex);
+	int ret = MISO_NETWORK_SEND_BUSY;
+
+	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000));
+	{
+		ret = ctx->send_fn(ctx, buffer, length);
+		(void)xSemaphoreGive(rx_tx_mutex);
+	}
 
 	return ret;
 }
@@ -813,7 +804,7 @@ int miso_network_get_socket(miso_network_ctx_t ctx)
 int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length)
 {
 	int n_bytes_sent = 0;
-	int ret = (int)UISO_NETWORK_OK;
+	volatile int ret = (int)UISO_NETWORK_OK;
 	size_t offset = 0;
 
 	uint32_t current_time = sl_sleeptimer_get_time();
@@ -822,43 +813,7 @@ int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t lengt
 	ret = mbedtls_ssl_get_peer_cid(ctx->ssl_context, &cid_enabled, NULL, 0);
 	if (MBEDTLS_SSL_CID_DISABLED == cid_enabled)
 	{
-		if ((current_time - ctx->last_send_time) > 120)
-		{
-			// Not supported when watchdog is enabled
-
-			/* Attempt re-negotiation */
-			//do
-			//{
-			//	ret = mbedtls_ssl_renegotiate(ctx->ssl_context);
-			//} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret) || (MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == ret));
-
-			if (0 == ret)
-			{
-				/* This code tries to handle issues seen when the server does not support renegociation */
-				ret = mbedtls_ssl_close_notify(ctx->ssl_context);
-				if (0 == ret)
-				{
-					ret = mbedtls_ssl_session_reset(ctx->ssl_context);
-				}
-				else
-				{
-					(void)mbedtls_ssl_session_reset(ctx->ssl_context);
-				}
-
-				if (0 == ret)
-				{
-					do
-					{
-						ret = mbedtls_ssl_handshake(ctx->ssl_context);
-					} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
-				}
-			}
-
-			if (0 != ret)
-			{
-				ret = (int)UISO_NETWORK_DTLS_RENEGOCIATION_FAIL;
-			}
-		}
+		//
 	}
 	else
 	{
@@ -876,33 +831,14 @@ int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t lengt
 				/* These mbedTLS return codes mean that the write operation must be retried */
 				n_bytes_sent = 0;
 			}
-			else if (0 > n_bytes_sent)
+			else if (n_bytes_sent < 0)
 			{
-				ret = UISO_NETWORK_GENERIC_ERROR;
-				do
-				{
-					ret = mbedtls_ssl_close_notify(ctx->ssl_context);
-				} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
-
-				ret = mbedtls_ssl_session_reset(ctx->ssl_context);
-				if (0 == ret)
-				{
-					do
-					{
-						ret = mbedtls_ssl_handshake(ctx->ssl_context);
-					} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
-				}
-
-				if (0 == ret)
-				{
-					n_bytes_sent = 0;
-				}
-				else
-				{
-					break;
-				}
+				ret = (int)MISO_NETWORK_DTLS_SEND_ERROR;
+				break;
 			}
-			offset += n_bytes_sent;
+			else{
+				offset += n_bytes_sent;
+			}
 		}
 
 		if (0 == ret)

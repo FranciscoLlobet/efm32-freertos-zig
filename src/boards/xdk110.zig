@@ -85,6 +85,10 @@ pub fn watchdogFeed() void {
     c.BOARD_Watchdog_Feed();
 }
 
+pub fn watchdogDisable() void {
+    c.BOARD_Watchdog_Disable();
+}
+
 pub const bma280_dev = &c.board_bma280;
 pub const bme280_dev = &c.board_bme280;
 pub const bmg160_dev = &c.board_bmg160;

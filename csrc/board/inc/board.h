@@ -344,7 +344,7 @@ uint32_t BOARD_SD_CARD_IsInserted(void);
 void BOARD_Watchdog_Init(void);
 void BOARD_Watchdog_Feed(void);
 void BOARD_Watchdog_Enable(void);
-
+void BOARD_Watchdog_Disable(void);
 
 void BOARD_EM9301_Init(void);
 void BOARD_EM9301_Enable(void);

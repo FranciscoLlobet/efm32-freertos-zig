@@ -96,7 +96,7 @@ fn myUserTaskFunction(self: *@This()) void {
 
             self.state = .start_connectivity;
         } else if (self.state == .start_connectivity) {
-
+            _ = c.printf("Starting connectivity\r\n");
             // Change this to wait for connectivity
             wifi_task.resumeTask();
 
@@ -183,6 +183,7 @@ fn myUserTaskFunction(self: *@This()) void {
             // recieve
             if (self.task.waitForNotify(0, 0xFFFFFFFF, null) catch unreachable) |val| {
                 if (notificationValues.isNotification(val, notificationValues.connectivity_on)) {
+                    _ = c.printf("Connectivity regained\r\n");
                     self.state = .start_ntp_time;
                 } else if (notificationValues.isNotification(val, notificationValues.connectivity_off)) {
                     self.state = .stop_connectivity;

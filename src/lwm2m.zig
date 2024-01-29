@@ -50,7 +50,7 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
-        self.reg_update.create((5 * 60 * 1000), true, self) catch unreachable;
+        self.reg_update.create((1 * 60 * 1000), true, self) catch unreachable;
         self.timer_update.create((60 * 1000), true, self) catch unreachable;
     }
 }
