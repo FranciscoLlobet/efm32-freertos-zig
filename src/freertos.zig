@@ -174,6 +174,10 @@ pub const Task = struct {
         return @This(){ .handle = task_handle };
     }
 
+    pub fn initFromCurrentTask() @This() {
+        return @This(){ .handle = xTaskGetCurrentTaskHandle() };
+    }
+
     /// Create a FreeRTOS task using dynamic memory allocation
     pub fn create(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, usStackDepth: u16, pvParameters: ?*anyopaque, uxPriority: UBaseType_t) !@This() {
         var self: @This() = undefined;

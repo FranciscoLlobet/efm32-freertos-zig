@@ -67,6 +67,10 @@ enum miso_event
 {
 	miso_connectivity_on = (1 << 0),
 	miso_connectivity_off = (1 << 1),
+	miso_lwm2m_suspended = (1 << 2),
+    miso_ntp_sync = (1 << 3),
+    miso_user_timer = (1 << 4),
+
 };
 
 extern void miso_notify_event(enum miso_event event);

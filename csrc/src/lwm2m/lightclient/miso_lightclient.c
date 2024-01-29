@@ -73,8 +73,6 @@
 #include "wifi_service.h"
 #include "lwm2m_temperature.h"
 
-extern TaskHandle_t user_task_handle;
-
 /* Extern declarations */
 extern lwm2m_object_t* get_object_device(void);
 extern void free_object_device(lwm2m_object_t *objectP);
@@ -350,7 +348,6 @@ void print_state(lwm2m_context_t *lwm2mH)
 #include "FreeRTOS.h"
 #include "task.h"
 
-extern TaskHandle_t user_task_handle;
 
 client_data_t data;
 
@@ -494,6 +491,7 @@ int lwm2m_client_task_runner(void *param1)
 			if(notification_value & (uint32_t) lwm2m_notify_suspend)
 			{
 				/* Suspend */
+				miso_notify_event(miso_lwm2m_suspended);
 				vTaskSuspend(xTaskGetCurrentTaskHandle()); // Suspend myself
 				break;
 				//lwm2m_suspend(lwm2mH);
@@ -553,8 +551,8 @@ void lwm2m_client_update_accel(float x, float y, float z)
 {
 	update_accelerometer_values(x, y, z);
 
-	xTaskNotify(user_task_handle, (uint32_t )lwm2m_notify_accelerometer,
-			eSetBits);
+//	xTaskNotify(user_task_handle, (uint32_t )lwm2m_notify_accelerometer,
+//			eSetBits);
 }
 
 int wait_for_rx(uint32_t wait_s)

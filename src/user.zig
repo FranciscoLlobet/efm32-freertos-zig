@@ -43,8 +43,10 @@ const notificationValues = enum(u32) {
     connectivity_on = c.miso_connectivity_on,
     connectivity_off = c.miso_connectivity_off,
 
-    ntp_sync = (1 << 2),
-    user_timer = (1 << 3),
+    ntp_sync = c.miso_ntp_sync,
+    user_timer = c.miso_user_timer,
+
+    lwm2m_suspended = c.miso_lwm2m_suspended,
 
     pub fn isNotification(val: u32, notification: notificationValues) bool {
         return (val & @intFromEnum(notification)) == @intFromEnum(notification);
@@ -59,10 +61,13 @@ timer: freertos.StaticTimer(@This(), "user timer", myTimerFunction),
 
 /// NTP timer
 ntpTimer: freertos.StaticTimer(@This(), "ntp timer", myNtpTimerFunction),
+
 ntpSyncTime: u32,
 
 /// User Statemachine state
 state: state,
+
+const ntpUri = "ntp://1.de.pool.ntp.org:123";
 
 fn myTimerFunction(self: *@This()) void {
     self.task.notify(@intFromEnum(notificationValues.user_timer), .eSetBits) catch {};
@@ -116,11 +121,14 @@ fn myUserTaskFunction(self: *@This()) void {
             lwm2m.service.suspendTask();
             mqtt.service.task.suspendTask();
 
-            self.state = .working; // go to the working state (?)
+            // Wait for lwm2m to suspend
+            _ = self.task.waitForNotify(0, @intFromEnum(notificationValues.lwm2m_suspended), null) catch unreachable;
+
+            self.state = .working; // go to the working state
         } else if (self.state == .start_ntp_time) {
             // Get time from NTP Server
 
-            const ntp_uri: std.Uri = std.Uri.parse("ntp://1.de.pool.ntp.org:123") catch unreachable;
+            const ntp_uri: std.Uri = std.Uri.parse(ntpUri) catch unreachable;
 
             if (ntp.getTimeFromServer(ntp_uri)) |ntpResponse| {
                 self.ntpSyncTime = ntpResponse.timestamp_s;
@@ -130,12 +138,10 @@ fn myUserTaskFunction(self: *@This()) void {
 
                 _ = c.printf("NTP Sync: %d\r\n", system.time.now());
                 self.ntpTimer.changePeriod(nextSyncTime, null) catch unreachable;
-                self.state = .perform_firmware_download;
-                //self.state = .start_mqtt;
+                self.state = .start_lwm2m;
             } else |_| {
-                self.ntpSyncTime = 0;
                 self.task.delayTask(16000); // wait for 16
-                self.state = .start_ntp_time;
+                self.state = .start_ntp_time; // unnecessary
             }
         } else if (self.state == .perform_firmware_download) {
             if (config.enable_http) {
@@ -144,7 +150,7 @@ fn myUserTaskFunction(self: *@This()) void {
                 if (downloadAndVerify()) |_| {
                     // Happy path
 
-                    //nvm.setUpdateRequest() catch unreachable;
+                    nvm.setUpdateRequest() catch unreachable;
 
                     _ = c.printf("Firmware download complete\r\n");
 
@@ -191,10 +197,11 @@ fn myUserTaskFunction(self: *@This()) void {
                     // Execute the NTP sync
 
                     // self.ntpSyncTime = ntp.getTime();
-
+                    self.state = .working;
                 } else if (notificationValues.isNotification(val, notificationValues.user_timer)) {
                     leds.yellow.toggle();
                     _ = c.printf("UserTimer: %d\r\n", self.task.getStackHighWaterMark());
+                    self.state = .working;
                 }
             }
         } else {
