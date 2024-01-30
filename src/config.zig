@@ -40,7 +40,7 @@ pub const rtos_stack_depth_timer_task: u16 = 512;
 pub const rtos_stack_depth_idle_task: u16 = 200;
 
 // LWM2M
-pub const rtos_prio_lwm2m = @intFromEnum(task_priorities.rtos_prio_normal);
+pub const rtos_prio_lwm2m = @intFromEnum(task_priorities.rtos_prio_above_normal);
 pub const rtos_stack_depth_lwm2m: u16 = if (enable_lwm2m) 2000 else min_task_stack_depth;
 
 // MQTT

@@ -582,7 +582,7 @@ typedef struct
 }tSimpleLinkSpawnMsg;
   
 /* The queue used to send message to simple link spawn task. */
-extern void* xSimpleLinkSpawnQueue;
+//extern QueueHandle_t xSimpleLinkSpawnQueue;
 
 /* API for SL Task*/
 OsiReturnVal_e VStartSimpleLinkSpawnTask(unsigned portBASE_TYPE uxPriority);

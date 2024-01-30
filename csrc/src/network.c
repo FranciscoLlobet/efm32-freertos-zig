@@ -193,7 +193,7 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 	if(pdTRUE == xQueueSend(rx_queue, &msg, portMAX_DELAY))
 	{
 		// Dummy take
-		(void)xSemaphoreTake(ctx->rx_signal, 0);
+		//(void)xSemaphoreTake(ctx->rx_signal, 0);
 		
 		(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);	
 		
@@ -718,16 +718,17 @@ int miso_close_network_connection(miso_network_ctx_t ctx)
 
 static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t length)
 {
-	volatile int numBytes = (int)UISO_NETWORK_OK;
+	volatile int numBytes = (int)MBEDTLS_ERR_SSL_WANT_READ;
 
-	//do
-	//{
+	while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT))
+	{
 		numBytes = mbedtls_ssl_read(ctx->ssl_context, buffer, length);
-	//} while ((numBytes == MBEDTLS_ERR_SSL_WANT_READ) || (numBytes == MBEDTLS_ERR_SSL_WANT_WRITE) || (numBytes == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) || (numBytes == MBEDTLS_ERR_SSL_CLIENT_RECONNECT));
+	} 
 
 	if (numBytes < 0)
 	{
 		numBytes = (int)MISO_NETWORK_DTLS_RECV_ERROR;
+		__BKPT(1);
 	}
 
 	return numBytes;
@@ -829,7 +830,7 @@ int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t lengt
 			if ((MBEDTLS_ERR_SSL_WANT_READ == n_bytes_sent) || (MBEDTLS_ERR_SSL_WANT_WRITE == n_bytes_sent) || (MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS == n_bytes_sent) || (MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == n_bytes_sent))
 			{
 				/* These mbedTLS return codes mean that the write operation must be retried */
-				n_bytes_sent = 0;
+				// n_bytes_sent = 0;
 			}
 			else if (n_bytes_sent < 0)
 			{
@@ -850,6 +851,10 @@ int _send_dtls(miso_network_ctx_t ctx, const unsigned char *buffer, size_t lengt
 	if (ret >= 0)
 	{
 		ctx->last_send_time = sl_sleeptimer_get_time();
+	}
+	else
+	{
+		__BKPT(0);
 	}
 	return ret;
 }

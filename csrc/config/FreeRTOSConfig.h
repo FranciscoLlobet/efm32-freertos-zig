@@ -95,7 +95,7 @@
  * the next task to run using a generic C algorithm that works for all FreeRTOS
  * ports.  Not all FreeRTOS ports have this option.  Defaults to 0 if left
  * undefined. */
-#define configUSE_PORT_OPTIMISED_TASK_SELECTION    0
+#define configUSE_PORT_OPTIMISED_TASK_SELECTION    1
 
 /* Set configUSE_TICKLESS_IDLE to 1 to use the low power tickless mode.  Set to
  * 0 to keep the tick interrupt running at all times.  Not all FreeRTOS ports
@@ -138,7 +138,7 @@
  * application task if there is an Idle priority (priority 0) application task that
  * can run.  Set to 0 to have the Idle task use all of its timeslice.  Default to 1
  * if left undefined. */
-#define configIDLE_SHOULD_YIELD                    1
+#define configIDLE_SHOULD_YIELD                    0
 
 /* Each task has an array of task notifications.
  * configTASK_NOTIFICATION_ARRAY_ENTRIES sets the number of indexes in the array.
@@ -581,7 +581,7 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 #define INCLUDE_xEventGroupSetBitFromISR       1
 #define INCLUDE_xTimerPendFunctionCall         1
 #define INCLUDE_xTaskAbortDelay                0
-#define INCLUDE_xTaskGetHandle                 0
+#define INCLUDE_xTaskGetHandle                 1
 #define INCLUDE_xTaskResumeFromISR             1
 
 #endif /* FREERTOS_CONFIG_H */

@@ -13,8 +13,11 @@
 
 #define BOARD_CC3100_FD		((int)INT32_C(1))
 
-static SemaphoreHandle_t tx_semaphore = NULL;
-static SemaphoreHandle_t rx_semaphore = NULL;
+static SemaphoreHandle_t tx_queue = NULL;
+static SemaphoreHandle_t rx_queue = NULL;
+
+#define CC3100_SPI_RX_TIMEOUT_MS		(1000)
+#define CC3100_SPI_TX_TIMEOUT_MS		(1000)
 
 SPIDRV_HandleData_t cc3100_usart;
 
@@ -54,9 +57,9 @@ static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferS
 
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	if (NULL != rx_semaphore)
+	if (NULL != rx_queue)
 	{
-		(void)xQueueSendFromISR(rx_semaphore, &transfer_status_information, &xHigherPriorityTaskWoken);
+		(void)xQueueSendFromISR(rx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
 	}
 
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -71,9 +74,9 @@ static void send_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStat
 
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	if (NULL != tx_semaphore)
+	if (NULL != tx_queue)
 	{
-		(void)xQueueSendFromISR(tx_semaphore, &transfer_status_information, &xHigherPriorityTaskWoken);
+		(void)xQueueSendFromISR(tx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
 	}
 
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -127,14 +130,14 @@ void CC3100_DeviceEnablePreamble(void)
 
 void CC3100_DeviceEnable(void)
 {
-	if (tx_semaphore == NULL)
+	if (tx_queue == NULL)
 	{
-		tx_semaphore = xQueueCreate(1, sizeof(struct transfer_status_s));
+		tx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
 	}
 
-	if (rx_semaphore == NULL)
+	if (rx_queue == NULL)
 	{
-		rx_semaphore = xQueueCreate(1, sizeof(struct transfer_status_s));
+		rx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
 	}
 
 	GPIO_PinOutSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
@@ -166,21 +169,20 @@ void CC3100_DeviceDisable(void)
 //	GPIO_PinModeSet(WIFI_SPI0_MOSI_PORT, WIFI_SPI0_MOSI_PIN, gpioModeDisabled, 0);
 //	GPIO_PinModeSet(WIFI_SPI0_SCK_PORT, WIFI_SPI0_SCK_PIN, gpioModeDisabled, 0);
 
-	if (NULL != tx_semaphore)
+	if (NULL != tx_queue)
 	{
-		vQueueDelete(tx_semaphore);
-		tx_semaphore = NULL;
+		vQueueDelete(tx_queue);
+		tx_queue = NULL;
 	}
-	if (NULL != rx_semaphore)
+	if (NULL != rx_queue)
 	{
-		vQueueDelete(rx_semaphore);
-		rx_semaphore = NULL;
+		vQueueDelete(rx_queue);
+		rx_queue = NULL;
 	}
 }
 
 int CC3100_IfOpen(char *pIfName, unsigned long flags)
 {
-	(void) pIfName;
 	(void) flags;
 	int ret = -1;
 	// Success: FD (positive integer)
@@ -232,29 +234,26 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
 
 	cc3100_spi_select();
 
-	if (rx_semaphore != NULL) // Change to check if scheduler is active
+	if (rx_queue != NULL) // Change to check if scheduler is active
 	{
+		(void)xQueueReset(rx_queue);
+
 		ecode = SPIDRV_MReceive(&cc3100_usart, pBuff, Len, recieve_callback);
 		if (ECODE_EMDRV_SPIDRV_OK == ecode)
 		{
-			if(pdTRUE == xQueueReceive(rx_semaphore, &transfer_status, 2*1000)) // Added rx timeout
+			if(pdTRUE == xQueueReceive(rx_queue, &transfer_status, CC3100_SPI_RX_TIMEOUT_MS)) // Added rx timeout
 			{
-				if (ECODE_EMDRV_SPIDRV_OK == transfer_status.transferStatus)
-				{
-					retVal = transfer_status.itemsTransferred;
-				}
+				ecode = transfer_status.transferStatus;
 			}
 			else
 			{
-				retVal = -1;
+				ecode = ECODE_EMDRV_SPIDRV_TIMEOUT;
 			}
-		}
-	} else
-	{
-		ecode = SPIDRV_MReceiveB(&cc3100_usart, pBuff, Len);
-		if (ECODE_EMDRV_SPIDRV_OK == ecode)
-		{
-			retVal = Len;
+
+			if (ECODE_EMDRV_SPIDRV_OK == ecode)
+			{
+				retVal = transfer_status.itemsTransferred;
+			}
 		}
 	}
 
@@ -277,26 +276,26 @@ int CC3100_IfWrite(Fd_t Fd, uint8_t *pBuff, int Len)
 
 	cc3100_spi_select();
 
-	if (rx_semaphore != NULL) // Change to check if scheduler is active
+	if (tx_queue != NULL) // Change to check if scheduler is active
 	{
+		xQueueReset(tx_queue);
+
 		ecode = SPIDRV_MTransmit(&cc3100_usart, pBuff, Len, send_callback);
-		if (ECODE_EMDRV_SPIDRV_OK == ecode)
+		if(ECODE_EMDRV_SPIDRV_OK == ecode)
 		{
-			(void) xQueueReceive(tx_semaphore, &transfer_status, portMAX_DELAY);
-			if (ECODE_EMDRV_SPIDRV_OK == transfer_status.transferStatus)
+			if(pdTRUE == xQueueReceive(tx_queue, &transfer_status, CC3100_SPI_TX_TIMEOUT_MS))
 			{
-				retVal = transfer_status.itemsTransferred;
-			} else
+				ecode = transfer_status.transferStatus;
+			}
+			else
 			{
-				retVal = -1;
+				ecode = ECODE_EMDRV_SPIDRV_TIMEOUT;
 			}
 		}
-	} else
-	{
-		ecode = SPIDRV_MTransmitB(&cc3100_usart, pBuff, Len);
-		if (ECODE_EMDRV_SPIDRV_OK == ecode)
+
+		if(ECODE_EMDRV_SPIDRV_OK == ecode)
 		{
-			retVal = Len;
+			retVal = transfer_status.itemsTransferred;
 		}
 	}
 
