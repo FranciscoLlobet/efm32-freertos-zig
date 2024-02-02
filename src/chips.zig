@@ -16,17 +16,17 @@ const KiB: usize = 1024;
 const NVM3_SIZE: usize = 64 * KiB;
 
 /// Size of the RAM region in bytes.
-const RAM_SIZE: usize = 128 * KiB;
+pub const RAM_SIZE: usize = 128 * KiB;
 
 /// Size of the flash region in bytes.
-const FLASH_SIZE: usize = 1024 * KiB;
+pub const FLASH_SIZE: usize = 1024 * KiB;
 
 /// Size of the available flash region in bytes.
 const FLASH_AVAILABLE_SIZE: usize = FLASH_SIZE - NVM3_SIZE;
 
-const FLASH_BOOTLOADER_SIZE: usize = 256 * KiB;
+pub const FLASH_BOOTLOADER_SIZE: usize = 256 * KiB;
 
-const FLASH_APP_SIZE: usize = (FLASH_SIZE - NVM3_SIZE - FLASH_BOOTLOADER_SIZE);
+pub const FLASH_APP_SIZE: usize = (FLASH_SIZE - NVM3_SIZE - FLASH_BOOTLOADER_SIZE);
 
 //const FLASH_RESERVE_SIZE: usize = FLASH_AVAILABLE_SIZE - FLASH_APP_SIZE;
 

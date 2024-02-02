@@ -6,6 +6,7 @@ const board = @import("microzig").board;
 const config = @import("../config.zig");
 const fatfs = @import("../fatfs.zig");
 const freertos = @import("../freertos.zig");
+const chips = @import("../chips.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso_config.h");
@@ -14,8 +15,8 @@ const c = @cImport({
     @cInclude("bootutil/sign_key.h");
 });
 
-const firmware_start_address: usize = 0x78000;
-const firmware_max_size: usize = 0x78000;
+const firmware_start_address: usize = chips.FLASH_BOOTLOADER_SIZE;
+const firmware_max_size: usize = chips.FLASH_APP_SIZE;
 const flash_page_size: usize = 4096;
 const flash_page_addr_mask: usize = @intCast(~@as(u32, flash_page_size - 1)); // 0xFFFFF000
 const sd_page_size: usize = 512;

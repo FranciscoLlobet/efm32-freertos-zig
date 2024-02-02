@@ -184,6 +184,8 @@ fn myUserTaskFunction(self: *@This()) void {
             lwm2m.service.task.resumeTask();
 
             self.timer.start(null) catch unreachable;
+
+            self.timer.start(null) catch unreachable;
             self.state = .working;
         } else if (self.state == .working) {
             // recieve
