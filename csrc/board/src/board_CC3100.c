@@ -191,6 +191,8 @@ int CC3100_IfOpen(char *pIfName, unsigned long flags)
 	{
 		if (ECODE_OK == SPIDRV_Init(&cc3100_usart, &cc3100_usart_init_data))
 		{
+			NVIC_SetPriority(USART0_RX_IRQn, 5);
+			NVIC_SetPriority(USART0_TX_IRQn, 6);
 			GPIO_PinOutSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN); // Clear Hybernate
 			BOARD_msDelay(50);
 			cc3100_spi_deselect();

@@ -179,6 +179,15 @@ char * const config_get_config_uri(void)
 	return (char *)&config_config_uri[0];
 }
 
+
+void copyString(char *dest_ptr, size_t dest_len, char *src_ptr, size_t src_len)
+{
+	if (src_len > dest_len) src_len = dest_len;
+
+	memset(dest_ptr, 0, dest_len);
+	strncpy(dest_ptr, src_ptr, src_len);					
+}
+
 void miso_load_config(void)
 {
 	FSIZE_t fSize = 0;
@@ -296,10 +305,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			// Access the lwm2m configuration
@@ -335,10 +342,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			// Access the ntp configuration
@@ -398,10 +403,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					(void)strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			else if (((lwm2m_psk_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
@@ -422,11 +425,8 @@ void miso_load_config(void)
 				if ((JSMN_STRING == json_tokens[i + 1].type) && (dest_ptr != NULL))
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
-					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			else if (((mqtt_psk_key + 1) == json_tokens[i].parent) && (json_tokens[i].type == JSMN_STRING))
@@ -449,10 +449,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			// Access the http (firmware) configuration
@@ -489,10 +487,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 			// access the config 
@@ -523,10 +519,8 @@ void miso_load_config(void)
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
 					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
-					if (src_len > dest_len)
-						src_len = dest_len;
-
-					strncpy(dest_ptr, src_ptr, src_len);
+					
+					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
 			}
 		}
