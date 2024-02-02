@@ -425,6 +425,7 @@ void miso_load_config(void)
 				if ((JSMN_STRING == json_tokens[i + 1].type) && (dest_ptr != NULL))
 				{
 					char *src_ptr = (char *)read_buffer + json_tokens[i + 1].start;
+					size_t src_len = json_tokens[i + 1].end - json_tokens[i + 1].start;
 					
 					copyString(dest_ptr, dest_len, src_ptr, src_len);
 				}
