@@ -160,6 +160,14 @@ void CC3100_DeviceDisable(void)
 	false,
 	false);
 	BOARD_msDelay(1); // Very important (!)
+
+	//GPIO_PinOutClear(WIFI_NRESET_PORT, WIFI_NRESET_PIN);
+	//GPIO_PinOutClear(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
+	//GPIO_PinOutClear(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN);
+	//GPIO_PinOutSet(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN);
+	//BOARD_msDelay(19);
+
+
 //	GPIO_PinModeSet(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN, gpioModeDisabled, 0);
 //	GPIO_PinModeSet(WIFI_CSN_PORT, WIFI_CSN_PIN, gpioModeDisabled, 0);
 	GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, gpioModeDisabled, 0);

@@ -421,13 +421,27 @@ OsiReturnVal_e osi_Spawn(P_OSI_SPAWN_ENTRY pEntry , void* pValue , unsigned long
 	Msg.pValue = pValue;
 	xHigherPriorityTaskWoken = pdFALSE;
 
-	if(pdTRUE != xQueueSendFromISR( xSimpleLinkSpawnQueue, &Msg, &xHigherPriorityTaskWoken ))
+	if(flags == 0x01)
 	{
-		ret = OSI_OPERATION_FAILED;
-	}
+		if(pdTRUE != xQueueSendFromISR( xSimpleLinkSpawnQueue, &Msg, &xHigherPriorityTaskWoken ))
+		{
+			ret = OSI_OPERATION_FAILED;
+		}
 
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	return ret;
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		return ret;
+	}
+	else
+	{
+		// This is the case when calling outside of ISR
+		if(pdTRUE != xQueueSend( xSimpleLinkSpawnQueue, &Msg, portMAX_DELAY ))
+		{
+			ret = OSI_OPERATION_FAILED;
+		}
+
+		portYIELD();
+		return ret;
+	}
 }
 
 
@@ -444,13 +458,18 @@ void vSimpleLinkSpawnTask(void *pvParameters)
 {
 	tSimpleLinkSpawnMsg Msg;
 	portBASE_TYPE ret=pdFAIL;
+	short msgRet = OSI_OK;
 
 	for(;;)
 	{
 		ret = xQueueReceive( xSimpleLinkSpawnQueue, &Msg, portMAX_DELAY );
 		if(ret == pdPASS)
 		{
-				Msg.pEntry(Msg.pValue);
+			msgRet = Msg.pEntry(Msg.pValue);
+			if(msgRet != OSI_OK)
+			{
+				//Error
+			}
 		}
 	}
 }

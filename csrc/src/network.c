@@ -193,11 +193,11 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 	if(pdTRUE == xQueueSend(rx_queue, &msg, portMAX_DELAY))
 	{
 		// Dummy take
-		//(void)xSemaphoreTake(ctx->rx_signal, 0);
+		(void)xSemaphoreTake(ctx->rx_signal, 0);
 		
 		(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);	
 		
-		if (pdTRUE == xSemaphoreTake(ctx->rx_signal, timeout_ms + 500))
+		if (pdTRUE == xSemaphoreTake(ctx->rx_signal, timeout_ms))
 		{
 			ret_value = 0;
 		}
@@ -229,6 +229,8 @@ static void select_task(void *param)
 
 	fd_set read_fd_set;
 	fd_set write_fd_set;
+	fd_set error_fd_set;
+
 	uint32_t notification_counter = 0;
 
 	struct timeout_msg_s timeout_msg = {0};
@@ -239,9 +241,12 @@ static void select_task(void *param)
 		// Reset the pointers
 		fd_set *read_set_ptr = NULL;
 		fd_set *write_fd_set_ptr = NULL;
+		fd_set *error_fd_set_ptr = NULL;
+		int16_t nfds = -1;
 
 		FD_ZERO(&read_fd_set);
 		FD_ZERO(&write_fd_set);
+		FD_ZERO(&error_fd_set);
 
 		uint32_t current_time = sl_sleeptimer_get_time();
 
@@ -272,19 +277,31 @@ static void select_task(void *param)
 					if (ctx->rx_wait_deadline_s >= current_time)
 					{
 						FD_SET((_i16)ctx->sd, &read_fd_set);
+						FD_SET((_i16)ctx->sd, &error_fd_set);
+						if(ctx->sd > nfds)
+						{
+							nfds = ctx->sd;
+						}
 						read_set_ptr = &read_fd_set;
+						error_fd_set_ptr = &error_fd_set;
 					}
 					else
 					{
 						ctx->rx_wait_deadline_s = 0; /* Deadline expired */
 					}
-				} // rx deadlines
+				} // tx deadlines
 				if (ctx->tx_wait_deadline_s != 0)
 				{
 					if (ctx->tx_wait_deadline_s >= current_time)
 					{
 						FD_SET((_i16)ctx->sd, &write_fd_set);
+						FD_SET((_i16)ctx->sd, &error_fd_set);
+						if(ctx->sd > nfds)
+						{
+							nfds = ctx->sd;
+						}
 						write_fd_set_ptr = &write_fd_set;
+						error_fd_set_ptr = &error_fd_set;
 					}
 					else
 					{
@@ -295,7 +312,7 @@ static void select_task(void *param)
 			} // tx deadlines
 		}	  // End processing deadlines
 
-		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL))
+		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL) || (error_fd_set_ptr != NULL))
 		{
 			// Start second cycle
 			// The select function is called with a timeout of 20 ms
@@ -304,7 +321,7 @@ static void select_task(void *param)
 
 			if(pdTRUE == xSemaphoreTake(conn_mutex, 1000))
 			{
-				result = sl_Select(FD_SETSIZE, read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
+				result = sl_Select((nfds + 1), read_set_ptr, write_fd_set_ptr, error_fd_set_ptr, (struct SlTimeval_t *)&tv);
 				(void)xSemaphoreGive(conn_mutex);
 			}
 
@@ -314,7 +331,7 @@ static void select_task(void *param)
 				{
 					for (size_t i = 0; i < (size_t)wifi_service_max; i++)
 					{
-						miso_network_ctx_t ctx = &system_sockets[(size_t)i];
+						miso_network_ctx_t ctx = &system_sockets[i];
 
 						if (ctx->sd >= 0)
 						{
@@ -330,7 +347,7 @@ static void select_task(void *param)
 				{
 					for (size_t i = 0; i < (size_t)wifi_service_max; i++)
 					{
-						miso_network_ctx_t ctx = &system_sockets[(size_t)i];
+						miso_network_ctx_t ctx = &system_sockets[i];
 
 						if (ctx->sd >= 0)
 						{
@@ -342,6 +359,26 @@ static void select_task(void *param)
 						}
 					}
 				}
+				if(NULL != error_fd_set_ptr)
+				{
+					for (size_t i = 0; i < (size_t)wifi_service_max; i++)
+					{
+						miso_network_ctx_t ctx = &system_sockets[i];
+
+						if (ctx->sd >= 0)
+						{
+							if (FD_ISSET(ctx->sd, error_fd_set_ptr))
+							{
+								//__BKPT(0);
+
+							}
+						}
+					}
+				}
+			}
+			else if(result < 0)
+			{
+				__BKPT(0);
 			}
 		}
 		else
@@ -420,6 +457,16 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, size_t hos
 		ret = (int)UISO_NETWORK_SOCKET_ERROR;
 	}
 
+	if (ret == (int)UISO_NETWORK_OK)
+	{
+		SlSockNonblocking_t enableOption =
+			{.NonblockingEnabled = 1};
+		(void)sl_SetSockOpt(ctx->sd, SL_SOL_SOCKET, SL_SO_NONBLOCKING, (_u8 *)&enableOption,
+							sizeof(enableOption));
+	    uint8_t RxAggrEnable = 0;
+    	(void) sl_NetCfgSet((int) SL_SET_HOST_RX_AGGR, 0, sizeof(RxAggrEnable), (_u8 *) &RxAggrEnable); 
+	}
+
 	// Bind to local port
 	if (ret == (int)UISO_NETWORK_OK)
 	{
@@ -434,17 +481,6 @@ static int _network_connect(miso_network_ctx_t ctx, const char *host, size_t hos
 				ret = (int)UISO_NETWORK_BIND_ERROR;
 			}
 		}
-	}
-
-	if (ret == (int)UISO_NETWORK_OK)
-	{
-		//	if((uint32_t)proto & UISO_UDP_SELECTION_BIT)
-		//	{
-		SlSockNonblocking_t enableOption =
-			{.NonblockingEnabled = 1};
-		(void)sl_SetSockOpt(ctx->sd, SL_SOL_SOCKET, SL_SO_NONBLOCKING, (_u8 *)&enableOption,
-							sizeof(enableOption));
-		//	}
 	}
 
 	if (ret == (int)UISO_NETWORK_OK)
@@ -667,10 +703,13 @@ int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, siz
 			}
 
 			/* Perform mbedTLS handshake */
-			do
+			ret = MBEDTLS_ERR_SSL_WANT_READ;
+			
+			while((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret))
 			{
 				ret = mbedtls_ssl_handshake(ctx->ssl_context);
-			} while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
+				BOARD_msDelay(20);	
+			}
 		}
 	}
 

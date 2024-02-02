@@ -139,9 +139,15 @@ void wifi_task(void *param)
 			sizeof(_WlanRxFilterOperationCommandBuff_t));
 	//    ASSERT_ON_ERROR(retVal);
 
-	retVal = sl_Stop(0xff);
+	retVal = sl_WlanSetMode(ROLE_STA);
+	retVal = sl_Stop(0);
 
 	role = sl_Start(NULL, (_i8*) CC3100_DEVICE_NAME, NULL);
+	if(role == ROLE_STA)
+	{
+		(void)sl_NetAppStop(SL_NET_APP_HTTP_SERVER_ID);
+		(void)sl_NetAppStop(SL_NET_APP_MDNS_ID);
+	}
 
 	//sl_NetCfgGet(SL_MAC_ADDRESS_GET, NULL, &macLen, mac_);
 
@@ -191,7 +197,6 @@ void wifi_task(void *param)
 
 			if(ulNotifiedValue & (uint32_t)wifi_connecting)
 			{
-				/*_u8 MacAddr[6] =  0xD0, 0x5F, 0xB8, 0x4B, 0xD3, 0x74 }; */
 				secParams.Key = (signed char*) config_get_wifi_key();
 				secParams.KeyLen = strlen(config_get_wifi_key());
 				secParams.Type = SL_SEC_TYPE_WPA_WPA2;

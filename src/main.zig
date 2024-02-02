@@ -36,25 +36,10 @@ export fn vApplicationIdleHook() void {
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-//var timerTask: freertos.StaticTask(@This(), config.rtos_stack_depth_timer_task, "timer", dummyTask) = undefined;
-//var idleTask: freertos.StaticTask(@This(), config.rtos_stack_depth_idle_task, "idle", dummyTask) = undefined;
-
 fn dummyTask(self: *@This()) void {
     _ = self;
     unreachable;
 }
-
-//export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxTimerTaskTCBBuffer.* = &timerTask.staticTask;
-//    ppxTimerTaskStackBuffer.* = &timerTask.stack[0];
-//    pulTimerTaskStackSize.* = timerTask.stack.len;
-//}
-
-//export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticTask_t, ppxIdleTaskStackBuffer: **freertos.StackType_t, pulIdleTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxIdleTaskTCBBuffer.* = &idleTask.staticTask;
-//    ppxIdleTaskStackBuffer.* = &idleTask.stack[0];
-//    pulIdleTaskStackSize.* = idleTask.stack.len;
-//}
 
 export fn vApplicationDaemonTaskStartupHook() void {
     appStart();
