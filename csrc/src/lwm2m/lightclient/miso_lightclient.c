@@ -348,7 +348,6 @@ void print_state(lwm2m_context_t *lwm2mH)
 #include "FreeRTOS.h"
 #include "task.h"
 
-
 client_data_t data;
 
 int lwm2m_client_task_runner(void *param1)
@@ -358,6 +357,7 @@ int lwm2m_client_task_runner(void *param1)
 	lwm2m_context_t *lwm2mH = NULL;
 	lwm2m_object_t *objArray[OBJ_COUNT];
 
+	int suspend = 0;
 	int result;
 	int opt;
 
@@ -428,7 +428,7 @@ int lwm2m_client_task_runner(void *param1)
 
 	uint32_t lwm2m_timeout = 0;
 
-	do
+	while (1)
 	{
 		uint32_t notification_value = 0;
 
@@ -490,12 +490,8 @@ int lwm2m_client_task_runner(void *param1)
 			}
 			if(notification_value & (uint32_t) lwm2m_notify_suspend)
 			{
-				/* Suspend */
-				miso_notify_event(miso_lwm2m_suspended);
-				vTaskSuspend(xTaskGetCurrentTaskHandle()); // Suspend myself
+				suspend = 1;
 				break;
-				//lwm2m_suspend(lwm2mH);
-
 			}
 		}
 		else
@@ -526,7 +522,7 @@ int lwm2m_client_task_runner(void *param1)
 		}
 
 		printf("LWM2M: %d\n\r", uxTaskGetStackHighWaterMark(NULL));
-	} while (1);
+	} 
 
 	/*
 	 * Finally when the loop is left, we unregister our client from it
@@ -542,7 +538,7 @@ int lwm2m_client_task_runner(void *param1)
 
 	fprintf(stdout, "\r\n\n");
 
-	return 0;
+	return (suspend == 1);
 }
 
 extern void update_accelerometer_values(float x, float y, float z);

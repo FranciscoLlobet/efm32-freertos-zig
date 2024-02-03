@@ -65,6 +65,10 @@ struct wifi_status_s
 	enum wifi_ip_acquired_state_e ip;
 } wifi_status;
 
+bool network_is_connected(void)
+{
+	return (wifi_status.connection == wifi_connected);
+}
 
 void wifi_task(void *param)
 {

@@ -26,6 +26,11 @@ fn taskFunction(self: *@This()) void {
     while (ret == 0) {
         ret = c.lwm2m_client_task_runner(self);
 
+        if (ret == 1) {
+            c.miso_notify_event(c.miso_lwm2m_suspended);
+            self.task.suspendTask();
+        }
+
         self.task.delayTask(60 * 1000);
     }
     system.reset();

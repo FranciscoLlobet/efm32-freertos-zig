@@ -388,9 +388,11 @@ void CC3100_SockEvtHdlr(SlSockEvent_t *pSlSockEvent)
 	switch (pSlSockEvent->Event)
 	{
 		case SL_SOCKET_TX_FAILED_EVENT:
+			// status, sd
 			printf("tx failed\r\n");
 			break;
 		case SL_SOCKET_ASYNC_EVENT:
+			// sd, type
 			printf("socket async event\r\n");
 			break;
 		default:

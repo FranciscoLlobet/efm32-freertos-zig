@@ -38,6 +38,9 @@ struct miso_sockets_s
 	SemaphoreHandle_t rx_signal; /* RX available signal */
 	SemaphoreHandle_t tx_signal; /* TX available signal */
 
+	QueueHandle_t rx_queue;
+	QueueHandle_t tx_queue;
+
 	/* local address */
 	SlSockAddrIn_t local;
 	SlSocklen_t local_len;
@@ -58,7 +61,6 @@ struct miso_sockets_s
 struct timeout_msg_s
 {
 	uint32_t deadline;
-	miso_network_ctx_t ctx;
 };
 
 static struct miso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
@@ -69,8 +71,6 @@ static SemaphoreHandle_t rx_tx_mutex = NULL;
 // Connection mutex
 static SemaphoreHandle_t conn_mutex = NULL;
 
-static QueueHandle_t rx_queue = NULL;
-static QueueHandle_t tx_queue = NULL;
 
 static void select_task(void *param);
 static void initialize_socket_management(void);
@@ -115,9 +115,8 @@ static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t tim
 	struct timeout_msg_s msg;
 
 	msg.deadline = timeout_s + sl_sleeptimer_get_time();
-	msg.ctx = ctx;
 
-	(void)xQueueSend(tx_queue, &msg, portMAX_DELAY);
+	(void)xQueueSend(ctx->tx_queue, &msg, portMAX_DELAY);
 }
 
 int create_network_mediator(void)
@@ -158,20 +157,6 @@ int create_network_mediator(void)
 			ret = -1;
 	}
 
-	if (0 == ret)
-	{
-		rx_queue = xQueueCreate((UBaseType_t)wifi_service_max * 2, sizeof(struct timeout_msg_s));
-		if (NULL == rx_queue)
-			ret = -1;
-	}
-
-	if (0 == ret)
-	{
-		tx_queue = xQueueCreate((UBaseType_t)wifi_service_max, sizeof(struct timeout_msg_s));
-		if (NULL == tx_queue)
-			ret = -1;
-	}
-
 	return ret;
 }
 
@@ -188,9 +173,8 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 	uint32_t timeout_ms = 1000 * timeout_s;
 
 	msg.deadline = timeout_s + sl_sleeptimer_get_time();
-	msg.ctx = ctx;
 
-	if(pdTRUE == xQueueSend(rx_queue, &msg, portMAX_DELAY))
+	if(pdTRUE == xQueueSend(ctx->rx_queue, &msg, portMAX_DELAY))
 	{
 		// Dummy take
 		(void)xSemaphoreTake(ctx->rx_signal, 0);
@@ -227,9 +211,8 @@ static void select_task(void *param)
 {
 	(void)param;
 
-	fd_set read_fd_set;
-	fd_set write_fd_set;
-	fd_set error_fd_set;
+	SlFdSet_t read_fd_set;
+	SlFdSet_t write_fd_set;
 
 	uint32_t notification_counter = 0;
 
@@ -239,92 +222,87 @@ static void select_task(void *param)
 	while (1)
 	{
 		// Reset the pointers
-		fd_set *read_set_ptr = NULL;
-		fd_set *write_fd_set_ptr = NULL;
-		fd_set *error_fd_set_ptr = NULL;
-		int16_t nfds = -1;
+		SlFdSet_t *read_set_ptr = NULL;
+		SlFdSet_t *write_fd_set_ptr = NULL;
+		_i16 nfds = -1;
 
-		FD_ZERO(&read_fd_set);
-		FD_ZERO(&write_fd_set);
-		FD_ZERO(&error_fd_set);
+		SL_FD_ZERO(&read_fd_set);
+		SL_FD_ZERO(&write_fd_set);
 
 		uint32_t current_time = sl_sleeptimer_get_time();
 
-		/* Process RX and TX queues */
-		while (pdTRUE == xQueueReceive(rx_queue, &timeout_msg, 0))
-		{
-			if (timeout_msg.ctx != NULL)
-			{
-				timeout_msg.ctx->rx_wait_deadline_s = timeout_msg.deadline;
-			}
-		}
-		while (pdTRUE == xQueueReceive(tx_queue, &timeout_msg, 0))
-		{
-			if (timeout_msg.ctx != NULL)
-			{
-				timeout_msg.ctx->tx_wait_deadline_s = timeout_msg.deadline;
-			}
-		}
-
 		for (size_t i = 0; i < (size_t)wifi_service_max; i++)
 		{
-			miso_network_ctx_t ctx = &system_sockets[(size_t)i];
+			miso_network_ctx_t ctx = &system_sockets[i];
 
+			// Only process sockets that are in use
 			if (ctx->sd >= 0)
 			{
+				// Process incoming messages
+				if(pdTRUE == xQueueReceive(ctx->rx_queue, &timeout_msg, 0))
+				{
+					ctx->rx_wait_deadline_s = timeout_msg.deadline;
+				}
+				if(pdTRUE == xQueueReceive(ctx->tx_queue, &timeout_msg, 0))
+				{
+					ctx->tx_wait_deadline_s = timeout_msg.deadline;
+				}
+
+				// Process deadlines
 				if (ctx->rx_wait_deadline_s != 0)
 				{
 					if (ctx->rx_wait_deadline_s >= current_time)
 					{
-						FD_SET((_i16)ctx->sd, &read_fd_set);
-						FD_SET((_i16)ctx->sd, &error_fd_set);
+						SL_FD_SET((_i16)ctx->sd, &read_fd_set);
 						if(ctx->sd > nfds)
 						{
-							nfds = ctx->sd;
+							nfds = (_i16)ctx->sd;
 						}
 						read_set_ptr = &read_fd_set;
-						error_fd_set_ptr = &error_fd_set;
 					}
 					else
 					{
+						// Invalidate the deadline
 						ctx->rx_wait_deadline_s = 0; /* Deadline expired */
+						(void)xSemaphoreGive(ctx->rx_signal);
 					}
-				} // tx deadlines
+				} 
+				
+				// tx deadlines
 				if (ctx->tx_wait_deadline_s != 0)
 				{
 					if (ctx->tx_wait_deadline_s >= current_time)
 					{
-						FD_SET((_i16)ctx->sd, &write_fd_set);
-						FD_SET((_i16)ctx->sd, &error_fd_set);
+						SL_FD_SET((_i16)ctx->sd, &write_fd_set);
 						if(ctx->sd > nfds)
 						{
-							nfds = ctx->sd;
+							nfds = (_i16)ctx->sd;
 						}
 						write_fd_set_ptr = &write_fd_set;
-						error_fd_set_ptr = &error_fd_set;
 					}
 					else
 					{
 						ctx->tx_wait_deadline_s = 0; /* Deadline expired */
+						(void)xSemaphoreGive(ctx->tx_signal);
 					}
 				}
 
 			} // tx deadlines
 		}	  // End processing deadlines
 
-		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL) || (error_fd_set_ptr != NULL))
+		if ((read_set_ptr != NULL) || (write_fd_set_ptr != NULL))
 		{
 			// Start second cycle
-			// The select function is called with a timeout of 20 ms
-			struct timeval tv = {.tv_sec = 0, .tv_usec = 20000}; // Here we have the select cycle time
+			// The select function is called with a timeout of 50 ms
+			SlTimeval_t tv = {.tv_sec = 0, .tv_usec = 10240}; // Here we have the select cycle time
 			int result = 0;
 
 			if(pdTRUE == xSemaphoreTake(conn_mutex, 1000))
 			{
-				result = sl_Select((nfds + 1), read_set_ptr, write_fd_set_ptr, error_fd_set_ptr, (struct SlTimeval_t *)&tv);
+				result = sl_Select((nfds + (_i16)1), read_set_ptr, write_fd_set_ptr, NULL, (struct SlTimeval_t *)&tv);
 				(void)xSemaphoreGive(conn_mutex);
 			}
-
+			
 			if (result > 0)
 			{
 				if (NULL != read_set_ptr)
@@ -335,9 +313,9 @@ static void select_task(void *param)
 
 						if (ctx->sd >= 0)
 						{
-							if (FD_ISSET(ctx->sd, read_set_ptr))
+							if (SL_FD_ISSET(ctx->sd, read_set_ptr))
 							{
-								ctx->rx_wait_deadline_s = 0;
+								ctx->rx_wait_deadline_s = 0; // Cancel the deadline
 								(void)xSemaphoreGive(ctx->rx_signal);
 							}
 						}
@@ -351,26 +329,10 @@ static void select_task(void *param)
 
 						if (ctx->sd >= 0)
 						{
-							if (FD_ISSET(ctx->sd, write_fd_set_ptr))
+							if (SL_FD_ISSET(ctx->sd, write_fd_set_ptr))
 							{
-								ctx->tx_wait_deadline_s = 0;
+								ctx->tx_wait_deadline_s = 0; // Cancel the deadline
 								(void)xSemaphoreGive(ctx->tx_signal);
-							}
-						}
-					}
-				}
-				if(NULL != error_fd_set_ptr)
-				{
-					for (size_t i = 0; i < (size_t)wifi_service_max; i++)
-					{
-						miso_network_ctx_t ctx = &system_sockets[i];
-
-						if (ctx->sd >= 0)
-						{
-							if (FD_ISSET(ctx->sd, error_fd_set_ptr))
-							{
-								//__BKPT(0);
-
 							}
 						}
 					}
@@ -386,7 +348,7 @@ static void select_task(void *param)
 			 // printf("select %d\r\n", uxTaskGetStackHighWaterMark(network_monitor_task_handle));
 
 			// Wait for notifications
-			(void)xTaskGenericNotifyWait(0, 0, UINT32_MAX, &notification_counter, portMAX_DELAY);
+			(void)xTaskGenericNotifyWait(0, 0, UINT32_MAX, &notification_counter, 2000);
 		}
 	}
 }
@@ -766,8 +728,8 @@ static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t leng
 
 	if (numBytes < 0)
 	{
+		//__BKPT(1);
 		numBytes = (int)MISO_NETWORK_DTLS_RECV_ERROR;
-		__BKPT(1);
 	}
 
 	return numBytes;
@@ -812,7 +774,7 @@ int miso_network_read(miso_network_ctx_t ctx, unsigned char *buffer, size_t leng
 	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000))
 	{
 		ret = ctx->read_fn(ctx, buffer, length);
-		(void)xSemaphoreGive(rx_tx_mutex);
+	(void)xSemaphoreGive(rx_tx_mutex);
 	}
 
 	return ret;
@@ -825,7 +787,7 @@ int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_
 	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000));
 	{
 		ret = ctx->send_fn(ctx, buffer, length);
-		(void)xSemaphoreGive(rx_tx_mutex);
+	(void)xSemaphoreGive(rx_tx_mutex);
 	}
 
 	return ret;
@@ -982,6 +944,9 @@ static int _initialize_network_ctx(miso_network_ctx_t ctx)
 	ctx->tx_wait_deadline_s = 0;
 	ctx->rx_signal = xSemaphoreCreateBinary();
 	ctx->tx_signal = xSemaphoreCreateBinary();
+
+	ctx->rx_queue = xQueueCreate(1, sizeof(struct timeout_msg_s));
+	ctx->tx_queue = xQueueCreate(1, sizeof(struct timeout_msg_s));
 
 	return 0;
 }
