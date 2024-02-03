@@ -204,12 +204,6 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
                 }
             }
 
-            // End the ssl initialization
-            if (ret == mbedtls_ok) {
-                // Invert this (!)
-                //ret = c.miso_network_register_ssl_context(@as(*c.struct_miso_sockets_s, @ptrCast(connection_ctx.ctx)), &self.context);
-            }
-
             if (ret != mbedtls_ok) {
                 return mbedtls_error.init_error;
             }
