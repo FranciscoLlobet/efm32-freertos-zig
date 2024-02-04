@@ -21,7 +21,7 @@ const source_path = [_][]const u8{
     "csrc/system/cc3100-sdk/simplelink/source/wlan.c",
 };
 
-const c_flags = [_][]const u8{ "-DEFM32GG390F1024", "-D__OSI__=1", "-D__SL__", "-DOS_USE_TRACE_ITM", "-fdata-sections", "-ffunction-sections" };
+const c_flags = [_][]const u8{ "-O0", "-DEFM32GG390F1024", "-D__OSI__=1", "-D__SL__", "-fdata-sections", "-ffunction-sections", "-fstack-protector-all" };
 
 pub fn aggregate(exe: *microzig.Firmware) void {
     for (include_path) |path| {

@@ -73,8 +73,6 @@
 #include "wifi_service.h"
 #include "lwm2m_temperature.h"
 
-extern TaskHandle_t user_task_handle;
-
 /* Extern declarations */
 extern lwm2m_object_t* get_object_device(void);
 extern void free_object_device(lwm2m_object_t *objectP);
@@ -350,8 +348,6 @@ void print_state(lwm2m_context_t *lwm2mH)
 #include "FreeRTOS.h"
 #include "task.h"
 
-extern TaskHandle_t user_task_handle;
-
 client_data_t data;
 
 int lwm2m_client_task_runner(void *param1)
@@ -361,6 +357,7 @@ int lwm2m_client_task_runner(void *param1)
 	lwm2m_context_t *lwm2mH = NULL;
 	lwm2m_object_t *objArray[OBJ_COUNT];
 
+	int suspend = 0;
 	int result;
 	int opt;
 
@@ -431,7 +428,7 @@ int lwm2m_client_task_runner(void *param1)
 
 	uint32_t lwm2m_timeout = 0;
 
-	do
+	while (1)
 	{
 		uint32_t notification_value = 0;
 
@@ -491,6 +488,11 @@ int lwm2m_client_task_runner(void *param1)
 							(size_t) numBytes, connP);
 				}
 			}
+			if(notification_value & (uint32_t) lwm2m_notify_suspend)
+			{
+				suspend = 1;
+				break;
+			}
 		}
 		else
 		{
@@ -520,7 +522,7 @@ int lwm2m_client_task_runner(void *param1)
 		}
 
 		printf("LWM2M: %d\n\r", uxTaskGetStackHighWaterMark(NULL));
-	} while (1);
+	} 
 
 	/*
 	 * Finally when the loop is left, we unregister our client from it
@@ -533,12 +535,10 @@ int lwm2m_client_task_runner(void *param1)
 	free_server_object(objArray[1]);
 	free_object_device(objArray[2]); /* Device object */
 	free_accelerometer_object(objArray[4]); /* Accelerometer */
-	//free_object_device(objArray[3]); /* Temperature */
-	//free_object_device(objArray[4]);
 
 	fprintf(stdout, "\r\n\n");
 
-	return 0;
+	return (suspend == 1);
 }
 
 extern void update_accelerometer_values(float x, float y, float z);
@@ -547,8 +547,8 @@ void lwm2m_client_update_accel(float x, float y, float z)
 {
 	update_accelerometer_values(x, y, z);
 
-	xTaskNotify(user_task_handle, (uint32_t )lwm2m_notify_accelerometer,
-			eSetBits);
+//	xTaskNotify(user_task_handle, (uint32_t )lwm2m_notify_accelerometer,
+//			eSetBits);
 }
 
 int wait_for_rx(uint32_t wait_s)

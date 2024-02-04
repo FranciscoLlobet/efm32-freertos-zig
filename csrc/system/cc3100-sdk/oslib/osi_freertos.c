@@ -52,10 +52,10 @@ portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
 //Local function definition
 static void vSimpleLinkSpawnTask( void *pvParameters );
 //Queue Handler
-void * xSimpleLinkSpawnQueue = NULL;
+QueueHandle_t xSimpleLinkSpawnQueue = NULL;
 TaskHandle_t xSimpleLinkSpawnTaskHndl = NULL;
 // Queue size 
-#define slQUEUE_SIZE				( 3 )
+#define slQUEUE_SIZE				( 5 )
 
 
 
@@ -166,20 +166,11 @@ OsiReturnVal_e osi_SyncObjSignalFromISR(OsiSyncObj_t* pSyncObj)
 		return OSI_INVALID_PARAMS;
 	}
 	xHigherPriorityTaskWoken = pdFALSE;
-	if(pdTRUE == xSemaphoreGiveFromISR( *pSyncObj, &xHigherPriorityTaskWoken ))
-	{
-		if( xHigherPriorityTaskWoken )
-		{
-			taskYIELD ();
-		}
-		return OSI_OK;
-	}
-	else
-	{
-		//In case of Semaphore, you are expected to get this if multiple sem
-		// give is called before sem take
-		return OSI_OK;
-	}
+	
+	(void)xSemaphoreGiveFromISR( *pSyncObj, &xHigherPriorityTaskWoken );
+
+	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	return OSI_OK;
 }
 
 /*!
@@ -424,22 +415,33 @@ OsiReturnVal_e osi_LockObjUnlock(OsiLockObj_t* pLockObj)
 
 OsiReturnVal_e osi_Spawn(P_OSI_SPAWN_ENTRY pEntry , void* pValue , unsigned long flags)
 {
-
+	OsiReturnVal_e ret = OSI_OK;
 	tSimpleLinkSpawnMsg Msg;
 	Msg.pEntry = pEntry;
 	Msg.pValue = pValue;
 	xHigherPriorityTaskWoken = pdFALSE;
 
-	if(pdTRUE == xQueueSendFromISR( xSimpleLinkSpawnQueue, &Msg, &xHigherPriorityTaskWoken ))
+	if(flags == 0x01)
 	{
-		if( xHigherPriorityTaskWoken )
+		if(pdTRUE != xQueueSendFromISR( xSimpleLinkSpawnQueue, &Msg, &xHigherPriorityTaskWoken ))
 		{
-			taskYIELD ();
+			ret = OSI_OPERATION_FAILED;
 		}
 
-		return OSI_OK;
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		return ret;
 	}
-	return OSI_OPERATION_FAILED;
+	else
+	{
+		// This is the case when calling outside of ISR
+		if(pdTRUE != xQueueSend( xSimpleLinkSpawnQueue, &Msg, portMAX_DELAY ))
+		{
+			ret = OSI_OPERATION_FAILED;
+		}
+
+		portYIELD();
+		return ret;
+	}
 }
 
 
@@ -456,13 +458,18 @@ void vSimpleLinkSpawnTask(void *pvParameters)
 {
 	tSimpleLinkSpawnMsg Msg;
 	portBASE_TYPE ret=pdFAIL;
+	short msgRet = OSI_OK;
 
 	for(;;)
 	{
 		ret = xQueueReceive( xSimpleLinkSpawnQueue, &Msg, portMAX_DELAY );
 		if(ret == pdPASS)
 		{
-				Msg.pEntry(Msg.pValue);
+			msgRet = Msg.pEntry(Msg.pValue);
+			if(msgRet != OSI_OK)
+			{
+				//Error
+			}
 		}
 	}
 }
@@ -484,7 +491,7 @@ OsiReturnVal_e VStartSimpleLinkSpawnTask(unsigned portBASE_TYPE uxPriority)
     	return OSI_OPERATION_FAILED;
     }
     if(pdPASS == xTaskCreate( vSimpleLinkSpawnTask, ( portCHAR * ) "SLSPAWN",\
-    					 (3500/sizeof( portSTACK_TYPE )), NULL, uxPriority, &xSimpleLinkSpawnTaskHndl ))
+    					 (4000/sizeof( portSTACK_TYPE )), NULL, uxPriority, &xSimpleLinkSpawnTaskHndl ))
     {
     	return OSI_OK;
     }
@@ -584,21 +591,20 @@ OsiReturnVal_e osi_MsgQDelete(OsiMsgQ_t* pMsgQ)
 
 OsiReturnVal_e osi_MsgQWrite(OsiMsgQ_t* pMsgQ, void* pMsg , OsiTime_t Timeout)
 {
+	OsiReturnVal_e ret = OSI_OK;
 	//Check for NULL
 	if(NULL == pMsgQ)
 	{
 		return OSI_INVALID_PARAMS;
 	}
 
-    if(pdPASS == xQueueSendFromISR((QueueHandle_t) *pMsgQ, pMsg, &xHigherPriorityTaskWoken ))
+    if(pdPASS != xQueueSendFromISR((QueueHandle_t) *pMsgQ, pMsg, &xHigherPriorityTaskWoken ))
     {
-		taskYIELD ();
-		return OSI_OK;
+		ret = OSI_OPERATION_FAILED;
     }
-	else
-	{
-		return OSI_OPERATION_FAILED;
-	}
+
+	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+	return ret;
 }
 /*!
 	\brief 	This function is used to read data from the MsgQ

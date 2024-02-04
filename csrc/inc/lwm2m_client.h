@@ -17,7 +17,8 @@ enum
 	lwm2m_notify_timestamp = (1 << 1),
 	lwm2m_notify_temperature = (1 << 2),
 	lwm2m_notify_accelerometer = (1 << 3),
-	lwm2m_notify_message_reception = (1 << 4)
+	lwm2m_notify_message_reception = (1 << 4),
+	lwm2m_notify_suspend = (1 << 5)
 };
 /**
  * Notify of temperature value change

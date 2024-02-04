@@ -30,6 +30,11 @@
 
 #define UISO_PROTOCOL_MASK    (UISO_PROTOCOL_BIT_MASK | UISO_UDP_SELECTION_BIT_MASK | UISO_TCP_SELECTION_BIT_MASK | UISO_IPV4_IPV6_SELECTION_BIT_MASK | UISO_SECURITY_BIT_MASK)
 
+/**
+ * Protocol Selection Bit Masks
+ * 
+ * Do not use directly
+ */
 enum
 {
 	miso_protocol_udp = (UISO_UDP_SELECTION_BIT_MASK | UISO_PROTOCOL_BIT_MASK),
@@ -39,6 +44,9 @@ enum
 	miso_protocol_ip6 = (1 << UISO_IPV4_IPV6_SELECTION_BIT)| UISO_PROTOCOL_BIT_MASK,
 };
 
+/**
+ * MISO Protocol selction
+*/
 enum miso_protocol
 {
 	miso_protocol_no_protocol = 0,
@@ -58,9 +66,28 @@ enum miso_protocol
 	miso_protocol_dtls_ip6 = (miso_protocol_udp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
 	miso_protocol_tls_ip6 =  (miso_protocol_tcp_ip6 | UISO_SECURITY_BIT_MASK) & UISO_PROTOCOL_MASK,
 
-	miso_protocol_max = UISO_PROTOCOL_MASK,
+	miso_protocol_max = UISO_PROTOCOL_MASK, // Do not use
 };
 
+/**
+ * miso security mode
+ */
+enum miso_security_mode{
+	miso_security_mode_none = 0,
+	miso_security_mode_psk = 1,
+	miso_security_mode_ec = 2,
+	miso_security_mode_rsa = 3,
+};
+
+
+/**
+ * Socket ID
+ * 
+ * Currently only 4 sockets are supported in the pool.
+ * 
+ * Each socket is identified by an ID and associated with a service.
+ * 
+ */
 enum wifi_socket_id_e
 {
 	wifi_service_ntp_socket = 0,
@@ -70,14 +97,17 @@ enum wifi_socket_id_e
 	wifi_service_max
 };
 
+/**
+ * Network Context
+ * 
+ * Forward declaration of the network context.
+ */
 typedef struct miso_sockets_s * miso_network_ctx_t;
-
-// socket id?
 
 enum miso_network_ret
 {
 	UISO_NETWORK_OK = 0,
-	UISO_NETWORK_GENERIC_ERROR = INT32_MIN,
+	UISO_NETWORK_GENERIC_ERROR = INT16_MIN,
 	UISO_NETWORK_SOCKET_ERROR ,
 	UISO_NETWORK_BIND_ERROR,
 	UISO_NETWORK_CONNECT_ERROR,
@@ -89,9 +119,13 @@ enum miso_network_ret
 
 	UISO_NETWORK_RECV_ERROR,
 	UISO_NETWORK_SEND_ERROR,
+	MISO_NETWORK_SEND_BUSY,
+	MISO_NETWORK_RECV_BUSY,
 
 	UISO_NETWORK_DTLS_RENEGOCIATION_FAIL,
 	UISO_NETWORK_UDP_SEND_ERROR,
+	MISO_NETWORK_DTLS_SEND_ERROR,
+	MISO_NETWORK_DTLS_RECV_ERROR,
 };
 
 #define UISO_NETWORK_INVALID_SOCKET		((int32_t)-1)
@@ -114,6 +148,10 @@ miso_network_ctx_t miso_get_network_ctx(enum wifi_socket_id_e id);
 int miso_create_network_connection(miso_network_ctx_t ctx, const char *host, size_t host_len, uint16_t port, uint16_t local_port,
 								   enum miso_protocol proto);
 
+/**
+ * Close Connection
+ * 
+ */
 int miso_close_network_connection(miso_network_ctx_t ctx);
 
 /**
@@ -124,7 +162,14 @@ int miso_close_network_connection(miso_network_ctx_t ctx);
  */
 int miso_network_register_ssl_context(miso_network_ctx_t ctx, mbedtls_ssl_context * ssl_ctx);
 
+/** 
+ * Read from socket
+*/
 int miso_network_read(miso_network_ctx_t ctx, unsigned char *buffer, size_t length);
+
+/**
+ * Write (send) to socket
+*/
 int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_t length);
 
 int miso_network_get_socket(miso_network_ctx_t ctx);

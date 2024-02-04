@@ -9,7 +9,7 @@ const freertos = @import("freertos.zig");
 const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
-const user = @import("user.zig");
+const mbedtls = @import("mbedtls.zig");
 
 const c = @cImport({
     @cDefine("MQTT_CLIENT", "1");
@@ -91,7 +91,9 @@ const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 const reset_topic = "zig/reset";
 
-connection: connection,
+const connectionType = connection.Connection(.mqtt, mbedtls.TlsContext(.psk));
+
+connection: connectionType,
 connectionCounter: usize,
 disconnectionCounter: usize,
 
@@ -152,16 +154,16 @@ fn init() @This() {
 }
 
 /// Authentification callback for mbedTLS connections
-fn authCallback(self: *connection.mbedtls, security_mode: connection.security_mode) connection.mbedtls.auth_error!void {
+fn authCallback(self: *mbedtls.TlsContext(.psk), security_mode: connection.security_mode) mbedtls.auth_error!void {
     if (security_mode == .psk) {
         var psk_buf: [64]u8 = undefined; // Request 64 Bytes for Base64 decoder
 
-        const psk = connection.mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return connection.mbedtls.auth_error.generic_error;
-        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return connection.mbedtls.auth_error.generic_error;
+        const psk = mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return mbedtls.auth_error.generic_error;
+        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return mbedtls.auth_error.generic_error;
 
         @memset(&psk_buf, 0); // Sanitize the buffer to avoid the decoded psk to remain in stack
     } else {
-        return connection.mbedtls.auth_error.unsuported_mode;
+        return mbedtls.auth_error.unsuported_mode;
     }
 }
 
@@ -289,7 +291,7 @@ const packet = struct {
         }, .packetIdState = packetId, .workBufferMutex = undefined, .txQueue = undefined };
     }
 
-    pub fn create(self: *@This(), conn: *connection) void {
+    pub fn create(self: *@This(), conn: *connectionType) void {
         self.transport.sck = @ptrCast(conn);
 
         self.workBufferMutex.create() catch unreachable;
@@ -313,7 +315,7 @@ const packet = struct {
 
     /// Get function for the MQTTTransport
     fn getFn(ptr: ?*anyopaque, buf: [*c]u8, buf_len: c_int) callconv(.C) c_int {
-        var self = @as(*connection, @ptrCast(@alignCast(ptr))); // Cast ptr as connection
+        var self = @as(*connectionType, @ptrCast(@alignCast(ptr))); // Cast ptr as connection
 
         const ret = self.recieve(buf[0..@intCast(buf_len)]) catch {
             return @intFromEnum(msgTypes.err_msg);
@@ -720,9 +722,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
         } else {
             _ = c.printf("mqtt: %d\r\n", self.task.getStackHighWaterMark());
         }
-
-        // Process the qos1 to 2 tx queue
-
+        // Check if the task has been suspended
     }
 }
 
@@ -777,7 +777,8 @@ pub fn create(self: *@This()) void {
     self.task.create(self, config.rtos_prio_mqtt) catch unreachable;
     self.task.suspendTask();
     if (config.enable_mqtt) {
-        self.connection = connection.init(.mqtt, authCallback, null);
+        self.connection.init();
+        self.connection.ssl = @TypeOf(self.connection.ssl).create(authCallback, null, null);
         self.pingTimer.create(60000, true, self) catch unreachable;
         self.pubTimer.create(10000, true, self) catch unreachable;
         self.packet.create(&self.connection);
@@ -795,7 +796,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         self.connection.close() catch {};
     }
 
-    try self.connection.create(uri.host.?, uri.port.?, null, connection.schemes.match(uri.scheme).?.getProtocol(), .psk);
+    try self.connection.create(uri, null);
 
     _ = try self.packet.prepareConnectPacket(self.device_id[0..c.strlen(self.device_id)], null, null);
 

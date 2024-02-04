@@ -133,12 +133,12 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	mbedtls_ssl_config_init(&ssl_config);
 	mbedtls_ctr_drbg_init(&drbg_context);
 	mbedtls_entropy_init(&entropy_context);
-
+#if 0
 	mbedtls_pk_init(&own_pk);
 	mbedtls_x509_crt_init(&own_crt_ctx);
 	mbedtls_x509_crt_init(&peer_crt_ctx);
 	mbedtls_x509_crl_init(&peer_crl_ctx);
-
+#endif
 	ret = mbedtls_ssl_config_defaults(&ssl_config, MBEDTLS_SSL_IS_CLIENT,
 	MBEDTLS_SSL_TRANSPORT_DATAGRAM, MBEDTLS_SSL_PRESET_DEFAULT);
 	if (0 == ret)
@@ -150,20 +150,20 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	if (0 == ret)
 	{
 		mbedtls_ssl_conf_authmode(&ssl_config, MBEDTLS_SSL_VERIFY_OPTIONAL);
-		mbedtls_ssl_conf_read_timeout(&ssl_config, 5000);
+		mbedtls_ssl_conf_read_timeout(&ssl_config, 1000);
 		mbedtls_ssl_conf_rng(&ssl_config, mbedtls_ctr_drbg_random,
 				&drbg_context);
 		//mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
 		mbedtls_ctr_drbg_seed(&drbg_context, mbedtls_entropy_func, &entropy,
 		NULL, 0);
 	}
-
+#if 0
 	if ((0 == ret) && (security_mode_certificate == security_mode))
 	{
 		mbedtls_ssl_conf_groups(&ssl_config, groups);
 		mbedtls_ssl_conf_sig_algs(&ssl_config, sig_algorithms);
 	}
-
+#endif
 	if ((0 == ret) && (security_mode_psk == security_mode))
 	{
 		size_t psk_len = 0;
@@ -177,7 +177,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 		ret = mbedtls_ssl_conf_psk(&ssl_config, psk, psk_len, public_identity,
 				strlen((char*) public_identity));
 	}
-
+#if 0
 	if ((0 == ret) && (security_mode_certificate == security_mode))
 	{
 		// Load certificates
@@ -207,7 +207,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 					&peer_crl_ctx);
 		}
 	}
-
+#endif
 	if (0 == ret)
 	{
 		if (security_mode_certificate == security_mode)
@@ -225,7 +225,7 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 		mbedtls_ssl_conf_min_tls_version(&ssl_config,
 				MBEDTLS_SSL_VERSION_TLS1_2);
 		mbedtls_ssl_conf_renegotiation( &ssl_config, MBEDTLS_SSL_RENEGOTIATION_ENABLED );
-		ret = mbedtls_ssl_conf_cid(&ssl_config, 6, MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
+		ret = mbedtls_ssl_conf_cid(&ssl_config, sizeof(own_cid), MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
 	}
 
 	if (0 == ret)
@@ -238,10 +238,10 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 	{
 		memset(own_cid, 0, sizeof(own_cid));
 
-		ret = mbedtls_ctr_drbg_random(&drbg_context, own_cid, 8);
-		*((uint64_t*)own_cid) ^= (uint64_t)lwm2m_gettime();
+		ret = mbedtls_ctr_drbg_random(&drbg_context, own_cid, sizeof(own_cid));
+		*((uint32_t*)own_cid) ^= (uint32_t)lwm2m_gettime();
 
-		ret = mbedtls_ssl_set_cid(&ssl_context, MBEDTLS_SSL_CID_DISABLED, NULL, 0);
+		ret = mbedtls_ssl_set_cid(&ssl_context, MBEDTLS_SSL_CID_ENABLED, own_cid, sizeof(own_cid));
 	}
 #endif
 
@@ -263,13 +263,14 @@ int mbedtls_connector_initialize(lwm2m_object_t * securityObjP, uint16_t secObjI
 void mbedtls_cleanup(void)
 {
 	/* Free Certificate Chains */
+#if 0
 	mbedtls_x509_crt_free(&own_crt_ctx);
 	mbedtls_x509_crt_free(&peer_crt_ctx);
 	mbedtls_x509_crl_free(&peer_crl_ctx);
 
 	/* Free own PK */
 	mbedtls_pk_free(&own_pk);
-
+#endif
 	miso_mbedtls_deinit_timer(&ssl_timer);
 	//mbedtls_threading_free_alt();
 

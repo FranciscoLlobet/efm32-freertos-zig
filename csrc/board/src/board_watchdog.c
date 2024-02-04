@@ -30,6 +30,11 @@ void BOARD_Watchdog_Enable(void)
 	WDOGn_Enable(BOARD_WDOG, true);
 }
 
+void BOARD_Watchdog_Disable(void)
+{
+	WDOGn_Enable(BOARD_WDOG, false);
+}
+
 void BOARD_Watchdog_Feed(void)
 {
 	WDOGn_Feed(BOARD_WDOG);

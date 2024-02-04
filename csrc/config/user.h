@@ -187,7 +187,7 @@ extern "C" {
     \warning        
 */
 
-#define SL_INC_STD_BSD_API_NAMING /* Including standard BSD names */
+//#define SL_INC_STD_BSD_API_NAMING /* Including standard BSD names */
 
 
 /*!

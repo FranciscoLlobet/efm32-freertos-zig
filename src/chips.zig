@@ -16,24 +16,26 @@ const KiB: usize = 1024;
 const NVM3_SIZE: usize = 64 * KiB;
 
 /// Size of the RAM region in bytes.
-const RAM_SIZE: usize = 128 * KiB;
+pub const RAM_SIZE: usize = 128 * KiB;
 
 /// Size of the flash region in bytes.
-const FLASH_SIZE: usize = 1024 * KiB;
+pub const FLASH_SIZE: usize = 1024 * KiB;
 
 /// Size of the available flash region in bytes.
 const FLASH_AVAILABLE_SIZE: usize = FLASH_SIZE - NVM3_SIZE;
 
-const FLASH_APP_SIZE: usize = 480 * KiB;
+pub const FLASH_BOOTLOADER_SIZE: usize = 256 * KiB;
 
-const FLASH_RESERVE_SIZE: usize = FLASH_AVAILABLE_SIZE - FLASH_APP_SIZE;
+pub const FLASH_APP_SIZE: usize = (FLASH_SIZE - NVM3_SIZE - FLASH_BOOTLOADER_SIZE);
+
+//const FLASH_RESERVE_SIZE: usize = FLASH_AVAILABLE_SIZE - FLASH_APP_SIZE;
 
 pub const bootloader = .{
     .name = "EFM32GG390F1024",
     .cpu = .cortex_m3,
     .memory_regions = &.{
-        .{ .offset = 0x00000000, .length = FLASH_APP_SIZE, .kind = .flash }, // Main Application
-        .{ .offset = FLASH_APP_SIZE, .length = FLASH_RESERVE_SIZE, .kind = .reserved }, // Main Application
+        .{ .offset = 0x00000000, .length = FLASH_BOOTLOADER_SIZE, .kind = .flash }, // Main Application
+        .{ .offset = FLASH_BOOTLOADER_SIZE, .length = FLASH_APP_SIZE, .kind = .reserved }, // Main Application
         .{ .offset = FLASH_AVAILABLE_SIZE, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
         .{ .offset = 0x20000000, .length = RAM_SIZE, .kind = .ram }, // RAM
     },
@@ -44,8 +46,8 @@ pub const application = .{
     .name = "EFM32GG390F1024",
     .cpu = .cortex_m3,
     .memory_regions = &.{
-        .{ .offset = 0x00000000, .length = FLASH_APP_SIZE, .kind = .reserved }, // Main Application
-        .{ .offset = FLASH_APP_SIZE + 0x80, .length = FLASH_RESERVE_SIZE - 0x80, .kind = .flash }, // Main Application
+        .{ .offset = 0x00000000, .length = FLASH_BOOTLOADER_SIZE, .kind = .reserved }, // Main Application
+        .{ .offset = FLASH_BOOTLOADER_SIZE + 0x80, .length = FLASH_APP_SIZE - 0x80, .kind = .flash }, // Main Application
         .{ .offset = FLASH_AVAILABLE_SIZE, .length = (NVM3_SIZE), .kind = .reserved }, // NVM3 space
         .{ .offset = 0x20000000, .length = RAM_SIZE, .kind = .ram }, // RAM
     },

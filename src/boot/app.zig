@@ -10,12 +10,15 @@ const fatfs = @import("../fatfs.zig");
 const nvm = @import("../nvm.zig");
 const board = @import("microzig").board;
 const firmware = @import("firmware.zig");
+const chips = @import("../chips.zig");
 
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
     @cInclude("miso_config.h");
 });
+
+const app_start_addr: usize = chips.FLASH_BOOTLOADER_SIZE + 0x80;
 
 const firmware_update_outcome = enum {
     incomplete,
@@ -24,7 +27,7 @@ const firmware_update_outcome = enum {
 };
 
 fn prepareJump() void {
-    board.jumpToApp(0x78000 + 0x80);
+    board.jumpToApp(app_start_addr);
 }
 
 const update_phase = enum(usize) {

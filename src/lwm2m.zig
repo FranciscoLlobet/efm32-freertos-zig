@@ -26,6 +26,11 @@ fn taskFunction(self: *@This()) void {
     while (ret == 0) {
         ret = c.lwm2m_client_task_runner(self);
 
+        if (ret == 1) {
+            c.miso_notify_event(c.miso_lwm2m_suspended);
+            self.task.suspendTask();
+        }
+
         self.task.delayTask(60 * 1000);
     }
     system.reset();
@@ -38,16 +43,15 @@ fn dummyTaskFunction(self: *@This()) void {
 }
 
 fn reg_update_function(self: *@This()) void {
-    self.task.notify(c.lwm2m_notify_registration, .eSetBits) catch unreachable;
+    self.task.notify(c.lwm2m_notify_registration, .eSetBits) catch {};
 }
 
 fn timer_update_function(self: *@This()) void {
-    self.task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch unreachable;
+    self.task.notify(c.lwm2m_notify_timestamp, .eSetBits) catch {};
 }
 
 pub fn create(self: *@This()) void {
     self.task.create(self, config.rtos_prio_lwm2m) catch unreachable;
-
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
@@ -61,6 +65,11 @@ pub fn updateTemperature(self: *@This(), temperature_in_celsius: f32) void {
         write_temperature(temperature_in_celsius);
         self.task.notify(c.lwm2m_notify_temperature, .eSetBits) catch {};
     }
+}
+
+/// Send suspend Task signal to LwM2M task
+pub fn suspendTask(self: *@This()) void {
+    self.task.notify(c.lwm2m_notify_suspend, .eSetBits) catch {};
 }
 
 pub fn getTaskHandle(self: *@This()) freertos.TaskHandle_t {

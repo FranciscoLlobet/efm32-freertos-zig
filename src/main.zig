@@ -24,6 +24,10 @@ const board = microzig.board;
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
+export fn __stack_chk_fail() callconv(.C) noreturn {
+    microzig.hang();
+}
+
 export fn vApplicationIdleHook() void {
     board.watchdogFeed();
 }
@@ -32,24 +36,9 @@ export fn vApplicationIdleHook() void {
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-var timerTask: freertos.StaticTask(@This(), config.rtos_stack_depth_timer_task, "timer", dummyTask) = undefined;
-var idleTask: freertos.StaticTask(@This(), config.rtos_stack_depth_idle_task, "idle", dummyTask) = undefined;
-
 fn dummyTask(self: *@This()) void {
     _ = self;
     unreachable;
-}
-
-export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
-    ppxTimerTaskTCBBuffer.* = &timerTask.staticTask;
-    ppxTimerTaskStackBuffer.* = &timerTask.stack[0];
-    pulTimerTaskStackSize.* = timerTask.stack.len;
-}
-
-export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticTask_t, ppxIdleTaskStackBuffer: **freertos.StackType_t, pulIdleTaskStackSize: *c_uint) callconv(.C) void {
-    ppxIdleTaskTCBBuffer.* = &idleTask.staticTask;
-    ppxIdleTaskStackBuffer.* = &idleTask.stack[0];
-    pulIdleTaskStackSize.* = idleTask.stack.len;
 }
 
 export fn vApplicationDaemonTaskStartupHook() void {
@@ -66,6 +55,10 @@ export fn vApplicationMallocFailedHook() noreturn {
 
 export fn vApplicationTickHook() void {
     //
+}
+
+export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
+    pxHeapCanary.* = @as(u32, 0xdeadbeef);
 }
 
 pub const microzig_options = struct {
@@ -220,11 +213,14 @@ pub export fn appStart() void {
 // Initialisation of the C runtime.
 
 extern fn __libc_init_array() callconv(.C) void;
+extern fn __stack_chk_init() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
-    __libc_init_array();
-
+    //@setRuntimeSafety(false);
+    //__libc_init_array();
+    __stack_chk_init();
+    //@setRuntimeSafety(true);
     SystemInit();
 }
 

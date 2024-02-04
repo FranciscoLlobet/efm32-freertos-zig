@@ -127,7 +127,7 @@ pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: 
             taskRunnerFn(@as(*T, @ptrCast(@alignCast(pvParameters))));
         }
         pub inline fn create(self: *@This(), pvParameters: *T, uxPriority: UBaseType_t) !void {
-            self.task = try Task.createStatic(run, pcName, @ptrCast(pvParameters), uxPriority, self.stack[0..], &self.staticTask);
+            self.task = try Task.createStatic(run, pcName, @ptrCast(@alignCast(pvParameters)), uxPriority, self.stack[0..], &self.staticTask);
         }
         pub inline fn resumeTask(self: *const @This()) void {
             self.task.resumeTask();
@@ -172,6 +172,10 @@ pub const Task = struct {
 
     pub fn initFromHandle(task_handle: TaskHandle_t) @This() {
         return @This(){ .handle = task_handle };
+    }
+
+    pub fn initFromCurrentTask() @This() {
+        return @This(){ .handle = xTaskGetCurrentTaskHandle() };
     }
 
     /// Create a FreeRTOS task using dynamic memory allocation

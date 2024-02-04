@@ -23,8 +23,8 @@ const task_priorities = enum(freertos.BaseType_t) {
 pub const min_task_stack_depth: u16 = freertos.c.configMINIMAL_STACK_SIZE;
 
 // Enable or Disable features at compile time
-pub const enable_lwm2m = false;
-pub const enable_mqtt = true;
+pub const enable_lwm2m = true;
+pub const enable_mqtt = false;
 pub const enable_http = true;
 
 pub const rtos_prio_boot_app = @intFromEnum(task_priorities.rtos_prio_highest);
@@ -40,16 +40,12 @@ pub const rtos_stack_depth_timer_task: u16 = 512;
 pub const rtos_stack_depth_idle_task: u16 = 200;
 
 // LWM2M
-pub const rtos_prio_lwm2m = @intFromEnum(task_priorities.rtos_prio_normal);
+pub const rtos_prio_lwm2m = @intFromEnum(task_priorities.rtos_prio_above_normal);
 pub const rtos_stack_depth_lwm2m: u16 = if (enable_lwm2m) 2000 else min_task_stack_depth;
 
 // MQTT
 pub const rtos_prio_mqtt = @intFromEnum(task_priorities.rtos_prio_normal);
 pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1450 else min_task_stack_depth;
-
-// HTTP
-pub const rtos_prio_http = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_http: u16 = if (enable_http) 2000 else min_task_stack_depth;
 
 pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_below_normal);
 pub const rtos_stack_depth_user_task: u16 = 2500;

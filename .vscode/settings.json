@@ -71,7 +71,18 @@
         "miso_mbedtls_config.h": "c",
         "freertos.h": "c",
         "freertosconfig.h": "c",
-        "os_malloc.h": "c"
+        "os_malloc.h": "c",
+        "trace.h": "c",
+        "timers.h": "c",
+        "semphr.h": "c",
+        "task.h": "c",
+        "miso_ntp.h": "c",
+        "internals.h": "c",
+        "liblwm2m.h": "c",
+        "__locale": "c",
+        "string": "c",
+        "string_view": "c"
     },
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "cortex-debug.variableUseNaturalFormat": true
 }

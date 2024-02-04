@@ -27,7 +27,6 @@
 #define SIMPLE_LINK_MAX_SEND_MTU 	1472
 
 extern mbedtls_ssl_context ssl_context;
-//extern miso_mbedtls_context_t net_context;
 
 connection_t connection_create(connection_t connList, char *host, char *port,
 		int protocol)
