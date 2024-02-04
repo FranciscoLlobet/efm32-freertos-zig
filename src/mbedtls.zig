@@ -86,6 +86,9 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
         /// Entropy Seed
         entropy_seed: u32,
 
+        /// DTLS CID
+        cid: [c.MBEDTLS_SSL_CID_IN_LEN_MAX]u8,
+
         /// Custom init callback
         custom_init_callback: ?custom_init_callback_fn = null,
 
@@ -117,6 +120,7 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
                 c.mbedtls_ssl_config_free(&self.config);
             }
         }
+        /// Initialize the MbedTLS context
         pub fn init(self: *@This(), protocol: connection.protocol) !void {
             var ret: i32 = mbedtls_nok;
 
@@ -152,7 +156,7 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
                     ret = c.mbedtls_ssl_conf_max_frag_len(&self.config, c.MBEDTLS_SSL_MAX_FRAG_LEN_1024);
                 }
                 if (ret == mbedtls_ok) {
-                    c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_NONE); // None since using PSK
+                    c.mbedtls_ssl_conf_authmode(&self.config, c.MBEDTLS_SSL_VERIFY_OPTIONAL); // None since using PSK
                     c.mbedtls_ssl_conf_read_timeout(&self.config, tls_read_timeout);
                     c.mbedtls_ssl_conf_rng(&self.config, c.mbedtls_ctr_drbg_random, &self.drbg);
                     //mbedtls_entropy_add_source(&entropy_context, mbedtls_entropy_f_source_ptr f_source, void *p_source, size_t threshold, MBEDTLS_ENTROPY_SOURCE_STRONG );
@@ -181,13 +185,12 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
                 if (ret == mbedtls_ok) {
                     c.mbedtls_ssl_conf_min_tls_version(&self.config, c.MBEDTLS_SSL_VERSION_TLS1_2);
                     c.mbedtls_ssl_conf_renegotiation(&self.config, c.MBEDTLS_SSL_RENEGOTIATION_ENABLED);
+                }
 
-                    // In case of DTLS set CID
-                    ret = switch (protocol) {
-                        .dtls_ip4, .dtls_ip6 => c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL),
-                        .tls_ip4, .tls_ip6 => mbedtls_ok, // Probably not necessary
-                        else => mbedtls_nok,
-                    };
+                if ((protocol == connection.protocol.dtls_ip4) or (protocol == connection.protocol.dtls_ip6)) {
+                    if (ret == mbedtls_ok) {
+                        ret = c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
+                    }
                 }
 
                 // Run the auth credentials callback
@@ -197,6 +200,17 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
 
                 if (ret == mbedtls_ok) {
                     ret = c.mbedtls_ssl_setup(&self.context, &self.config);
+                }
+
+                if (protocol == connection.protocol.dtls_ip4 or protocol == connection.protocol.dtls_ip6) {
+                    if (ret == mbedtls_ok) {
+                        @memset(self.cid, 0);
+                        ret = c.mbedtls_ctr_drbg_random(&self.drbg, &self.cid, @sizeOf(self.cid));
+                    }
+
+                    if (ret == mbedtls_ok) {
+                        ret = c.mbedtls_ssl_set_cid(&self.context, &self.cid, @sizeOf(self.cid));
+                    }
                 }
 
                 if (ret == mbedtls_ok) {
