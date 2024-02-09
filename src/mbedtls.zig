@@ -51,13 +51,15 @@ const tls_read_timeout: u32 = 5000;
 pub const mbedtls_ssl_context = c.mbedtls_ssl_context;
 pub const mbedtls_ssl_config = c.mbedtls_ssl_config;
 
-pub fn TlsContext(comptime mode: connection.security_mode) type {
+pub fn TlsContext(comptime T: type, comptime mode: connection.security_mode) type {
     // Mbedtls context
 
     return struct {
-        const credential_callback_fn = *const fn (*@This(), connection.security_mode) auth_error!void;
+        const credential_callback_fn = *const fn (*T, connection.security_mode) auth_error!void;
         const custom_init_callback_fn = *const fn (*@This(), connection.security_mode) void;
         const custom_cleanup_callback_fn = *const fn (*@This()) void;
+
+        parent: *T,
 
         /// MbedTLS Context
         context: mbedtls_ssl_context,
@@ -96,8 +98,8 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
         custom_cleanup_callback: ?custom_cleanup_callback_fn = null,
 
         // Default auth callback
-        pub fn create(comptime auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
-            return @This(){ .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined };
+        pub fn create(parent: *T, comptime auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
+            return @This(){ .parent = parent, .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined, .cid = undefined };
         }
         pub fn cleanup(self: *@This()) void {
             if (self.custom_cleanup_callback) |custom| {
@@ -189,13 +191,13 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
 
                 if ((protocol == connection.protocol.dtls_ip4) or (protocol == connection.protocol.dtls_ip6)) {
                     if (ret == mbedtls_ok) {
-                        ret = c.mbedtls_ssl_conf_cid(&self.config, 6, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
+                        ret = c.mbedtls_ssl_conf_cid(&self.config, self.cid.len, c.MBEDTLS_SSL_UNEXPECTED_CID_FAIL);
                     }
                 }
 
                 // Run the auth credentials callback
                 if (ret == mbedtls_ok) {
-                    try self.auth_callback(self, mode);
+                    try self.auth_callback(self.parent, mode);
                 }
 
                 if (ret == mbedtls_ok) {
@@ -204,12 +206,12 @@ pub fn TlsContext(comptime mode: connection.security_mode) type {
 
                 if (protocol == connection.protocol.dtls_ip4 or protocol == connection.protocol.dtls_ip6) {
                     if (ret == mbedtls_ok) {
-                        @memset(self.cid, 0);
-                        ret = c.mbedtls_ctr_drbg_random(&self.drbg, &self.cid, @sizeOf(self.cid));
+                        @memset(&self.cid, 0);
+                        ret = c.mbedtls_ctr_drbg_random(&self.drbg, &self.cid, self.cid.len);
                     }
 
                     if (ret == mbedtls_ok) {
-                        ret = c.mbedtls_ssl_set_cid(&self.context, &self.cid, @sizeOf(self.cid));
+                        ret = c.mbedtls_ssl_set_cid(&self.context, c.MBEDTLS_SSL_CID_ENABLED, &self.cid, self.cid.len);
                     }
                 }
 

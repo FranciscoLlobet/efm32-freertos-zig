@@ -36,17 +36,19 @@ typedef struct connection_s *connection_t;
 struct connection_s
 {
 		connection_t next;
-		miso_network_ctx_t ctx;
+		miso_network_ctx_t ctx; // C-level ctx
+		void * parent; // parent ptr
 };
 
-connection_t connection_find(connection_t connList, struct sockaddr_in *addr, size_t addrLen);
-connection_t connection_new_incoming(connection_t connList,
-		struct miso_mbedtls_context_s *connection);
+//connection_t connection_find(connection_t connList, struct sockaddr_in *addr, size_t addrLen);
+//connection_t connection_new_incoming(connection_t connList,
+//		struct miso_mbedtls_context_s *connection);
 
-connection_t connection_create(connection_t connList, char *host, char *port, int protocol);
+connection_t connection_create(connection_t connList, void * ctx);
 
 void connection_free(connection_t connList);
 
-int connection_send(connection_t connP, uint8_t *buffer, size_t length);
+extern int lwm2mservice_create_connection(void * conn, uint8_t * uri, uint16_t local_port, lwm2m_object_t * lwm2m_object, uint16_t sec_obj_inst_id);
+extern void lwm2mservice_close_connection(void * conn);
 
 #endif
