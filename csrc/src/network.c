@@ -61,6 +61,7 @@ struct miso_sockets_s
 struct timeout_msg_s
 {
 	uint32_t deadline;
+	uint32_t deadline_ms;
 };
 
 static struct miso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
@@ -166,19 +167,26 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 
 	struct timeout_msg_s msg;
 	uint32_t timeout_ms = 1000 * timeout_s;
+	uint32_t current_time = xTaskGetTickCount();
 
+	uint32_t deadline_ms = current_time + timeout_ms;
+
+	msg.deadline_ms = deadline_ms;
 	msg.deadline = timeout_s + sl_sleeptimer_get_time();
 
-	if(pdTRUE == xQueueSend(ctx->rx_queue, &msg, portMAX_DELAY))
+	if(pdTRUE == xQueueSend(ctx->rx_queue, &msg, timeout_ms))
 	{
 		// Dummy take
 		(void)xSemaphoreTake(ctx->rx_signal, 0);
-		
 		(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);	
 		
-		if (pdTRUE == xSemaphoreTake(ctx->rx_signal, timeout_ms))
+		current_time = xTaskGetTickCount();
+		if(current_time <= deadline_ms)
 		{
-			ret_value = 0;
+			if (pdTRUE == xSemaphoreTake(ctx->rx_signal, deadline_ms - current_time))
+			{
+				ret_value = 0;
+			}
 		}
 	}
 
