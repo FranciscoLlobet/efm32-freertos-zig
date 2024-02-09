@@ -35,8 +35,18 @@ export fn lwm2mservice_create_connection(param: ?*anyopaque, uri: [*c]u8, local_
 }
 
 export fn lwm2mservice_close_connection(param: ?*anyopaque) callconv(.C) void {
-    var self: *@This() = @ptrCast(@alignCast(param));
-    self.connection.close() catch {};
+    @as(*@This(), @ptrCast(@alignCast(param))).connection.close() catch {};
+}
+
+export fn lwm2mservice_send_data(param: ?*anyopaque, data: [*c]u8, len: usize) callconv(.C) c_int {
+    return @intCast(@as(*@This(), @ptrCast(@alignCast(param))).connection.send(data[0..len]) catch {
+        return @as(c_int, -1);
+    });
+}
+
+export fn lwm2mservice_read_data(param: ?*anyopaque, data: [*c]u8, len: usize) callconv(.C) c_int {
+    const ret = @as(*@This(), @ptrCast(@alignCast(param))).connection.recieve(data[0..len]) catch return -1;
+    return @intCast(ret.len);
 }
 
 /// Authentification callback for mbedTLS connections

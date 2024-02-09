@@ -433,15 +433,8 @@ int lwm2m_client_task_runner(void *param1)
 			if (notification_value & (uint32_t) lwm2m_notify_message_reception)
 			{
 				/* Handle reception */
-				ssize_t numBytes = miso_network_read(data.connList->ctx, get_rx_buffer(),
-						MAX_PACKET_SIZE);
-
-				if (numBytes >= MAX_PACKET_SIZE)
-				{
-					// Number of bytes is bigger than max packet
-					fprintf(stderr, "Received packet >= MAX_PACKET_SIZE\r\n");
-				}
-				else if (numBytes >= 0)
+				int numBytes = lwm2mservice_read_data(data.param, &buffer[0], sizeof(buffer));
+				if (numBytes != -1)
 				{
 					connection_t connP = data.connList;
 

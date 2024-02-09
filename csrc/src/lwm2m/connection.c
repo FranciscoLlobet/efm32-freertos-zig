@@ -86,10 +86,9 @@ uint8_t lwm2m_buffer_send(void *sessionH, uint8_t *buffer, size_t length,
 
 	if (connP == NULL)
 	{
-		return COAP_500_INTERNAL_SERVER_ERROR ;
+		ret = COAP_500_INTERNAL_SERVER_ERROR ;
 	}
-
-	if(0 > miso_network_send(miso_get_network_ctx(wifi_service_lwm2m_socket), buffer, length))
+	else if(-1 == lwm2mservice_send_data(connP->parent, buffer, length))
 	{
 		ret = COAP_500_INTERNAL_SERVER_ERROR ;
 	}
