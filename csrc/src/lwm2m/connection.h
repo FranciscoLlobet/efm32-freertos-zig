@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
-#include "network.h"
+//#include "network.h"
 #include <sys/stat.h>
 #include <liblwm2m.h>
 
@@ -36,7 +36,6 @@ typedef struct connection_s *connection_t;
 struct connection_s
 {
 		connection_t next;
-		miso_network_ctx_t ctx; // C-level ctx
 		void * parent; // parent ptr
 };
 

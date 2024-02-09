@@ -34,7 +34,7 @@ connection_t connection_create(connection_t connList, void * ctx)
 		if(ret >= 0)
 		{
 			/* Prepare */
-			newConn->ctx = miso_get_network_ctx(wifi_service_lwm2m_socket);
+			//newConn->ctx = miso_get_network_ctx(wifi_service_lwm2m_socket);
 			newConn->parent = ctx;
 			newConn->next = NULL;
 

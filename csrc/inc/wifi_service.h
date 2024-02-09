@@ -10,8 +10,6 @@
 
 #include "miso.h"
 
-#include "network.h"
-
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"

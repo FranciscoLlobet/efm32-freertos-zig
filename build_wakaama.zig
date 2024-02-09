@@ -37,7 +37,6 @@ const source_path = [_][]const u8{
     usr_src_path ++ "memtrace.c",
     usr_src_path ++ "connection.c",
     //usr_src_path ++ "commandline.c",
-    usr_src_path ++ "lightclient/mbedtls_connector.c",
     usr_src_path ++ "lightclient/object_accelerometer.c",
     usr_src_path ++ "lightclient/object_device_capability.c",
     usr_src_path ++ "lightclient/object_device.c",
