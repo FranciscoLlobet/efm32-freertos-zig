@@ -17,8 +17,7 @@
 
 
 
-int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s);
-int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s);
+
 
 
 

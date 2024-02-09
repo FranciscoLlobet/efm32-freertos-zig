@@ -20,7 +20,6 @@
 
 #include <stdio.h>
 #include <unistd.h>
-//#include "network.h"
 #include <sys/stat.h>
 #include <liblwm2m.h>
 
@@ -51,4 +50,5 @@ extern int lwm2mservice_create_connection(void * conn, uint8_t * uri, uint16_t l
 extern void lwm2mservice_close_connection(void * conn);
 extern int lwm2mservice_send_data(void * conn, uint8_t * buffer, size_t length);
 extern int lwm2mservice_read_data(void * conn, uint8_t * buffer, size_t length);
+extern int lwm2mservice_wait_data(void * conn, uint32_t timeout);
 #endif

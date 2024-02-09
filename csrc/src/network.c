@@ -12,8 +12,8 @@
 
 #include "wifi_service.h"
 
-// #include "simplelink.h"
-#include "sl_sleeptimer.h"
+#include "network.h"
+//#include "sl_sleeptimer.h"
 
 #define NETWORK_MONITOR_TASK (UBaseType_t)(miso_task_connectivity_service)
 
@@ -158,11 +158,6 @@ int create_network_mediator(void)
 	}
 
 	return ret;
-}
-
-int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s)
-{
-	return wait_rx(_get_network_ctx(id), timeout_s);
 }
 
 int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
@@ -340,7 +335,7 @@ static void select_task(void *param)
 			}
 			else if(result < 0)
 			{
-				__BKPT(0);
+				//__BKPT(0);
 			}
 		}
 		else
@@ -728,7 +723,6 @@ static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t leng
 
 	if (numBytes < 0)
 	{
-		//__BKPT(1);
 		numBytes = (int)MISO_NETWORK_DTLS_RECV_ERROR;
 	}
 

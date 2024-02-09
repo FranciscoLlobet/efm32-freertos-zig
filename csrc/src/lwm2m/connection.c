@@ -26,7 +26,7 @@
 
 connection_t connection_create(connection_t connList, void * ctx)
 {
-	int ret = UISO_NETWORK_GENERIC_ERROR;
+	int ret = -1;
 	connection_t newConn = lwm2m_malloc(sizeof(struct connection_s));
 	if(NULL != newConn)
 	{
@@ -60,7 +60,6 @@ connection_t connection_create(connection_t connList, void * ctx)
 
 void connection_free(connection_t connList)
 {
-	int ret = UISO_NETWORK_OK;
 	if(connList != NULL)
 	{
 		do{
