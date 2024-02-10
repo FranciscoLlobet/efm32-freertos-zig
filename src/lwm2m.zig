@@ -6,6 +6,7 @@ const system = @import("system.zig");
 const mqtt = @import("mqtt.zig");
 const mbedtls = @import("mbedtls.zig");
 const connection = @import("connection.zig");
+const simpleConnection = @import("simpleConnection.zig");
 
 const c = @cImport({
     @cInclude("network.h");
@@ -19,7 +20,7 @@ extern fn write_temperature(temperature: f32) callconv(.C) void;
 task: freertos.StaticTask(@This(), config.rtos_stack_depth_lwm2m, "lwm2m", if (config.enable_lwm2m) taskFunction else dummyTaskFunction),
 reg_update: freertos.StaticTimer(@This(), "lwm2m_reg_update", reg_update_function),
 timer_update: freertos.StaticTimer(@This(), "lwm2m_timer_update", timer_update_function),
-connection: connection.Connection(.lwm2m, mbedtls.TlsContext(@This(), .psk)),
+connection: connection.Connection(.lwm2m, mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.dtls_ip4), .psk)),
 lwm2m_object: *c.lwm2m_object_t = undefined,
 lwm2m_sec_obj_inst_id: u16 = undefined,
 

@@ -1,9 +1,6 @@
 const std = @import("std");
-const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
-const config = @import("config.zig");
 const system = @import("system.zig");
-//pub const mbedtls = @import("mbedtls.zig");
 
 const c = @cImport({
     @cInclude("network.h");
@@ -16,6 +13,13 @@ pub const connection_error = error{
     /// Create Connection Error
     /// Could not create a connection to the host
     create_error,
+
+    /// DNS error (peer not found)
+    dns,
+    /// Unavailable socket
+    socket,
+    /// Connect error
+    connect,
 
     /// SSL Init error
     ssl_init_error,
@@ -47,30 +51,57 @@ pub const connection_id = enum(usize) {
     http = c.wifi_service_http_socket,
 };
 
-/// Protocol Enumerations
-pub const protocol = enum(u32) {
-    no_protocol = c.miso_protocol_no_protocol,
+/// Protocol Bit
+const protocol_bit: u32 = (1 << 0);
+/// Select TCP or UDP
+const udp_tcp_bit: u32 = (1 << 1);
+/// Select IP4 or IP6
+const ip4_ip6_bit: u32 = (1 << 2);
+/// Select if the connection is secure
+const secure_bit: u32 = (1 << 3);
 
-    udp_ip4 = c.miso_protocol_udp_ip4,
-    tcp_ip4 = c.miso_protocol_tcp_ip4,
+/// New protocol Enum
+pub const proto = enum(u32) {
+    no_protocol = 0,
+    udp_ip4 = protocol_bit | udp_tcp_bit,
+    tcp_ip4 = protocol_bit,
+    udp_ip6 = protocol_bit | ip4_ip6_bit | udp_tcp_bit,
+    tcp_ip6 = protocol_bit | ip4_ip6_bit,
+    dtls_ip4 = protocol_bit | secure_bit | udp_tcp_bit,
+    tls_ip4 = protocol_bit | secure_bit,
+    dtls_ip6 = protocol_bit | secure_bit | ip4_ip6_bit | udp_tcp_bit,
+    tls_ip6 = protocol_bit | secure_bit | ip4_ip6_bit,
 
-    udp_ip6 = c.miso_protocol_udp_ip6,
-    tcp_ip6 = c.miso_protocol_tcp_ip6,
-
-    dtls_ip4 = c.miso_protocol_dtls_ip4,
-    tls_ip4 = c.miso_protocol_tls_ip4,
-
-    dtls_ip6 = c.miso_protocol_dtls_ip6,
-    tls_ip6 = c.miso_protocol_tls_ip6,
-
-    /// Checks if the protocol is secure (TLS/DTLS)
+    /// Is the protocol secure
     pub fn isSecure(self: @This()) bool {
-        return switch (self) {
-            .dtls_ip4, .tls_ip4, .dtls_ip6, .tls_ip6 => true,
-            else => false,
-        };
+        return (@intFromEnum(self) & secure_bit) != 0;
+    }
+    /// Is the protocol IP6
+    pub fn isIp6(self: @This()) bool {
+        return (@intFromEnum(self) & ip4_ip6_bit) != 0;
+    }
+    /// Is the protocol TCP
+    pub fn isTcp(self: @This()) bool {
+        return (@intFromEnum(self) & udp_tcp_bit) == 0;
+    }
+    /// Is the protocol UDP
+    pub fn isUdp(self: @This()) bool {
+        return (@intFromEnum(self) & udp_tcp_bit) != 0;
+    }
+    /// Is the protocol DTLS
+    pub fn isDtls(self: @This()) bool {
+        return self.isSecure() and self.isUdp();
+    }
+    /// Is the protocol TLS
+    pub fn isTls(self: @This()) bool {
+        return self.isSecure() and self.isTcp();
+    }
+    pub fn isStream(self: @This()) bool {
+        return self.isTcp();
     }
 };
+
+pub const EAGAIN: isize = -11;
 
 /// Security Mode Enumerations
 ///
@@ -104,13 +135,13 @@ pub const schemes = enum(u32) {
     }
 
     /// Get the underlying protocol for the proposed scheme
-    pub fn getProtocol(self: @This()) protocol {
+    pub fn getProtocol(self: @This()) proto {
         return switch (self) {
-            .ntp, .coap => protocol.udp_ip4,
-            .coaps => protocol.dtls_ip4,
-            .http, .mqtt => protocol.tcp_ip4,
-            .https, .mqtts => protocol.tls_ip4,
-            else => protocol.no_protocol,
+            .ntp, .coap => .udp_ip4,
+            .coaps => .dtls_ip4,
+            .http, .mqtt => .tcp_ip4,
+            .https, .mqtts => .tls_ip4,
+            else => .no_protocol,
         };
     }
 
@@ -124,23 +155,23 @@ pub const schemes = enum(u32) {
 pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
     // Compile time checks
     if (sslType != void) {
-        if (@hasDecl(sslType, "init") == false) {
+        if (!@hasDecl(sslType, "init")) {
             @compileError("SSL Type must have an init function");
         }
-        if (@hasDecl(sslType, "deinit") == false) {
+        if (!@hasDecl(sslType, "deinit")) {
             @compileError("SSL Type must have a deinit function");
         }
     }
 
     return struct {
         ctx: network_ctx,
-        proto: protocol,
+        proto: proto,
         ssl: sslType,
 
         /// Initialize the connection
         pub fn init(self: *@This()) void {
             self.ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id))));
-            self.proto = protocol.no_protocol;
+            self.proto = .no_protocol;
         }
 
         pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {

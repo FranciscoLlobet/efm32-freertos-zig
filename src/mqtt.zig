@@ -10,6 +10,7 @@ const config = @import("config.zig");
 const system = @import("system.zig");
 const connection = @import("connection.zig");
 const mbedtls = @import("mbedtls.zig");
+const simpleConnection = @import("simpleConnection.zig");
 
 const c = @cImport({
     @cDefine("MQTT_CLIENT", "1");
@@ -91,7 +92,7 @@ const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 const reset_topic = "zig/reset";
 
-const connectionType = connection.Connection(.mqtt, mbedtls.TlsContext(@This(), .psk));
+const connectionType = connection.Connection(.mqtt, mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.tls_ip4), .psk));
 
 connection: connectionType,
 connectionCounter: usize,
