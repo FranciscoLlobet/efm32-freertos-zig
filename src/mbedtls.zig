@@ -219,6 +219,9 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
             return if (len == connection.EAGAIN) c.MBEDTLS_ERR_SSL_WANT_READ else len;
         }
 
+        pub fn waitRx(self: *@This(), timeout: u32) bool {
+            return self.connection.waitRx(timeout);
+        }
         /// Initialize the MbedTLS context
         pub fn init(self: *@This(), protocol: connection.proto) !void {
             var ret: i32 = mbedtls_nok;

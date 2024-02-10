@@ -172,7 +172,6 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
             _ = self;
             //self.ssl.init();
         }
-
         pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             try self.ssl.open(uri, local_port);
         }
@@ -185,8 +184,8 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
             return self.ssl.recieve(buffer);
         }
-        pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
-            return self.waitRx(timeout_s);
+        pub fn waitRx(self: *@This(), timeout_s: u32) bool {
+            return self.ssl.waitRx(timeout_s);
         }
     };
 }
