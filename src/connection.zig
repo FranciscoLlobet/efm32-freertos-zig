@@ -153,6 +153,7 @@ pub const schemes = enum(u32) {
 };
 
 pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
+    _ = id;
     // Compile time checks
     if (sslType != void) {
         if (!@hasDecl(sslType, "init")) {
@@ -164,62 +165,28 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
     }
 
     return struct {
-        ctx: network_ctx,
-        proto: proto,
         ssl: sslType,
 
         /// Initialize the connection
         pub fn init(self: *@This()) void {
-            self.ctx = c.miso_get_network_ctx(@as(c_uint, @intCast(@intFromEnum(id))));
-            self.proto = .no_protocol;
+            _ = self;
+            //self.ssl.init();
         }
 
         pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
-            self.proto = schemes.match(uri.scheme).?.getProtocol();
-
-            const host = uri.host.?;
-            const port = uri.port.?;
-
-            if (sslType != void) {
-                _ = self.ssl.init(self.proto) catch {
-                    return connection_error.ssl_init_error;
-                };
-                _ = c.miso_network_register_ssl_context(@ptrCast(self.ctx), @ptrCast(&self.ssl.context));
-            }
-
-            if (0 != c.miso_create_network_connection(self.ctx, @as([*c]const u8, host.ptr), host.len, port, local_port orelse 0, @as(c.enum_miso_protocol, @intFromEnum(self.proto)))) {
-                return connection_error.create_error;
-            }
+            try self.ssl.open(uri, local_port);
         }
         pub fn close(self: *@This()) !void {
-            defer {
-                if (sslType != void) {
-                    _ = self.ssl.deinit();
-                }
-            }
-
-            if (0 != c.miso_close_network_connection(self.ctx)) {
-                return connection_error.close_error;
-            }
+            try self.ssl.close();
         }
         pub fn send(self: *@This(), buffer: []const u8) !usize {
-            const len: isize = c.miso_network_send(self.ctx, @as([*c]const u8, buffer.ptr), buffer.len);
-            return if (len <= 0) connection_error.send_error else @intCast(len);
+            return self.ssl.send(buffer);
         }
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
-            const len: isize = c.miso_network_read(self.ctx, buffer.ptr, buffer.len);
-            return if (len <= 0)
-                connection_error.recieve_error
-            else if (@as(usize, @intCast(len)) > buffer.len)
-                connection_error.buffer_owerflow
-            else
-                buffer[0..@intCast(len)];
+            return self.ssl.recieve(buffer);
         }
         pub fn waitRx(self: *@This(), timeout_s: u32) i32 {
-            return c.wait_rx(self.ctx, timeout_s);
-        }
-        pub fn waitTx(self: *@This(), timeout_s: u32) i32 {
-            return c.wait_tx(self.ctx, timeout_s);
+            return self.waitRx(timeout_s);
         }
     };
 }

@@ -5,14 +5,14 @@ const system = @import("system.zig");
 const connection = @import("connection.zig");
 const file = @import("fatfs.zig").file;
 const led = @import("leds.zig");
-
+const simpleConnection = @import("simpleConnection.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("picohttpparser.h");
 });
 
 /// Connection instance
-connection: connection.Connection(.http, void),
+connection: connection.Connection(.http, simpleConnection.SimpleLinkConnection(.tcp_ip4)),
 
 /// Array to store parsed header information
 headers: [24]c.phr_header,

@@ -131,6 +131,16 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
             };
         }
 
+        pub fn init(self: *@This()) !void {
+            self.sd = @intFromEnum(sd_e.invalid);
+        }
+        pub fn deinit(self: *@This()) !void {
+            _ = self;
+            //if (self.sd != @intFromEnum(sd_e.invalid)) {
+            //    _ = self.close();
+            //}
+        }
+
         /// Open a connection to designated peer
         pub fn open(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             const host = uri.host.?;
@@ -195,7 +205,7 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
         }
 
         /// Send
-        pub fn send(self: *@This(), data: []u8) !usize {
+        pub fn send(self: *@This(), data: []const u8) !usize {
             var ret: isize = undefined;
             if (comptime proto.isTcp()) {
                 ret = c.sl_Send(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);

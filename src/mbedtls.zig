@@ -141,27 +141,31 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
             try self.init(proto);
             errdefer {
-                self.deinit();
+                _ = self.deinit();
             }
 
             try self.connection.open(uri, local_port);
         }
+        pub fn close(self: *@This()) !void {
+            defer {
+                _ = self.deinit();
+            }
+            try self.connection.close();
+        }
 
         pub fn send(self: *@This(), buffer: []const u8) !usize {
-            if(self.conn.getProtocol().isTls())
-            {
-                //
-            }
-            else {
-                return self.connection.send_dtls(buffer);
+            if (self.connection.getProto().isTls()) {
+                return 1;
+            } else {
+                return self.send_dtls(buffer);
             }
         }
         fn send_dtls(self: *@This(), buffer: []const u8) !usize {
             var offset: usize = 0;
             var cid_enabled: c_int = c.MBEDTLS_SSL_CID_DISABLED;
 
-            var ret: i32 = c.mbedtls_ssl_get_peer_cid(&self.context, &cid_enabled, &self.cid, null, 0);
-            if (cid_enabled == c.MBEDTLS_CID_DISABLED) {
+            var ret: i32 = c.mbedtls_ssl_get_peer_cid(&self.context, &cid_enabled, null, 0);
+            if (cid_enabled == c.MBEDTLS_SSL_CID_DISABLED) {
                 //
             } else {
                 ret = 0;
@@ -171,41 +175,35 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
                 while (offset != buffer.len) {
                     const slice = buffer[offset..];
                     const num_bytes = c.mbedtls_ssl_write(&self.context, @ptrCast(slice.ptr), @intCast(slice.len));
-                    if ((c.MBEDTLS_ERR_SSL_WANT_READ == num_bytes) || (c.MBEDTLS_ERR_SSL_WANT_WRITE == num_bytes) || (c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS == num_bytes) || (c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == num_bytes))
-			        {
+                    if ((c.MBEDTLS_ERR_SSL_WANT_READ == num_bytes) or (c.MBEDTLS_ERR_SSL_WANT_WRITE == num_bytes) or (c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS == num_bytes) or (c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == num_bytes)) {
                         continue;
-			        }
-			        else if (num_bytes < 0)
-			        {
-				        ret = -1;
-				        break;
-			        }
-                    else{
+                    } else if (num_bytes < 0) {
+                        ret = -1;
+                        break;
+                    } else {
                         offset += @as(usize, @intCast(num_bytes));
                     }
                 }
             }
 
-            return if(ret == 0) offset else 0;
+            return if (ret == 0) offset else connection.connection_error.send_error;
         }
 
-        fn read_dlts(self: *@This(), buffer: []u8) ![]u8 {
+        fn read_dtls(self: *@This(), buffer: []u8) ![]u8 {
             var numBytes: isize = c.MBEDTLS_ERR_SSL_WANT_READ;
 
             while ((numBytes == c.MBEDTLS_ERR_SSL_WANT_READ) or (numBytes == c.MBEDTLS_ERR_SSL_WANT_WRITE) or (numBytes == c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CLIENT_RECONNECT)) {
                 numBytes = c.mbedtls_ssl_read(&self.context, @ptrCast(buffer.ptr), @intCast(buffer.len));
             }
 
-            return if (numBytes < 0) 0 else buffer[0..@intCast(numBytes)];
+            return if (numBytes < 0) connection.connection_error.recieve_error else buffer[0..@intCast(numBytes)];
         }
 
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
-            if(self.conn.getProtocol().isTls())
-            {
-                //
-            }
-            else {
-                return self.connection.read_dtls(buffer);
+            if (self.connection.getProto().isTls()) {
+                return buffer;
+            } else {
+                return self.read_dtls(buffer);
             }
         }
         /// Send data callback for MbedTLS
