@@ -102,7 +102,6 @@ const source_path = [_][]const u8{
     base_src_path ++ "ssl_tls13_client.c",
     base_src_path ++ "ssl_tls13_generic.c",
     "csrc/src/mbedtls_adapter/entropy.c",
-    "csrc/src/mbedtls_adapter/gmttime.c",
     "csrc/src/mbedtls_adapter/timing.c",
     "csrc/src/mbedtls_adapter/treading.c",
 };

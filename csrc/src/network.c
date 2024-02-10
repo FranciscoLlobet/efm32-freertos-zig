@@ -12,12 +12,15 @@
 
 #include "wifi_service.h"
 
-// #include "simplelink.h"
-#include "sl_sleeptimer.h"
+#include "network.h"
+//#include "sl_sleeptimer.h"
 
 #define NETWORK_MONITOR_TASK (UBaseType_t)(miso_task_connectivity_service)
 
 #define SIMPLELINK_MAX_SEND_MTU 1472
+
+#define SELECT_CYCLE_TIME_MS 10
+#define SELECT_CYCLE_TIME_US (SELECT_CYCLE_TIME_MS * 1024)
 
 typedef int (*_network_send_fn)(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
 typedef int (*_network_read_fn)(miso_network_ctx_t ctx, unsigned char *buf, size_t len);
@@ -31,8 +34,8 @@ struct miso_sockets_s
 	_network_read_fn read_fn;	/* Read function for the protocol */
 
 	/* Wait deadlines */
-	uint32_t rx_wait_deadline_s; /* Deadline for rx (in s) */
-	uint32_t tx_wait_deadline_s; /* Deadline for tx (in s) */
+	uint32_t rx_wait_deadline_ms; /* Deadline for rx (in s) */
+	uint32_t tx_wait_deadline_ms; /* Deadline for tx (in s) */
 
 	/* RX-TX Wait */
 	SemaphoreHandle_t rx_signal; /* RX available signal */
@@ -60,7 +63,7 @@ struct miso_sockets_s
 
 struct timeout_msg_s
 {
-	uint32_t deadline;
+	uint32_t deadline_ms;
 };
 
 static struct miso_sockets_s system_sockets[wifi_service_max] = {0}; /* new system sockets */
@@ -110,15 +113,6 @@ static void initialize_socket_management(void)
 	}
 }
 
-static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s)
-{
-	struct timeout_msg_s msg;
-
-	msg.deadline = timeout_s + sl_sleeptimer_get_time();
-
-	(void)xQueueSend(ctx->tx_queue, &msg, portMAX_DELAY);
-}
-
 int create_network_mediator(void)
 {
 	int ret = 0;
@@ -160,47 +154,33 @@ int create_network_mediator(void)
 	return ret;
 }
 
-int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s)
-{
-	return wait_rx(_get_network_ctx(id), timeout_s);
-}
-
 int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
 	int ret_value = -1;
 
 	struct timeout_msg_s msg;
 	uint32_t timeout_ms = 1000 * timeout_s;
+	uint32_t current_time = xTaskGetTickCount();
 
-	msg.deadline = timeout_s + sl_sleeptimer_get_time();
+	uint32_t deadline_ms = current_time + timeout_ms + 500 + SELECT_CYCLE_TIME_MS;
 
-	if(pdTRUE == xQueueSend(ctx->rx_queue, &msg, portMAX_DELAY))
+	msg.deadline_ms = deadline_ms;
+
+	if(pdTRUE == xQueueSend(ctx->rx_queue, &msg, timeout_ms))
 	{
 		// Dummy take
 		(void)xSemaphoreTake(ctx->rx_signal, 0);
-		
 		(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);	
 		
-		if (pdTRUE == xSemaphoreTake(ctx->rx_signal, timeout_ms))
+		current_time = xTaskGetTickCount();
+		if(current_time <= deadline_ms)
 		{
-			ret_value = 0;
+			// Allows for up to 1s of extra delay
+			if (pdTRUE == xSemaphoreTake(ctx->rx_signal, deadline_ms - current_time))
+			{
+				ret_value = 0;
+			}
 		}
-	}
-
-	return ret_value;
-}
-
-int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s)
-{
-	int ret_value = -1;
-	wifi_service_register_tx_socket(_get_network_ctx(id), timeout_s);
-
-	(void)xSemaphoreTake(_get_network_ctx(id)->tx_signal, 0);
-	(void)xTaskNotifyIndexed(network_monitor_task_handle, 0, 1, eIncrement);
-
-	if (pdTRUE == xSemaphoreTake(_get_network_ctx(id)->tx_signal, (1000 * timeout_s) + 500))
-	{
-		ret_value = 0;
 	}
 
 	return ret_value;
@@ -229,7 +209,7 @@ static void select_task(void *param)
 		SL_FD_ZERO(&read_fd_set);
 		SL_FD_ZERO(&write_fd_set);
 
-		uint32_t current_time = sl_sleeptimer_get_time();
+		uint32_t current_time = xTaskGetTickCount();
 
 		for (size_t i = 0; i < (size_t)wifi_service_max; i++)
 		{
@@ -241,17 +221,17 @@ static void select_task(void *param)
 				// Process incoming messages
 				if(pdTRUE == xQueueReceive(ctx->rx_queue, &timeout_msg, 0))
 				{
-					ctx->rx_wait_deadline_s = timeout_msg.deadline;
+					ctx->rx_wait_deadline_ms = timeout_msg.deadline_ms;
 				}
 				if(pdTRUE == xQueueReceive(ctx->tx_queue, &timeout_msg, 0))
 				{
-					ctx->tx_wait_deadline_s = timeout_msg.deadline;
+					ctx->tx_wait_deadline_ms = timeout_msg.deadline_ms;
 				}
 
 				// Process deadlines
-				if (ctx->rx_wait_deadline_s != 0)
+				if (ctx->rx_wait_deadline_ms != 0)
 				{
-					if (ctx->rx_wait_deadline_s >= current_time)
+					if (ctx->rx_wait_deadline_ms >= current_time)
 					{
 						SL_FD_SET((_i16)ctx->sd, &read_fd_set);
 						if(ctx->sd > nfds)
@@ -263,15 +243,15 @@ static void select_task(void *param)
 					else
 					{
 						// Invalidate the deadline
-						ctx->rx_wait_deadline_s = 0; /* Deadline expired */
+						ctx->rx_wait_deadline_ms = 0; /* Deadline expired */
 						(void)xSemaphoreGive(ctx->rx_signal);
 					}
 				} 
 				
 				// tx deadlines
-				if (ctx->tx_wait_deadline_s != 0)
+				if (ctx->tx_wait_deadline_ms != 0)
 				{
-					if (ctx->tx_wait_deadline_s >= current_time)
+					if (ctx->tx_wait_deadline_ms >= current_time)
 					{
 						SL_FD_SET((_i16)ctx->sd, &write_fd_set);
 						if(ctx->sd > nfds)
@@ -282,7 +262,7 @@ static void select_task(void *param)
 					}
 					else
 					{
-						ctx->tx_wait_deadline_s = 0; /* Deadline expired */
+						ctx->tx_wait_deadline_ms = 0; /* Deadline expired */
 						(void)xSemaphoreGive(ctx->tx_signal);
 					}
 				}
@@ -294,7 +274,7 @@ static void select_task(void *param)
 		{
 			// Start second cycle
 			// The select function is called with a timeout of 50 ms
-			SlTimeval_t tv = {.tv_sec = 0, .tv_usec = 10240}; // Here we have the select cycle time
+			SlTimeval_t tv = {.tv_sec = 0, .tv_usec = SELECT_CYCLE_TIME_US}; // Here we have the select cycle time
 			int result = 0;
 
 			if(pdTRUE == xSemaphoreTake(conn_mutex, 1000))
@@ -315,7 +295,7 @@ static void select_task(void *param)
 						{
 							if (SL_FD_ISSET(ctx->sd, read_set_ptr))
 							{
-								ctx->rx_wait_deadline_s = 0; // Cancel the deadline
+								ctx->rx_wait_deadline_ms = 0; // Cancel the deadline
 								(void)xSemaphoreGive(ctx->rx_signal);
 							}
 						}
@@ -331,7 +311,7 @@ static void select_task(void *param)
 						{
 							if (SL_FD_ISSET(ctx->sd, write_fd_set_ptr))
 							{
-								ctx->tx_wait_deadline_s = 0; // Cancel the deadline
+								ctx->tx_wait_deadline_ms = 0; // Cancel the deadline
 								(void)xSemaphoreGive(ctx->tx_signal);
 							}
 						}
@@ -340,7 +320,7 @@ static void select_task(void *param)
 			}
 			else if(result < 0)
 			{
-				__BKPT(0);
+				//__BKPT(0);
 			}
 		}
 		else
@@ -728,7 +708,6 @@ static int _read_dtls(miso_network_ctx_t ctx, unsigned char *buffer, size_t leng
 
 	if (numBytes < 0)
 	{
-		//__BKPT(1);
 		numBytes = (int)MISO_NETWORK_DTLS_RECV_ERROR;
 	}
 
@@ -940,8 +919,8 @@ static int _initialize_network_ctx(miso_network_ctx_t ctx)
 	ctx->last_recv_time = 0;
 	ctx->last_send_time = 0;
 	ctx->protocol = (int32_t)miso_protocol_no_protocol;
-	ctx->rx_wait_deadline_s = 0;
-	ctx->tx_wait_deadline_s = 0;
+	ctx->rx_wait_deadline_ms = 0;
+	ctx->tx_wait_deadline_ms = 0;
 	ctx->rx_signal = xSemaphoreCreateBinary();
 	ctx->tx_signal = xSemaphoreCreateBinary();
 

@@ -10,8 +10,6 @@
 
 #include "miso.h"
 
-#include "network.h"
-
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
@@ -19,8 +17,7 @@
 
 
 
-int enqueue_select_rx(enum wifi_socket_id_e id, uint32_t timeout_s);
-int enqueue_select_tx(enum wifi_socket_id_e id, uint32_t timeout_s);
+
 
 
 

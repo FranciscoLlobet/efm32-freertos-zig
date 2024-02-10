@@ -94,11 +94,6 @@ extern char * config_get_lwm2m_endpoint(void);
 /* RX buffer */
 static uint8_t buffer[MAX_PACKET_SIZE];
 
-static uint8_t* get_rx_buffer(void)
-{
-	return &buffer[0];
-}
-
 int g_reboot = 0;
 
 enum dtls_authentication_mode
@@ -110,76 +105,33 @@ typedef struct
 {
 	lwm2m_object_t *securityObjP;
 	connection_t connList;
+	void * param;
 } client_data_t;
 
-extern int mbedtls_connector_initialize(lwm2m_object_t *securityObjP,
-		uint16_t secObjInstID);
-extern void mbedtls_cleanup(void);
-extern void mbedtls_connector_close(void);
 
-int wait_for_rx(uint32_t wait_s);
+int wait_for_rx(void * param, uint32_t wait_s);
 
 void* lwm2m_connect_server(uint16_t secObjInstID, void *userData)
 {
-	client_data_t *dataP;
-	char *uri;
-	char *host;
-	char *port;
+	client_data_t *dataP = (client_data_t*) userData;
 	connection_t newConnP = NULL;
 	volatile int ret = -1;
 
-	dataP = (client_data_t*) userData;
-
-	uri = get_server_uri(dataP->securityObjP, secObjInstID);
-
+	char * uri = get_server_uri(dataP->securityObjP, secObjInstID);
 	if (uri == NULL)
 		return NULL;
 
 	fprintf(stdout, "Connecting to %s\r\n", uri);
 
-	// parse uri in the form "coaps://[host]:[port]"
-	if (0 == strncmp(uri, "coaps://", strlen("coaps://")))
-	{
-		host = uri + strlen("coaps://");
-	}
-	else if (0 == strncmp(uri, "coap://", strlen("coap://")))
-	{
-		host = uri + strlen("coap://");
-	}
-	else
-	{
-		goto exit;
-	}
-	port = strrchr(host, ':');
-	if (port == NULL)
-		goto exit;
-	// remove brackets
-	if (host[0] == '[')
-	{
-		host++;
-		if (*(port - 1) == ']')
-		{
-			*(port - 1) = 0;
-		}
-		else
-			goto exit;
-	}
-	// split strings
-	*port = 0;
-	port++;
-
-	ret = mbedtls_connector_initialize(dataP->securityObjP, secObjInstID);
-
+	ret = lwm2mservice_create_connection(dataP->param, (uint8_t *) get_server_uri(dataP->securityObjP, secObjInstID), 0, dataP->securityObjP, secObjInstID); // secObjP, secObjInstID);
 	if (0 == ret)
 	{
-		newConnP = connection_create(dataP->connList, host, port,
-				(int) miso_protocol_dtls_ip4);
+		newConnP = connection_create(dataP->connList, dataP->param);
 	}
 
 	if (newConnP == NULL)
 	{
 		fprintf(stderr, "Connection creation failed.\r\n");
-		(void) mbedtls_cleanup();
 	}
 	else if(NULL == dataP->connList)
 	{
@@ -199,8 +151,6 @@ void lwm2m_close_connection(void *sessionH, void *userData)
 	targetP = (connection_t) sessionH;
 
 	// Add stuff to close the connection
-
-	mbedtls_connector_close();
 
 	if (targetP == app_data->connList)
 	{
@@ -352,7 +302,7 @@ client_data_t data;
 
 int lwm2m_client_task_runner(void *param1)
 {
-	(void) param1;
+
 
 	lwm2m_context_t *lwm2mH = NULL;
 	lwm2m_object_t *objArray[OBJ_COUNT];
@@ -367,6 +317,7 @@ int lwm2m_client_task_runner(void *param1)
 	/* Reset the client_data_object */
 	memset(&data, 0, sizeof(client_data_t));
 
+	data.param = param1;
 	data.connList = (connection_t) NULL;
 
 	/*
@@ -471,20 +422,13 @@ int lwm2m_client_task_runner(void *param1)
 			if (notification_value & (uint32_t) lwm2m_notify_message_reception)
 			{
 				/* Handle reception */
-				ssize_t numBytes = miso_network_read(data.connList->ctx, get_rx_buffer(),
-						MAX_PACKET_SIZE);
-
-				if (numBytes >= MAX_PACKET_SIZE)
-				{
-					// Number of bytes is bigger than max packet
-					fprintf(stderr, "Received packet >= MAX_PACKET_SIZE\r\n");
-				}
-				else if (numBytes >= 0)
+				int numBytes = lwm2mservice_read_data(data.param, &buffer[0], sizeof(buffer));
+				if (numBytes != -1)
 				{
 					connection_t connP = data.connList;
 
 					/* Let liblwm2m respond to the query depending on the context */
-					lwm2m_handle_packet(lwm2mH, get_rx_buffer(),
+					lwm2m_handle_packet(lwm2mH, &buffer[0],
 							(size_t) numBytes, connP);
 				}
 			}
@@ -518,10 +462,10 @@ int lwm2m_client_task_runner(void *param1)
 				timeout_val = 1;
 			}
 
-			wait_for_rx(timeout_val);
+			wait_for_rx(data.param, timeout_val);
 		}
 
-		printf("LWM2M: %d\n\r", uxTaskGetStackHighWaterMark(NULL));
+		printf("LWM2M: %u\n\r", (unsigned int)uxTaskGetStackHighWaterMark(NULL));
 	} 
 
 	/*
@@ -551,9 +495,10 @@ void lwm2m_client_update_accel(float x, float y, float z)
 //			eSetBits);
 }
 
-int wait_for_rx(uint32_t wait_s)
+int wait_for_rx(void * param, uint32_t wait_s)
 {
-	int ret = enqueue_select_rx(wifi_service_lwm2m_socket, wait_s);
+
+	int ret = lwm2mservice_wait_data(param, wait_s);
 	if(0 == ret)
 	{
 		xTaskNotify(xTaskGetCurrentTaskHandle(), (uint32_t )lwm2m_notify_message_reception, eSetBits);

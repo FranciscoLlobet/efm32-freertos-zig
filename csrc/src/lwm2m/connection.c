@@ -24,22 +24,18 @@
 #include "mbedtls/net_sockets.h"
 #include <sys/types.h>
 
-#define SIMPLE_LINK_MAX_SEND_MTU 	1472
-
-extern mbedtls_ssl_context ssl_context;
-
-connection_t connection_create(connection_t connList, char *host, char *port,
-		int protocol)
+connection_t connection_create(connection_t connList, void * ctx)
 {
-	int ret = UISO_NETWORK_GENERIC_ERROR;
+	int ret = -1;
 	connection_t newConn = lwm2m_malloc(sizeof(struct connection_s));
 	if(NULL != newConn)
 	{
-		ret = miso_create_network_connection(miso_get_network_ctx(wifi_service_lwm2m_socket), host, strlen(host), atoi(port), 0, (enum miso_protocol)protocol);
+		ret = 1;
 		if(ret >= 0)
 		{
 			/* Prepare */
-			newConn->ctx = miso_get_network_ctx(wifi_service_lwm2m_socket);
+			//newConn->ctx = miso_get_network_ctx(wifi_service_lwm2m_socket);
+			newConn->parent = ctx;
 			newConn->next = NULL;
 
 			if(NULL != connList)
@@ -64,17 +60,12 @@ connection_t connection_create(connection_t connList, char *host, char *port,
 
 void connection_free(connection_t connList)
 {
-	int ret = UISO_NETWORK_OK;
 	if(connList != NULL)
 	{
 		do{
 			// connection free
-			ret = miso_close_network_connection(connList->ctx);
-			if(ret != UISO_NETWORK_OK)
-			{
-				printf("Error: %d\n\r");
-			}
-
+			lwm2mservice_close_connection(connList->parent);
+			
 			if(NULL != connList->next)
 			{
 				connList = connList->next;
@@ -84,37 +75,24 @@ void connection_free(connection_t connList)
 	}
 }
 
-int connection_send(connection_t connP, uint8_t *buffer, size_t length)
-{
-	(void)connP;
-
-	int nbSent = miso_network_send(miso_get_network_ctx(wifi_service_lwm2m_socket), buffer, length);
-	if(0 > nbSent)
-	{
-		return -1;
-	}
-	return nbSent;
-}
-
-
 uint8_t lwm2m_buffer_send(void *sessionH, uint8_t *buffer, size_t length,
 		void *userdata)
 {
 	connection_t connP = (connection_t) sessionH;
+	int ret = COAP_NO_ERROR;
 
 	(void) userdata; /* unused */
 
 	if (connP == NULL)
 	{
-		return COAP_500_INTERNAL_SERVER_ERROR ;
+		ret = COAP_500_INTERNAL_SERVER_ERROR ;
 	}
-
-	if (-1 == connection_send(connP, buffer, length))
+	else if(-1 == lwm2mservice_send_data(connP->parent, buffer, length))
 	{
-		return COAP_500_INTERNAL_SERVER_ERROR ;
+		ret = COAP_500_INTERNAL_SERVER_ERROR ;
 	}
 
-	return COAP_NO_ERROR ;
+	return ret;
 }
 
 bool lwm2m_session_is_equal(void *session1, void *session2, void *userData)
