@@ -138,6 +138,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
         /// Open a connection to peer
         pub fn open(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             const proto = connection.schemes.match(uri.scheme).?.getProtocol();
+            var ret: i32 = 0;
 
             try self.init(proto);
             errdefer {
@@ -145,6 +146,15 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
             }
 
             try self.connection.open(uri, local_port);
+
+            if (proto.isTls()) {
+                //ret = c.mbedtls_ssl_set_hostname(&self.context, @ptrCast(uri.host.?));
+            }
+
+            ret = c.MBEDTLS_ERR_SSL_WANT_WRITE;
+            while ((ret != 0) and ((ret == c.MBEDTLS_ERR_SSL_WANT_WRITE) or (ret == c.MBEDTLS_ERR_SSL_WANT_READ))) {
+                ret = c.mbedtls_ssl_handshake(&self.context);
+            }
         }
         pub fn close(self: *@This()) !void {
             defer {
@@ -155,7 +165,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
         pub fn send(self: *@This(), buffer: []const u8) !usize {
             if (self.connection.getProto().isTls()) {
-                return 1;
+                return self.send_tls(buffer);
             } else {
                 return self.send_dtls(buffer);
             }
@@ -198,10 +208,77 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
             return if (numBytes < 0) connection.connection_error.recieve_error else buffer[0..@intCast(numBytes)];
         }
+        fn read_tls(self: *@This(), buffer: []u8) ![]u8 {
+            var numBytes: i32 = c.MBEDTLS_ERR_SSL_WANT_READ;
+            var res: i32 = 0;
+
+            while ((numBytes == c.MBEDTLS_ERR_SSL_WANT_READ) or (numBytes == c.MBEDTLS_ERR_SSL_WANT_WRITE) or (numBytes == c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CLIENT_RECONNECT)) {
+                numBytes = c.mbedtls_ssl_read(&self.context, @ptrCast(buffer.ptr), @intCast(buffer.len));
+            }
+
+            if ((numBytes < 0) and !(numBytes == c.MBEDTLS_ERR_SSL_TIMEOUT)) {
+                // Connection Renegociation logic
+
+                // Send Close Notify
+                res = c.MBEDTLS_ERR_SSL_WANT_WRITE;
+                while ((res == c.MBEDTLS_ERR_SSL_WANT_READ) or (res == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
+                    res = c.mbedtls_ssl_close_notify(&self.context);
+                }
+
+                res = c.mbedtls_ssl_session_reset(&self.context);
+
+                // Retry handshake
+                if (res == 0) {
+                    res = c.MBEDTLS_ERR_SSL_WANT_WRITE;
+                    while ((res == c.MBEDTLS_ERR_SSL_WANT_READ) or (res == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
+                        res = c.mbedtls_ssl_handshake(&self.context);
+                    }
+                }
+            }
+
+            return if (numBytes < 0) connection.connection_error.recieve_error else buffer[0..@intCast(numBytes)];
+        }
+        fn send_tls(self: *@This(), buffer: []const u8) !usize {
+            var offset: usize = 0;
+            var ret: i32 = 0;
+            while (offset != buffer.len) {
+                const slice = buffer[offset..];
+                const num_bytes = c.mbedtls_ssl_write(&self.context, @ptrCast(slice.ptr), @intCast(slice.len));
+                if ((c.MBEDTLS_ERR_SSL_WANT_READ == num_bytes) or (c.MBEDTLS_ERR_SSL_WANT_WRITE == num_bytes) or (c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS == num_bytes) or (c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == num_bytes)) {
+                    continue;
+                } else if (num_bytes < 0) {
+                    // Connection Renegociation logic
+
+                    // Send Close Notify
+                    ret = c.MBEDTLS_ERR_SSL_WANT_WRITE;
+                    while ((ret == c.MBEDTLS_ERR_SSL_WANT_READ) or (ret == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
+                        ret = c.mbedtls_ssl_close_notify(&self.context);
+                    }
+
+                    ret = c.mbedtls_ssl_session_reset(&self.context);
+
+                    // Retry handshake
+                    if (ret == 0) {
+                        ret = c.MBEDTLS_ERR_SSL_WANT_WRITE;
+                        while ((ret == c.MBEDTLS_ERR_SSL_WANT_READ) or (ret == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
+                            ret = c.mbedtls_ssl_handshake(&self.context);
+                        }
+                    }
+                    if (ret != 0) {
+                        break;
+                    }
+
+                    // return connection.connection_error.send_error;
+                } else {
+                    offset += @as(usize, @intCast(num_bytes));
+                }
+            }
+            return if (ret == 0) offset else connection.connection_error.send_error;
+        }
 
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
             if (self.connection.getProto().isTls()) {
-                return buffer;
+                return self.read_tls(buffer);
             } else {
                 return self.read_dtls(buffer);
             }
