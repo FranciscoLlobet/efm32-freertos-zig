@@ -92,7 +92,7 @@ const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 const reset_topic = "zig/reset";
 
-const connectionType = connection.Connection(.mqtt, mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.tls_ip4), .psk));
+const connectionType = connection.Connection(mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.tls_ip4), .psk));
 
 connection: connectionType,
 connectionCounter: usize,

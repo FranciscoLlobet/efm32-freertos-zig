@@ -1,14 +1,9 @@
 const std = @import("std");
 const freertos = @import("freertos.zig");
-const system = @import("system.zig");
 const config = @import("config.zig");
 
 const c = @cImport({
     @cInclude("network.h");
-    @cInclude("wifi_service.h");
-    @cInclude("lwm2m_client.h");
-    //@cInclude("mbedtls/error");
-    //@cInclude("threading_alt.h");
 });
 
 /// Connection Errors
@@ -42,17 +37,6 @@ pub const connection_error = error{
 
 /// Network Context from C
 const network_ctx = c.miso_network_ctx_t;
-
-/// Connections are based on a fixed connection pool
-///
-/// Each connection has an id mapped to the protocol used
-///
-pub const connection_id = enum(usize) {
-    ntp = c.wifi_service_ntp_socket,
-    lwm2m = c.wifi_service_lwm2m_socket,
-    mqtt = c.wifi_service_mqtt_socket,
-    http = c.wifi_service_http_socket,
-};
 
 /// Protocol Bit
 const protocol_bit: u32 = (1 << 0);
@@ -155,8 +139,7 @@ pub const schemes = enum(u32) {
     }
 };
 
-pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
-    _ = id;
+pub fn Connection(comptime sslType: type) type {
     // Compile time checks
     if (sslType != void) {
         if (!@hasDecl(sslType, "init")) {
@@ -172,7 +155,6 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
         /// Initialize the connection
         pub fn init(self: *@This()) void {
             _ = self;
-            //self.ssl.init();
         }
         pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             try self.ssl.open(uri, local_port);
@@ -217,6 +199,9 @@ fn run(self: *@This()) void {
                 if (conn.rx_queue.recieve(0)) |msg| {
                     conn.rx_wait_deadline_ms = msg.deadline;
                 }
+                if (conn.tx_queue.recieve(0)) |msg| {
+                    conn.tx_wait_deadline_ms = msg.deadline;
+                }
 
                 if (conn.rx_wait_deadline_ms >= current_time) {
                     c.SL_FD_SET(conn.sd, &read_fd_set);
@@ -227,6 +212,16 @@ fn run(self: *@This()) void {
                 } else {
                     conn.rx_wait_deadline_ms = 0;
                 }
+
+                if (conn.tx_wait_deadline_ms >= current_time) {
+                    c.SL_FD_SET(conn.sd, &write_fd_set);
+                    if (nfsd < conn.sd) {
+                        nfsd = conn.sd;
+                    }
+                    write_set_ptr = &write_fd_set;
+                } else {
+                    conn.tx_wait_deadline_ms = 0;
+                }
             }
         }
 
@@ -234,9 +229,10 @@ fn run(self: *@This()) void {
             var res: i16 = 0;
             // Sem
             if (self.mutex.take(1000)) |_| {
-                var tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 10 * 1024 };
+                const tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 10 * 1024 };
 
-                res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, &tv);
+                res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, @constCast(&tv));
+
                 self.mutex.give() catch unreachable;
             } else |_| {
                 //Ignore
@@ -247,7 +243,9 @@ fn run(self: *@This()) void {
                     for (&self.connections) |*conn| {
                         if (conn.sd >= 0) {
                             if (1 == c.SL_FD_ISSET(conn.sd, read_set)) {
-                                conn.sd = -1;
+                                if (conn.tx_wait_deadline_ms == 0) {
+                                    conn.sd = -1;
+                                }
                                 conn.rx_wait_deadline_ms = 0;
                                 conn.rx_signal.give() catch unreachable;
                             }
@@ -258,7 +256,11 @@ fn run(self: *@This()) void {
                     for (&self.connections) |*conn| {
                         if (conn.sd >= 0) {
                             if (1 == c.SL_FD_ISSET(conn.sd, write_set)) {
-                                conn.sd = -1;
+                                if (conn.rx_wait_deadline_ms == 0) {
+                                    conn.sd = -1;
+                                }
+                                conn.tx_wait_deadline_ms = 0;
+                                conn.tx_signal.give() catch unreachable;
                             }
                         }
                     }
@@ -282,14 +284,21 @@ const timeout_msg = struct {
 
 const connectionManagerElement = struct {
     sd: i16 = -1,
-    rx_wait_deadline_ms: u32,
+    rx_wait_deadline_ms: u32 = 0,
+    tx_wait_deadline_ms: u32 = 0,
     rx_signal: freertos.StaticBinarySemaphore(),
+    tx_signal: freertos.StaticBinarySemaphore(),
     rx_queue: freertos.StaticQueue(timeout_msg, 1),
+    tx_queue: freertos.StaticQueue(timeout_msg, 1),
 
     pub fn init(self: *@This()) void {
         self.sd = -1;
+        self.rx_wait_deadline_ms = 0;
+        self.tx_wait_deadline_ms = 0;
         self.rx_signal.create() catch unreachable;
+        self.tx_signal.create() catch unreachable;
         self.rx_queue.create() catch unreachable;
+        self.tx_queue.create() catch unreachable;
     }
 };
 

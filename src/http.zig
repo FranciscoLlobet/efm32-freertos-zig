@@ -12,7 +12,7 @@ const c = @cImport({
 });
 
 /// Connection instance
-connection: connection.Connection(.http, simpleConnection.SimpleLinkConnection(.tcp_ip4)),
+connection: connection.Connection(simpleConnection.SimpleLinkConnection(.tcp_ip4)),
 
 /// Array to store parsed header information
 headers: [24]c.phr_header,
