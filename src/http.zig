@@ -250,7 +250,7 @@ fn recieveResponse(self: *@This()) !rx_response {
             self.rx_mutex.give() catch {};
         }
         while ((pret == -2) and (rx_count < self.rx_buffer.len)) {
-            if (self.connection.waitRx(5)) {
+            if (try self.connection.waitRx(5)) {
                 var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len)]);
 
                 // returns number of bytes consumed if successful, -2 if request is partial, -1 if failed

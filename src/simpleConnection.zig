@@ -267,11 +267,8 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
             }
         }
         /// Wait for data to be available
-        pub fn waitRx(self: *@This(), timeout_s: u32) bool {
-            _ = self;
-            _ = timeout_s;
-
-            return true;
+        pub fn waitRx(self: *@This(), timeout_s: u32) !bool {
+            return connection.network_mediator_wait_rx(self.sd, timeout_s);
         }
         pub fn getCtx(self: *@This()) *anyopaque {
             return @ptrCast(@alignCast(self));

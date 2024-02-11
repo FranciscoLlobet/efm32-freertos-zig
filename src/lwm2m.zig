@@ -51,7 +51,7 @@ export fn lwm2mservice_read_data(param: ?*anyopaque, data: [*c]u8, len: usize) c
 }
 
 export fn lwm2mservice_wait_data(param: ?*anyopaque, timeout: u32) callconv(.C) c_int {
-    return @intCast(@intFromBool(@as(*@This(), @ptrCast(@alignCast(param))).connection.waitRx(timeout)));
+    return @intCast(@intFromBool(@as(*@This(), @ptrCast(@alignCast(param))).connection.waitRx(timeout) catch false));
 }
 
 /// Authentification callback for mbedTLS connections

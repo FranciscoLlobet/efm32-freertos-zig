@@ -79,7 +79,7 @@ static void select_task(void *param);
 static void initialize_socket_management(void);
 static void wifi_service_register_tx_socket(miso_network_ctx_t ctx, uint32_t timeout_s);
 
-TaskHandle_t network_monitor_task_handle = NULL;
+//TaskHandle_t network_monitor_task_handle = NULL;
 
 /* mbedTLS Support */
 static int _network_send(miso_network_ctx_t ctx, const unsigned char *buf, size_t len);
@@ -113,47 +113,8 @@ static void initialize_socket_management(void)
 	}
 }
 
-int create_network_mediator(void)
-{
-	int ret = 0;
 
-	// Create and suspend
-	if (pdFALSE == xTaskCreate(select_task, "SelectTask", 1144, NULL, NETWORK_MONITOR_TASK, &network_monitor_task_handle))
-	{
-		ret = -1;
-	}
-	else
-	{
-		vTaskSuspend(network_monitor_task_handle);
-	}
-
-	if (0 == ret)
-	{
-		initialize_socket_management();
-	}
-
-	if (0 == ret)
-	{
-		miso_mbedtls_set_treading_alt();
-	}
-
-	if (0 == ret)
-	{
-		rx_tx_mutex = xSemaphoreCreateMutex();
-		if (NULL == rx_tx_mutex)
-			ret = -1;
-	}
-
-	if (0 == ret)
-	{
-		conn_mutex = xSemaphoreCreateMutex();
-		if (NULL == conn_mutex)
-			ret = -1;
-	}
-
-	return ret;
-}
-
+#if 0
 int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 {
 	int ret_value = -1;
@@ -185,7 +146,7 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s)
 
 	return ret_value;
 }
-
+#endif
 /* RX-TX-Monitor Task */
 static void select_task(void *param)
 {
@@ -763,7 +724,7 @@ int miso_network_send(miso_network_ctx_t ctx, const unsigned char *buffer, size_
 {
 	int ret = MISO_NETWORK_SEND_BUSY;
 
-	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000));
+	if(pdTRUE == xSemaphoreTake(rx_tx_mutex, 1000))
 	{
 		ret = ctx->send_fn(ctx, buffer, length);
 	(void)xSemaphoreGive(rx_tx_mutex);

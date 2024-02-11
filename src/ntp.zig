@@ -208,7 +208,7 @@ pub fn getTimeFromServer(uri: std.Uri) !ntp_response {
 
     try send(&conn, &packet);
 
-    _ = conn.waitRx(2);
+    _ = try conn.waitRx(2);
 
     _ = try conn.recieve(packet.slice());
 

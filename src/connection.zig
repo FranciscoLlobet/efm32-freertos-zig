@@ -1,11 +1,14 @@
 const std = @import("std");
 const freertos = @import("freertos.zig");
 const system = @import("system.zig");
+const config = @import("config.zig");
 
 const c = @cImport({
     @cInclude("network.h");
     @cInclude("wifi_service.h");
     @cInclude("lwm2m_client.h");
+    //@cInclude("mbedtls/error");
+    //@cInclude("threading_alt.h");
 });
 
 /// Connection Errors
@@ -163,7 +166,6 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
             @compileError("SSL Type must have a deinit function");
         }
     }
-
     return struct {
         ssl: sslType,
 
@@ -184,8 +186,189 @@ pub fn Connection(comptime id: connection_id, comptime sslType: type) type {
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
             return self.ssl.recieve(buffer);
         }
-        pub fn waitRx(self: *@This(), timeout_s: u32) bool {
+        pub fn waitRx(self: *@This(), timeout_s: u32) !bool {
             return self.ssl.waitRx(timeout_s);
         }
     };
+}
+
+fn run(self: *@This()) void {
+    var read_fd_set: c.SlFdSet_t = undefined;
+    var write_fd_set: c.SlFdSet_t = undefined;
+
+    c.SL_FD_ZERO(&read_fd_set);
+    c.SL_FD_ZERO(&write_fd_set);
+
+    self.mutex.give() catch {};
+
+    while (true) {
+        var read_set_ptr: ?*c.SlFdSet_t = null;
+        var write_set_ptr: ?*c.SlFdSet_t = null;
+        var nfsd: i16 = -1;
+
+        c.SL_FD_ZERO(&read_fd_set);
+        c.SL_FD_ZERO(&write_fd_set);
+
+        const current_time = freertos.xTaskGetTickCount();
+
+        // process the connection pool
+        for (&self.connections) |*conn| {
+            if (conn.sd >= 0) {
+                if (conn.rx_queue.recieve(0)) |msg| {
+                    conn.rx_wait_deadline_ms = msg.deadline;
+                }
+
+                if (conn.rx_wait_deadline_ms >= current_time) {
+                    c.SL_FD_SET(conn.sd, &read_fd_set);
+                    if (nfsd < conn.sd) {
+                        nfsd = conn.sd;
+                    }
+                    read_set_ptr = &read_fd_set;
+                } else {
+                    conn.rx_wait_deadline_ms = 0;
+                }
+            }
+        }
+
+        if ((read_set_ptr != null) or (write_set_ptr != null)) {
+            var res: i16 = 0;
+            // Sem
+            if (self.mutex.take(1000)) |_| {
+                var tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 10 * 1024 };
+
+                res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, &tv);
+                self.mutex.give() catch unreachable;
+            } else |_| {
+                //Ignore
+            }
+
+            if (res > 0) {
+                if (read_set_ptr) |read_set| {
+                    for (&self.connections) |*conn| {
+                        if (conn.sd >= 0) {
+                            if (1 == c.SL_FD_ISSET(conn.sd, read_set)) {
+                                conn.sd = -1;
+                                conn.rx_wait_deadline_ms = 0;
+                                conn.rx_signal.give() catch unreachable;
+                            }
+                        }
+                    }
+                }
+                if (write_set_ptr) |write_set| {
+                    for (&self.connections) |*conn| {
+                        if (conn.sd >= 0) {
+                            if (1 == c.SL_FD_ISSET(conn.sd, write_set)) {
+                                conn.sd = -1;
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // no deadlines
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, 2000)) |_| {
+                // Do something
+            } else |_| {
+                // Do nothing
+            }
+        }
+        // Do something
+    }
+}
+
+const timeout_msg = struct {
+    deadline: u32,
+};
+
+const connectionManagerElement = struct {
+    sd: i16 = -1,
+    rx_wait_deadline_ms: u32,
+    rx_signal: freertos.StaticBinarySemaphore(),
+    rx_queue: freertos.StaticQueue(timeout_msg, 1),
+
+    pub fn init(self: *@This()) void {
+        self.sd = -1;
+        self.rx_signal.create() catch unreachable;
+        self.rx_queue.create() catch unreachable;
+    }
+};
+
+task: freertos.StaticTask(@This(), 1200, "select_task", run),
+mutex: freertos.StaticMutex(),
+connections: [4]connectionManagerElement = undefined,
+
+fn findSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
+    for (&self.connections) |*conn| {
+        if (conn.sd == sd) {
+            return conn;
+        }
+    }
+    return null;
+}
+
+fn findFreeSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
+    for (&self.connections) |*conn| {
+        if (conn.sd < 0) {
+            conn.sd = sd;
+            return conn;
+        }
+    }
+    return null;
+}
+
+pub fn initializeConnectionsManager(self: *@This()) void {
+    for (&self.connections) |*conn| {
+        conn.init();
+    }
+}
+
+pub fn init(self: *@This()) !void {
+    try self.task.create(self, 4);
+    try self.mutex.create();
+    self.initializeConnectionsManager();
+    self.task.suspendTask();
+}
+
+pub fn wait_rx(self: *@This(), sd: i16, timeout_s: u32) !bool {
+    const timeout_ms = timeout_s * 1000;
+    var current_time = freertos.xTaskGetTickCount();
+    const deadline_ms = current_time + timeout_ms + 1000;
+
+    const msg: timeout_msg = .{ .deadline = deadline_ms };
+
+    var conn: *connectionManagerElement = self.findSocket(sd) orelse (self.findFreeSocket(sd) orelse unreachable);
+
+    try conn.rx_queue.send(@constCast(&msg), timeout_ms);
+
+    self.task.notify(1, .eIncrement) catch {};
+
+    current_time = freertos.xTaskGetTickCount();
+    if (current_time <= deadline_ms) {
+        return conn.rx_signal.take(deadline_ms - current_time);
+    }
+
+    return false;
+}
+
+pub var connectionManager: @This() = undefined;
+
+/// Handle the mbedtls threading
+extern fn miso_mbedtls_set_treading_alt() callconv(.C) void;
+
+export fn create_network_mediator() callconv(.C) c_int {
+    connectionManager.init() catch unreachable;
+    miso_mbedtls_set_treading_alt();
+    return 0;
+}
+
+export fn suspend_network_mediator() callconv(.C) void {
+    connectionManager.task.suspendTask();
+}
+
+export fn resume_network_mediator() callconv(.C) void {
+    connectionManager.task.resumeTask();
+}
+
+pub fn network_mediator_wait_rx(sd: i16, timeout_s: u32) !bool {
+    return connectionManager.wait_rx(sd, timeout_s);
 }

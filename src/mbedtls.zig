@@ -219,7 +219,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
             return if (len == connection.EAGAIN) c.MBEDTLS_ERR_SSL_WANT_READ else len;
         }
 
-        pub fn waitRx(self: *@This(), timeout: u32) bool {
+        pub fn waitRx(self: *@This(), timeout: u32) !bool {
             return self.connection.waitRx(timeout);
         }
         /// Initialize the MbedTLS context
@@ -320,7 +320,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
                 }
 
                 if (ret == mbedtls_ok) {
-                    c.mbedtls_ssl_set_bio(&self.context, @ptrCast(@alignCast(&self.connection)), send_c, recv_c, null);
+                    c.mbedtls_ssl_set_bio(&self.context, @ptrCast(@alignCast(self)), send_c, recv_c, null);
                     c.mbedtls_ssl_set_mtu(&self.context, 1472);
                 }
             }
