@@ -243,24 +243,9 @@ fn run(self: *@This()) void {
                     for (&self.connections) |*conn| {
                         if (conn.sd >= 0) {
                             if (1 == c.SL_FD_ISSET(conn.sd, read_set)) {
-                                if (conn.tx_wait_deadline_ms == 0) {
-                                    conn.sd = -1;
-                                }
+                                conn.sd = -1;
                                 conn.rx_wait_deadline_ms = 0;
                                 conn.rx_signal.give() catch unreachable;
-                            }
-                        }
-                    }
-                }
-                if (write_set_ptr) |write_set| {
-                    for (&self.connections) |*conn| {
-                        if (conn.sd >= 0) {
-                            if (1 == c.SL_FD_ISSET(conn.sd, write_set)) {
-                                if (conn.rx_wait_deadline_ms == 0) {
-                                    conn.sd = -1;
-                                }
-                                conn.tx_wait_deadline_ms = 0;
-                                conn.tx_signal.give() catch unreachable;
                             }
                         }
                     }
