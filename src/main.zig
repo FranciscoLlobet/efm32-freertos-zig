@@ -213,13 +213,12 @@ pub export fn appStart() void {
 // Initialisation of the C runtime.
 
 extern fn __libc_init_array() callconv(.C) void;
-extern fn __stack_chk_init() callconv(.C) void;
+//extern fn __stack_chk_init() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
     //@setRuntimeSafety(false);
     //__libc_init_array();
-    __stack_chk_init();
     //@setRuntimeSafety(true);
     SystemInit();
 }

@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) !void {
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION", "-fstack-protector-all" };
+    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION" };
 
     const c_flags_boot = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_BOOTLOADER" };
 
