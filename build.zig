@@ -83,7 +83,7 @@ pub fn build(b: *std.Build) !void {
             .board = boards.xdk110,
         },
         .optimize = optimize,
-        .source_file = .{ .path = "src/main.zig" },
+        .source_file = .{ .path = "src/app_lwm2m.zig" },
     };
 
     const bootloader = microzig.addFirmware(b, bootloader_target);

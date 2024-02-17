@@ -1,5 +1,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const board = microzig.board;
+
 const freertos = @import("freertos.zig");
 const system = @import("system.zig");
 const sensors = @import("sensors.zig");
@@ -11,7 +13,6 @@ const user = @import("user.zig");
 const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
-const board = microzig.board;
 
 const c = @cImport({
     @cInclude("board.h");

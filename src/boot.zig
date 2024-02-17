@@ -16,41 +16,15 @@ const c = @cImport({
 
 const board = microzig.board;
 
-extern fn xPortSysTickHandler() callconv(.C) void;
-
-extern fn vPortSVCHandler() callconv(.Naked) void;
-extern fn xPortPendSVHandler() callconv(.Naked) void;
-
-export fn vApplicationIdleHook() void {
-    board.watchdogFeed();
-}
+/// Redirecting the common system IRQ handlers
+pub const microzig_options = system.microzig_options;
 
 /// Export the NVM3 handle
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-//var timerTask: freertos.StaticTask(@This(), config.rtos_stack_depth_timer_task, "timer", dummyTask) = undefined;
-//var idleTask: freertos.StaticTask(@This(), config.rtos_stack_depth_idle_task, "idle", dummyTask) = undefined;
-
-fn dummyTask(self: *@This()) void {
-    _ = self;
-    unreachable;
-}
-
-//export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxTimerTaskTCBBuffer.* = &timerTask.staticTask;
-//    ppxTimerTaskStackBuffer.* = &timerTask.stack[0];
-//    pulTimerTaskStackSize.* = timerTask.stack.len;
-//}
-
-//export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticTask_t, ppxIdleTaskStackBuffer: **freertos.StackType_t, pulIdleTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxIdleTaskTCBBuffer.* = &idleTask.staticTask;
-//    ppxIdleTaskStackBuffer.* = &idleTask.stack[0];
-//    pulIdleTaskStackSize.* = idleTask.stack.len;
-//}
-
-export fn vApplicationDaemonTaskStartupHook() void {
-    appStart();
+export fn vApplicationIdleHook() void {
+    board.watchdogFeed();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -65,66 +39,12 @@ export fn vApplicationTickHook() void {
     //
 }
 
+export fn vApplicationDaemonTaskStartupHook() void {
+    appStart();
+}
+
 export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
-}
-
-export fn hang() callconv(.C) void {
-    microzig.hang();
-}
-
-pub const microzig_options = struct {
-    pub const interrupts = struct {
-        pub fn GPIO_EVEN() void {
-            c.GPIO_EVEN_IRQHandler();
-        }
-        pub fn GPIO_ODD() void {
-            c.GPIO_ODD_IRQHandler();
-        }
-        pub fn RTC() void {
-            c.RTC_IRQHandler();
-        }
-        pub fn DMA() void {
-            c.DMA_IRQHandler();
-        }
-        pub fn I2C0() void {
-            //c.I2C0_IRQHandler();
-        }
-        pub fn USB() void {
-            //c.USB_IRQHandler();
-        }
-        pub fn TIMER0() void {
-            c.TIMER0_IRQHandler();
-        }
-        pub fn SysTick() void {
-            if (.taskSCHEDULER_NOT_STARTED != freertos.xTaskGetSchedulerState()) {
-                xPortSysTickHandler();
-            }
-        }
-        /// Redirecting the PendSV to the FreeRTOS handler
-        pub const PendSV = xPortPendSVHandler;
-
-        /// Redirecting the SVCall to the FreeRTOS handler
-        pub const SVCall = vPortSVCHandler;
-
-        pub fn HardFault() void {
-            microzig.hang(); //c_board.BOARD_MCU_Reset();
-        }
-        pub fn MemManageFault() void {
-            microzig.hang(); //c_board.BOARD_MCU_Reset();
-        }
-        pub fn BusFault() void {
-            microzig.hang();
-        }
-        pub fn UsageFault() void {
-            microzig.hang();
-        }
-    };
-};
-
-pub export fn SVC7_Handler() callconv(.Naked) void {
-    asm volatile ("nop");
-    //microzig.cpu.regs.CONTROL.modify(.{ .nPRIV = 0 });
 }
 
 pub export fn system_reset() callconv(.C) void {
@@ -179,37 +99,6 @@ extern fn __libc_init_array() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
-    __libc_init_array();
-
+    //__libc_init_array();
     SystemInit();
-}
-
-// Button On-Change Callback
-pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
-    const instance = buttons.getInstance(handle);
-    const state = instance.getState();
-    switch (instance.getName()) {
-        .button1 => {
-            switch (state) {
-                .pressed => {
-                    leds.red.on();
-                },
-                .released => {
-                    leds.red.off();
-                },
-                else => {},
-            }
-        },
-        .button2 => {
-            switch (state) {
-                .pressed => {
-                    leds.orange.on();
-                },
-                .released => {
-                    leds.orange.off();
-                },
-                else => {},
-            }
-        },
-    }
 }
