@@ -391,7 +391,7 @@
 #define _PICOLIBC_MINOR__ 8
 
 /* The Picolibc version in string format. */
-#define _PICOLIBC_VERSION "1.8.5"
+#define _PICOLIBC_VERSION "1.8.6"
 
 /* The Picolibc major version number. */
 #define _PICOLIBC__ 1
@@ -464,10 +464,10 @@
 #define __PICOLIBC_MINOR__ 8
 
 /* The Picolibc patch level. */
-#define __PICOLIBC_PATCHLEVEL__ 5
+#define __PICOLIBC_PATCHLEVEL__ 6
 
 /* The Picolibc version in string format. */
-#define __PICOLIBC_VERSION__ "1.8.5"
+#define __PICOLIBC_VERSION__ "1.8.6"
 
 /* The Picolibc major version number. */
 #define __PICOLIBC__ 1

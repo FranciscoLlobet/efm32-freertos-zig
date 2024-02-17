@@ -338,7 +338,11 @@ pub fn wait_rx(self: *@This(), sd: i16, timeout_s: u32) !bool {
 
     current_time = freertos.xTaskGetTickCount();
     if (current_time <= deadline_ms) {
-        return conn.rx_signal.take(deadline_ms - current_time);
+        if (conn.rx_signal.take(deadline_ms - current_time)) |val| {
+            return val;
+        } else |err| {
+            return if (err == freertos.FreeRtosError.SemaphoreTakeTimeout) false else err;
+        }
     }
 
     return false;

@@ -4,7 +4,6 @@ const freertos = @import("freertos.zig");
 const system = @import("system.zig");
 const sensors = @import("sensors.zig");
 const network = @import("network.zig");
-const config = @import("config.zig");
 const leds = @import("leds.zig");
 const buttons = @import("buttons.zig");
 const usb = @import("usb.zig");
@@ -16,11 +15,15 @@ const nvm = @import("nvm.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("miso.h");
-    // @cInclude("sl_simple_led.h");
     @cInclude("miso_config.h");
 });
 
 const board = microzig.board;
+
+// Enable or Disable features at compile time
+pub const enable_lwm2m = true;
+pub const enable_mqtt = false;
+pub const enable_http = true;
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
@@ -210,9 +213,6 @@ pub export fn appStart() void {
     board.watchdogEnable();
 }
 
-// Initialisation of the C runtime.
-
-extern fn __libc_init_array() callconv(.C) void;
 //extern fn __stack_chk_init() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 

@@ -45,7 +45,7 @@ pub const pdMS_TO_TICKS = c.pdMS_TO_TICKS;
 // Scheduler State
 const eTaskSchedulerState = enum(BaseType_t) { taskSCHEDULER_NOT_STARTED = c.taskSCHEDULER_NOT_STARTED, taskSCHEDULER_SUSPENDED = c.taskSCHEDULER_SUSPENDED, taskSCHEDULER_RUNNING = c.taskSCHEDULER_RUNNING };
 
-const FreeRtosError = error{
+pub const FreeRtosError = error{
     pdFAIL,
 
     TaskCreationFailed,
@@ -187,7 +187,7 @@ pub const Task = struct {
     }
     /// Create a FreeRTOS task using static memory allocation
     pub fn createStatic(pxTaskCode: TaskFunction_t, pcName: [*:0]const u8, pvParameters: ?*anyopaque, uxPriority: UBaseType_t, stack: []StackType_t, pxTaskBuffer: *StaticTask_t) !@This() {
-        var self = @This(){ .handle = c.xTaskCreateStatic(pxTaskCode, pcName, stack.len, pvParameters, uxPriority, stack.ptr, pxTaskBuffer) };
+        var self = @This(){ .handle = c.xTaskCreateStatic(pxTaskCode, pcName, stack.len, pvParameters, uxPriority, @as([*c]StackType_t, @ptrCast(stack.ptr)), pxTaskBuffer) };
 
         return if (self.handle == null) FreeRtosError.TaskCreationFailed else self;
     }
@@ -449,7 +449,7 @@ const Timer = struct {
     }
     /// Create a FreeRTOS timer using static memory allocation
     pub inline fn createStatic(pcTimerName: [*:0]const u8, xTimerPeriodInTicks: TickType_t, autoReload: bool, comptime T: type, pvTimerID: *T, pxCallbackFunction: TimerCallbackFunction_t, pxTimerBuffer: *StaticTimer_t) !@This() {
-        var self: @This() = .{ .handle = c.xTimerCreateStatic(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction, pxTimerBuffer) };
+        var self: @This() = .{ .handle = c.xTimerCreateStatic(pcTimerName, xTimerPeriodInTicks, if (autoReload) pdTRUE else pdFALSE, @ptrCast(@alignCast(pvTimerID)), pxCallbackFunction, @as([*c]StaticTimer_t, pxTimerBuffer)) };
 
         return if (self.handle == null) FreeRtosError.TimerCreationFailed else self;
     }

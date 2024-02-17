@@ -92,7 +92,7 @@ const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 const reset_topic = "zig/reset";
 
-const connectionType = connection.Connection(mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.tls_ip4), .psk));
+const connectionType = connection.Connection(mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.no_protocol), .psk));
 
 connection: connectionType,
 connectionCounter: usize,
@@ -155,12 +155,12 @@ fn init() @This() {
 }
 
 /// Authentification callback for mbedTLS connections
-fn authCallback(self: *mbedtls.TlsContext(.psk), security_mode: connection.security_mode) mbedtls.auth_error!void {
+fn authCallback(self: *@This(), security_mode: connection.security_mode) mbedtls.auth_error!void {
     if (security_mode == .psk) {
         var psk_buf: [64]u8 = undefined; // Request 64 Bytes for Base64 decoder
 
         const psk = mbedtls.base64Decode(c.config_get_mqtt_psk_key(), &psk_buf) catch return mbedtls.auth_error.generic_error;
-        self.confPsk(psk, c.config_get_mqtt_psk_id()) catch return mbedtls.auth_error.generic_error;
+        self.connection.ssl.confPsk(psk, c.config_get_mqtt_psk_id()) catch return mbedtls.auth_error.generic_error;
 
         @memset(&psk_buf, 0); // Sanitize the buffer to avoid the decoded psk to remain in stack
     } else {
@@ -595,7 +595,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
         try self.processSendQueue();
 
-        if (0 == self.connection.waitRx(1)) {
+        if (self.connection.waitRx(1) catch false) {
             var readRet = self.packet.read(&rxBuffer);
             switch (readRet) {
                 .try_again => {},
@@ -779,7 +779,7 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
     if (config.enable_mqtt) {
         self.connection.init();
-        self.connection.ssl = @TypeOf(self.connection.ssl).create(authCallback, null, null);
+        self.connection.ssl = @TypeOf(self.connection.ssl).create(self, authCallback, null, null);
         self.pingTimer.create(60000, true, self) catch unreachable;
         self.pubTimer.create(10000, true, self) catch unreachable;
         self.packet.create(&self.connection);
@@ -804,7 +804,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
     try self.processSendQueue();
 
     // Wait for the connack
-    if (0 == self.connection.waitRx(5)) {
+    if (try self.connection.waitRx(5)) {
         if (msgTypes.connack == self.packet.read(&rxBuffer)) {
             try self.packet.processConnAck(&rxBuffer);
         } else {
@@ -819,7 +819,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
     try self.processSendQueue();
 
     // Wait for the connack
-    if (0 == self.connection.waitRx(5)) {
+    if (try self.connection.waitRx(5)) {
         if (msgTypes.suback == self.packet.read(&rxBuffer)) {
             var grantedQoSs: [2]QoS = .{ .qos0, .qos0 };
 

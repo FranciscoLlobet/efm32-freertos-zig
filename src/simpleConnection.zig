@@ -14,7 +14,7 @@ const conn_error = connection.connection_error;
 
 const SL_INVALID_SOCKET: i16 = -1;
 const SL_OK: i16 = 0;
-const SL_EAGAIN: i16 = c.SL_EAGAIN;
+const SL_EAGAIN: isize = c.SL_EAGAIN;
 const SL_EALREADY: i16 = c.SL_EALREADY;
 
 const SL_SOCK_DGRAM: i16 = c.SL_SOCK_DGRAM;
@@ -98,10 +98,10 @@ const ipv6Peer = struct {
     }
 };
 
-const peer = struct {
-    addr: c.sl_SockAddr_t,
-    len: usize,
-};
+//const peer = struct {
+//    addr: c.sl_SockAddr_t,
+//    len: usize,
+//};
 
 /// Map the generic connection protocol to the SimpleLink protocol settings
 fn mapConnProtoToSl(proto: connection.proto) struct { fam: sl_fam, sl_type: sl_type, proto: sl_proto } {
@@ -116,19 +116,16 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
     const settings = mapConnProtoToSl(proto);
 
     return struct {
+        proto: connection.proto = proto,
         /// Simple Link Socket Identifier
         sd: i16,
         /// Peer Address
-        peer: ipv4Peer,
+        peer: if (proto.isIp6()) ipv6Peer else ipv4Peer,
         /// Local Address
-        local: ipv4Peer,
+        local: if (proto.isIp6()) ipv6Peer else ipv4Peer,
 
         pub fn create() @This() {
-            return .{
-                .sd = @intFromEnum(sd_e.invalid),
-                .peer = undefined,
-                .local = undefined,
-            };
+            return .{ .proto = proto, .sd = @intFromEnum(sd_e.invalid), .peer = @TypeOf(@This().peer).create(0, 0), .local = @TypeOf(@This().local).create(0, 0) };
         }
 
         pub fn init(self: *@This()) !void {
@@ -190,7 +187,7 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
                 ret = c.sl_Connect(self.sd, @ptrCast(self.peer.getAddrPtr()), @intCast(self.peer.getLen()));
                 if (ret == SL_EALREADY) {
                     continue;
-                } else if (ret < 0) {
+                } else if (ret < SL_OK) {
                     return conn_error.connect;
                 }
             }
@@ -204,57 +201,57 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
             }
         }
 
+        /// Send TCP
+        inline fn send_tcp(self: *@This(), data: []const u8) isize {
+            const len: isize = c.sl_Send(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
+            return if (len == SL_EAGAIN) connection.EAGAIN else len;
+        }
+
+        /// Send UDP
+        inline fn send_udp(self: *@This(), data: []const u8) isize {
+            const len: isize = c.sl_SendTo(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(self.peer.getAddrPtr()), @intCast(self.peer.getLen()));
+            return if (len == SL_EAGAIN) connection.EAGAIN else len;
+        }
+
+        /// Recieve TCP
+        inline fn recieve_tcp(self: *@This(), data: []u8) isize {
+            const len: isize = c.sl_Recv(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
+            return if (len == SL_EAGAIN) connection.EAGAIN else len;
+        }
+
+        /// Recieve UDP
+        inline fn recieve_udp(self: *@This(), data: []u8) isize {
+            var peer_len: c_ushort = @intCast(self.peer.len);
+
+            const len: isize = c.sl_RecvFrom(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(&self.peer), &peer_len);
+            self.peer.len = @intCast(peer_len);
+
+            return if (len == SL_EAGAIN) connection.EAGAIN else len;
+        }
+
+        /// Simple Send without error handling
+        pub const send_c = if (proto.isTcp()) send_tcp else send_udp;
+
+        /// Simple Recieve without error handling
+        pub const recieve_c = if (proto.isTcp()) recieve_tcp else recieve_udp;
+
         /// Send
         pub fn send(self: *@This(), data: []const u8) !usize {
-            var ret: isize = undefined;
-            if (comptime proto.isTcp()) {
-                ret = c.sl_Send(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
-            } else {
-                ret = c.sl_SendTo(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(self.peer.getAddrPtr()), @intCast(self.peer.getLen()));
-            }
+            const ret = self.send_c(data);
 
             return if (ret <= 0) conn_error.send_error else @intCast(ret);
         }
 
-        /// Basic C send
-        pub fn send_c(self: *@This(), data: []const u8) isize {
-            var len: c_int = undefined;
-            if (comptime proto.isTcp()) {
-                len = c.sl_Send(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
-            } else {
-                len = c.sl_SendTo(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(self.peer.getAddrPtr()), @intCast(self.peer.getLen()));
-            }
-            return if (len == SL_EAGAIN) connection.EAGAIN else len;
-        }
-
         /// Basic C Recv
         pub fn recieve(self: *@This(), data: []u8) ![]u8 {
-            var len: isize = 0;
-            if (comptime proto.isTcp()) {
-                len = c.sl_Recv(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
-            } else {
-                var peer_len: c_ushort = @intCast(self.peer.len);
-                len = c.sl_RecvFrom(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(&self.peer), &peer_len);
-                self.peer.len = @intCast(peer_len);
-            }
+            const len: isize = self.recieve_c(data);
+
             return if (len <= 0)
                 conn_error.recieve_error
             else if (@as(usize, @intCast(len)) > data.len)
                 conn_error.buffer_owerflow
             else
                 data[0..@intCast(len)];
-        }
-
-        pub fn recieve_c(self: *@This(), data: []u8) isize {
-            var len: isize = undefined;
-            if (comptime proto.isTcp()) {
-                len = c.sl_Recv(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0);
-            } else {
-                var peer_len: c_ushort = @intCast(self.peer.len);
-                len = c.sl_RecvFrom(self.sd, @ptrCast(data.ptr), @intCast(data.len), 0, @ptrCast(&self.peer), &peer_len);
-                self.peer.len = @intCast(peer_len);
-            }
-            return if (len == SL_EAGAIN) connection.EAGAIN else len;
         }
 
         /// Close the connection
@@ -266,13 +263,12 @@ pub fn SimpleLinkConnection(comptime proto: connection.proto) type {
                 return conn_error.close_error;
             }
         }
+
         /// Wait for data to be available
         pub fn waitRx(self: *@This(), timeout_s: u32) !bool {
             return connection.network_mediator_wait_rx(self.sd, timeout_s);
         }
-        pub fn getCtx(self: *@This()) *anyopaque {
-            return @ptrCast(@alignCast(self));
-        }
+
         pub fn getProto(self: *@This()) connection.proto {
             _ = self;
             return proto;

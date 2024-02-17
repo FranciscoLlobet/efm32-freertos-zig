@@ -48,16 +48,16 @@ pub const mbedtls_ssl_context = c.mbedtls_ssl_context;
 pub const mbedtls_ssl_config = c.mbedtls_ssl_config;
 
 /// mbedTLS context
-pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connection.security_mode) type {
+pub fn TlsContext(comptime T: type, comptime connType: type, comptime mode: connection.security_mode) type {
     // Mbedtls context
-    if (conn != void) {
-        if (!@hasDecl(conn, "open"))
+    if (connType != void) {
+        if (!@hasDecl(connType, "open"))
             @compileError("Connection type must have an open method");
-        if (!@hasDecl(conn, "close"))
+        if (!@hasDecl(connType, "close"))
             @compileError("Connection type must have a close method");
-        if (!@hasDecl(conn, "recieve_c"))
+        if (!@hasDecl(connType, "recieve_c"))
             @compileError("Connection type must have a recieve_c method");
-        if (!@hasDecl(conn, "send_c"))
+        if (!@hasDecl(connType, "send_c"))
             @compileError("Connection type must have a send_c method");
     }
 
@@ -72,7 +72,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
         parent: *T,
 
         /// Connection
-        connection: conn,
+        conn: connType,
 
         /// MbedTLS Context
         context: mbedtls_ssl_context,
@@ -112,8 +112,27 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
         // Default auth callback
         pub fn create(parent: *T, comptime auth_callback: credential_callback_fn, custom_init: ?custom_init_callback_fn, custom_cleanup: ?custom_cleanup_callback_fn) @This() {
-            return @This(){ .parent = parent, .connection = undefined, .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined, .cid = undefined };
+            return @This(){ .parent = parent, .conn = undefined, .auth_callback = auth_callback, .custom_init_callback = custom_init, .custom_cleanup_callback = custom_cleanup, .context = undefined, .timer = undefined, .config = undefined, .drbg = undefined, .entropy = undefined, .entropy_seed = 0x55555555, .ec = undefined, .cid = undefined };
         }
+        /// Initialize the SSL context
+        pub fn messup(self: *@This()) void {
+            //self.entropy_seed = 0x55555555;
+
+            c.miso_mbedtls_init_timer(&self.timer);
+            c.mbedtls_ssl_init(&self.context);
+            c.mbedtls_ssl_config_init(&self.config);
+            c.mbedtls_ctr_drbg_init(&self.drbg);
+            c.mbedtls_entropy_init(&self.entropy);
+
+            if (mode == connection.security_mode.certificate_ec) {
+                // Initialize the certificate chains
+                c.mbedtls_x509_crt_init(&self.ec.own_crt);
+                c.mbedtls_x509_crt_init(&self.ec.peer_crt);
+                c.mbedtls_x509_crl_init(&self.ec.peer_crl);
+                c.mbedtls_pk_init(&self.ec.own_pk);
+            }
+        }
+
         pub fn cleanup(self: *@This()) void {
             if (self.custom_cleanup_callback) |custom| {
                 custom(self);
@@ -145,7 +164,10 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
                 _ = self.deinit();
             }
 
-            try self.connection.open(uri, local_port);
+            try self.conn.open(uri, local_port);
+            errdefer {
+                self.conn.close() catch {};
+            }
 
             if (proto.isTls()) {
                 //ret = c.mbedtls_ssl_set_hostname(&self.context, @ptrCast(uri.host.?));
@@ -156,20 +178,22 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
                 ret = c.mbedtls_ssl_handshake(&self.context);
             }
         }
+        /// Close connection to peer
         pub fn close(self: *@This()) !void {
             defer {
                 _ = self.deinit();
             }
-            try self.connection.close();
+            try self.conn.close();
         }
-
+        /// Send data to peer
         pub fn send(self: *@This(), buffer: []const u8) !usize {
-            if (self.connection.getProto().isTls()) {
+            if (self.conn.getProto().isTls()) {
                 return self.send_tls(buffer);
             } else {
                 return self.send_dtls(buffer);
             }
         }
+        /// Send data via DTLS
         fn send_dtls(self: *@This(), buffer: []const u8) !usize {
             var offset: usize = 0;
             var cid_enabled: c_int = c.MBEDTLS_SSL_CID_DISABLED;
@@ -198,7 +222,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
             return if (ret == 0) offset else connection.connection_error.send_error;
         }
-
+        /// Read data via DTLS
         fn read_dtls(self: *@This(), buffer: []u8) ![]u8 {
             var numBytes: isize = c.MBEDTLS_ERR_SSL_WANT_READ;
 
@@ -208,76 +232,39 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
 
             return if (numBytes < 0) connection.connection_error.recieve_error else buffer[0..@intCast(numBytes)];
         }
+        /// Read data via TLS
         fn read_tls(self: *@This(), buffer: []u8) ![]u8 {
             var numBytes: i32 = c.MBEDTLS_ERR_SSL_WANT_READ;
-            var res: i32 = 0;
+            //var res: i32 = 0;
 
             while ((numBytes == c.MBEDTLS_ERR_SSL_WANT_READ) or (numBytes == c.MBEDTLS_ERR_SSL_WANT_WRITE) or (numBytes == c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS) or (numBytes == c.MBEDTLS_ERR_SSL_CLIENT_RECONNECT)) {
                 numBytes = c.mbedtls_ssl_read(&self.context, @ptrCast(buffer.ptr), @intCast(buffer.len));
             }
 
-            if ((numBytes < 0) and !(numBytes == c.MBEDTLS_ERR_SSL_TIMEOUT)) {
-                // Connection Renegociation logic
-
-                // Send Close Notify
-                res = c.MBEDTLS_ERR_SSL_WANT_WRITE;
-                while ((res == c.MBEDTLS_ERR_SSL_WANT_READ) or (res == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
-                    res = c.mbedtls_ssl_close_notify(&self.context);
-                }
-
-                res = c.mbedtls_ssl_session_reset(&self.context);
-
-                // Retry handshake
-                if (res == 0) {
-                    res = c.MBEDTLS_ERR_SSL_WANT_WRITE;
-                    while ((res == c.MBEDTLS_ERR_SSL_WANT_READ) or (res == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
-                        res = c.mbedtls_ssl_handshake(&self.context);
-                    }
-                }
-            }
-
             return if (numBytes < 0) connection.connection_error.recieve_error else buffer[0..@intCast(numBytes)];
         }
+        /// Send data via TLS
         fn send_tls(self: *@This(), buffer: []const u8) !usize {
             var offset: usize = 0;
-            var ret: i32 = 0;
-            while (offset != buffer.len) {
+            var ret: i32 = -1;
+            while (offset < buffer.len) {
                 const slice = buffer[offset..];
                 const num_bytes = c.mbedtls_ssl_write(&self.context, @ptrCast(slice.ptr), @intCast(slice.len));
                 if ((c.MBEDTLS_ERR_SSL_WANT_READ == num_bytes) or (c.MBEDTLS_ERR_SSL_WANT_WRITE == num_bytes) or (c.MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS == num_bytes) or (c.MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS == num_bytes)) {
                     continue;
-                } else if (num_bytes < 0) {
-                    // Connection Renegociation logic
-
-                    // Send Close Notify
-                    ret = c.MBEDTLS_ERR_SSL_WANT_WRITE;
-                    while ((ret == c.MBEDTLS_ERR_SSL_WANT_READ) or (ret == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
-                        ret = c.mbedtls_ssl_close_notify(&self.context);
-                    }
-
-                    ret = c.mbedtls_ssl_session_reset(&self.context);
-
-                    // Retry handshake
-                    if (ret == 0) {
-                        ret = c.MBEDTLS_ERR_SSL_WANT_WRITE;
-                        while ((ret == c.MBEDTLS_ERR_SSL_WANT_READ) or (ret == c.MBEDTLS_ERR_SSL_WANT_WRITE)) {
-                            ret = c.mbedtls_ssl_handshake(&self.context);
-                        }
-                    }
-                    if (ret != 0) {
-                        break;
-                    }
-
-                    // return connection.connection_error.send_error;
-                } else {
+                } else if (num_bytes >= 0) {
                     offset += @as(usize, @intCast(num_bytes));
+                    ret = 0;
+                } else {
+                    ret = num_bytes;
+                    break;
                 }
             }
             return if (ret == 0) offset else connection.connection_error.send_error;
         }
-
+        /// Recieve data from peer
         pub fn recieve(self: *@This(), buffer: []u8) ![]u8 {
-            if (self.connection.getProto().isTls()) {
+            if (self.conn.getProto().isTls()) {
                 return self.read_tls(buffer);
             } else {
                 return self.read_dtls(buffer);
@@ -285,19 +272,19 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
         }
         /// Send data callback for MbedTLS
         fn send_c(ctx: ?*anyopaque, data: [*c]const u8, data_len: usize) callconv(.C) c_int {
-            const self: *@This() = @ptrCast(@alignCast(ctx));
-            const len = self.connection.send_c(data[0..data_len]);
+            const self: *@This() = @as(*@This(), @ptrCast(@alignCast(ctx)));
+            const len = self.conn.send_c(data[0..data_len]);
             return if (len == connection.EAGAIN) c.MBEDTLS_ERR_SSL_WANT_WRITE else len;
         }
         /// Recieve data callback for MbedTLS
         fn recv_c(ctx: ?*anyopaque, data: [*c]u8, data_len: usize) callconv(.C) c_int {
-            const self: *@This() = @ptrCast(@alignCast(ctx));
-            const len = self.connection.recieve_c(data[0..data_len]);
+            const self: *@This() = @as(*@This(), @ptrCast(@alignCast(ctx)));
+            const len = self.conn.recieve_c(data[0..data_len]);
             return if (len == connection.EAGAIN) c.MBEDTLS_ERR_SSL_WANT_READ else len;
         }
 
         pub fn waitRx(self: *@This(), timeout: u32) !bool {
-            return self.connection.waitRx(timeout);
+            return self.conn.waitRx(timeout);
         }
         /// Initialize the MbedTLS context
         pub fn init(self: *@This(), protocol: connection.proto) !void {
@@ -311,19 +298,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
             if (self.custom_init_callback) |custom| {
                 custom(self, mode);
             } else {
-                c.miso_mbedtls_init_timer(&self.timer);
-                c.mbedtls_ssl_init(&self.context);
-                c.mbedtls_ssl_config_init(&self.config);
-                c.mbedtls_ctr_drbg_init(&self.drbg);
-                c.mbedtls_entropy_init(&self.entropy);
-
-                if (mode == connection.security_mode.certificate_ec) {
-                    // Initialize the certificate chains
-                    c.mbedtls_x509_crt_init(&self.ec.own_crt);
-                    c.mbedtls_x509_crt_init(&self.ec.peer_crt);
-                    c.mbedtls_x509_crl_init(&self.ec.peer_crl);
-                    c.mbedtls_pk_init(&self.ec.own_pk);
-                }
+                self.messup();
 
                 const transport: c_int = switch (protocol) {
                     .dtls_ip4, .dtls_ip6 => c.MBEDTLS_SSL_TRANSPORT_DATAGRAM,
@@ -400,7 +375,7 @@ pub fn TlsContext(comptime T: type, comptime conn: type, comptime mode: connecti
                     c.mbedtls_ssl_set_bio(&self.context, @ptrCast(@alignCast(self)), send_c, recv_c, null);
                     c.mbedtls_ssl_set_mtu(&self.context, 1472);
                 }
-            }
+            } // End of standard init
 
             if (ret != mbedtls_ok) {
                 return mbedtls_error.init_error;
