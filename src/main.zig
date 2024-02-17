@@ -180,9 +180,6 @@ pub export fn appStart() void {
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
-    //@setRuntimeSafety(false);
-    //__libc_init_array();
-    //@setRuntimeSafety(true);
     SystemInit();
 }
 

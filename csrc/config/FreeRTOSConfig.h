@@ -396,6 +396,8 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 /* Debugging assistance. ******************************************************/
 /******************************************************************************/
 
+extern void hang(void);
+
 /* configASSERT() has the same semantics as the standard C assert().  It can
  * either be defined to take an action when the assertion fails, or not defined
  * at all (i.e. comment out or delete the definitions) to completely remove
@@ -404,13 +406,7 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
  * number of the failing assert (for example, "vAssertCalled( __FILE__, __LINE__ )"
  * or it can simple disable interrupts and sit in a loop to halt all execution
  * on the failing line for viewing in a debugger. */
-#define configASSERT( x )         \
-    if( ( x ) == 0 )              \
-    {                             \
-        taskDISABLE_INTERRUPTS(); \
-        for( ; ; )                \
-        ;                         \
-    }
+#define configASSERT( x )     if( ( x ) == 0 ) {  hang(); }
 
 /******************************************************************************/
 /* FreeRTOS MPU specific definitions. *****************************************/
