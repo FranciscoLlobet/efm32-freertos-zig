@@ -47,7 +47,7 @@ def private_key(c):
 
 @task(pre=[private_key])
 def public_key(c):
-    c.run(f"openssl ec -in fw_private_key.pem -pubout -out {PUB_KEY}")
+    c.run(f"openssl ec -in {PRIV_KEY} -pubout -out {PUB_KEY}")
 
 
 @task
