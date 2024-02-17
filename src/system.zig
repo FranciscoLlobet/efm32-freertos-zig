@@ -70,6 +70,10 @@ pub fn reset() void {
     };
 }
 
+pub export fn system_reset() callconv(.C) void {
+    reset();
+}
+
 pub fn shutdown() void {
     reset();
 }

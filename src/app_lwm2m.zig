@@ -58,10 +58,6 @@ export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
 }
 
-pub export fn system_reset() callconv(.C) void {
-    system.reset();
-}
-
 pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
     user.user_task.task.notify(event, .eSetBits) catch {};
 }

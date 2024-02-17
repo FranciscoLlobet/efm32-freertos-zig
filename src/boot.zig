@@ -47,10 +47,6 @@ export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
 }
 
-pub export fn system_reset() callconv(.C) void {
-    system.reset();
-}
-
 /// Application entry point
 pub export fn main() noreturn {
     board.init();

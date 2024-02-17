@@ -1,5 +1,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const board = microzig.board;
+
 const freertos = @import("freertos.zig");
 const system = @import("system.zig");
 const sensors = @import("sensors.zig");
@@ -11,7 +13,6 @@ const user = @import("user.zig");
 const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
-const board = microzig.board;
 
 const c = @cImport({
     @cInclude("board.h");
@@ -20,8 +21,8 @@ const c = @cImport({
 });
 
 // Enable or Disable features at compile time
-pub const enable_lwm2m = true;
-pub const enable_mqtt = false;
+pub const enable_lwm2m = false;
+pub const enable_mqtt = true;
 pub const enable_http = true;
 
 /// Export the NVM3 handle
@@ -55,10 +56,6 @@ export fn vApplicationTickHook() void {
 
 export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
-}
-
-pub export fn system_reset() callconv(.C) void {
-    system.reset();
 }
 
 pub export fn miso_notify_event(event: c.miso_event) callconv(.C) void {
