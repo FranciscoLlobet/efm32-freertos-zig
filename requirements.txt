@@ -3,3 +3,4 @@ yamllint
 pygount
 ninja
 meson
+invoke

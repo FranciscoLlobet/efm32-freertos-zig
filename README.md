@@ -273,16 +273,16 @@ Use the base64 output as a one-line string in the config (`http.key`)
 
 Use the MCUBoot [`imgtool`](https://docs.mcuboot.com/imgtool.html) script to sign and generate the fw container.
 
-The firmware container header is `0x80` (128) bytes long and the start address is currently `0x7800`
+The firmware container header is `0x80` (128) bytes long and the start address is currently `0x40000` (256kB)
 
 ```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x78000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0x78000 --align 4 .\zig-out\firmware\app.bin app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x40000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0xB0000 --align 4 .\zig-out\firmware\lwm2m.bin lwm2m_sig.bin
 ```
 
 Verify the content of the firmware container.
 
 ```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\lwm2m_sig.bin
 ```
 
 ## Configuration signature
