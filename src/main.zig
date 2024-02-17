@@ -27,6 +27,9 @@ pub const enable_http = true;
 
 extern fn xPortSysTickHandler() callconv(.C) void;
 
+extern fn vPortSVCHandler() callconv(.Naked) void;
+extern fn xPortPendSVHandler() callconv(.Naked) void;
+
 export fn __stack_chk_fail() callconv(.C) noreturn {
     microzig.hang();
 }
@@ -64,6 +67,10 @@ export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
 }
 
+export fn hang() callconv(.C) void {
+    microzig.hang();
+}
+
 pub const microzig_options = struct {
     pub const interrupts = struct {
         pub fn GPIO_EVEN() void {
@@ -92,56 +99,12 @@ pub const microzig_options = struct {
                 xPortSysTickHandler();
             }
         }
-        pub fn PendSV() callconv(.Naked) void {
-            asm volatile (
-                \\mrs r0, psp
-                \\isb
-                \\
-                \\ldr r3, pxCurrentTCBConst
-                \\ldr r2, [r3]
-                \\
-                \\stmdb r0!, {r4-r11}
-                \\str r0, [r2]
-                \\
-                \\stmdb sp!, {r3, r14}
-                \\mov r0, %[priority]
-                \\msr basepri, r0
-                \\bl vTaskSwitchContext
-                \\mov r0, #0
-                \\msr basepri, r0
-                \\ldmia sp!, {r3, r14}
-                \\
-                \\ldr r1, [r3]
-                \\ldr r0, [r1]
-                \\ldmia r0!, {r4-r11}
-                \\msr psp, r0
-                \\isb
-                \\bx r14
-                \\
-                \\.align 4
-                \\pxCurrentTCBConst: .word pxCurrentTCB
-                :
-                : [priority] "i" (freertos.c.configMAX_SYSCALL_INTERRUPT_PRIORITY),
-            );
-        }
-        pub fn SVCall() callconv(.Naked) void {
-            // Copy pasta the assembler code since the call to the naked function was not working
-            asm volatile (
-                \\ldr r3, pxCurrentTCBConst2  /* Restore the context. */
-                \\ldr r1, [r3]                /* Use pxCurrentTCBConst to get the pxCurrentTCB address. */
-                \\ldr r0, [r1]                /* The first item in pxCurrentTCB is the task top of stack. */
-                \\ldmia r0!, {r4-r11}         /* Pop the registers that are not automatically saved on exception entry and the critical nesting count. */
-                \\msr psp, r0                 /* Restore the task stack pointer. */
-                \\isb                         
-                \\mov r0, #0                  
-                \\msr basepri, r0             
-                \\orr r14, #0xd               
-                \\bx r14                      
-                \\                            
-                \\.align 4                  
-                \\pxCurrentTCBConst2: .word pxCurrentTCB
-            );
-        }
+        /// Redirecting the PendSV to the FreeRTOS handler
+        pub const PendSV = xPortPendSVHandler;
+
+        /// Redirecting the SVCall to the FreeRTOS handler
+        pub const SVCall = vPortSVCHandler;
+
         pub fn HardFault() void {
             microzig.hang(); //c_board.BOARD_MCU_Reset();
         }
