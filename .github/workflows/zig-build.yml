@@ -62,7 +62,7 @@ jobs:
 
       # Runs FW signature test
       - name: Generate test keys and sign firmware
-        run: inv sig-fw-images
+        run: inv --echo sig-fw-images
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

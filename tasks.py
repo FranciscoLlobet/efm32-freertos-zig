@@ -56,7 +56,7 @@ def sig_fw_dir(c):
         SIG_FW_DIR.mkdir()
 
 
-@task(pre=[sig_fw_dir, public_key])
+@task(pre=[public_key, sig_fw_dir])
 def sig_fw_images(c):
     c.run(
         f'python {IMG_TOOL} sign -v "0.1.2" -F 0x40000 -R 0xff --header-size 0x80 --pad-header -k {PRIV_KEY} --overwrite-only --public-key-format full -S 0xB0000 --align 4 {LWM2M_BIN} {LWM2M_SIG_BIN}'
