@@ -76,7 +76,7 @@ pub fn build(b: *std.Build) !void {
     };
 
     const application_target = .{
-        .name = "app",
+        .name = "lwm2m",
         .target = .{
             .preferred_format = .elf,
             .chip = chips.application,
