@@ -31,7 +31,7 @@ def zig_exe():
     """Choose Zig executable. If Zig is not installed, use the Python ziglang package."""
     try:
         subprocess.run(["zig", "version"], check=True)
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return f"{PYTHON_EXE} -m ziglang"
     return "zig"
 
