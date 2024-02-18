@@ -50,7 +50,10 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip setuptools wheel -r requirements.txt
-          python -m pip install --upgrade -r csrc/mcuboot/mcuboot/scripts/requirements.txt 
+          inv get-mcuboot-deps
+
+      - name: Clean Zig build
+        run: inv clean
 
       # Runs the Zig formatter and AST checker
       - name: Run Zig formatter
@@ -60,9 +63,9 @@ jobs:
       - name: Run Zig program
         run: python -m ziglang build
 
-      # Runs FW signature test
+      # Generate test private key
       - name: Generate test keys and sign firmware
-        run: inv --echo sig-fw-images
+        run: inv private-key sign_fw_images
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

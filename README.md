@@ -47,7 +47,7 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) and macOS (via brew) builds.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip), macOS (via brew) and [python ziglang](https://pypi.org/project/ziglang/) builds.
 
 #### Install the Arm GNU Toolchain
 
@@ -83,6 +83,52 @@ git submodule update
 ```powershell
 zig build
 ```
+
+### Automatization and tasks
+
+#### Automatisation
+
+See the [`zig-build.yml`](./.github/workflows/zig-build.yml) Github workflow for the current automatisation workflow
+
+### Tasks
+
+#### Base dependencies
+
+Get the tooling dependencies
+
+```console
+ python -m pip install --upgrade pip setuptools wheel -r requirements.txt
+ ```
+
+#### mcuboot dependencies
+
+```console
+inv get-mcuboot-deps
+```
+
+#### Generate private FW signing key
+
+To generate the firmware signing key:
+
+```console
+inv private-key
+```
+
+> Keep the private key safe.
+
+#### Sign and verify FW images
+
+- Via invoke:
+
+  ```console
+  inv sign-fw-images
+  ```
+
+- Via do-it:
+
+  ```console
+  doit
+  ```
 
 ## Used 3rd party software
 
