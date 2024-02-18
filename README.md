@@ -19,13 +19,13 @@ The current version of `MISO` boasts a set of features, including:
 - read configuration files from a SD card,
 - provide configuration persistance using non-volatile memory (NVM),
 - connect to a designated WiFi AP,
-- get a sNTP timestamp from an internet server and run a real-time clock (RTC),
-- provide a basic secured LWM2M service client with connection management,
-- provide a basic MQTT service client (QOS0 and QOS1 support, QOS2 experimental),
-- provide a HTTP file download client for configuration and firmware updates
+- get a sNTP timestamp from an internet server and run a real-time clock (RTC) with seconds (s) resolution,
+- provide a HTTP file download client for firmware updates
 - mbedTLS PSK and x509 certificate authentication tested with TLS (MQTTS) and DTLS (COAPS),
-- Watchdog
+- HW Watchdog (7s idle timeout)
 - Bootloader with support for MCUBoot firmware containers
+
+Either a binary with LwM2M via secure COAP (DTLS) or MQTT via TLS.
 
 ## Non-Features
 
@@ -84,7 +84,23 @@ git submodule update
 zig build
 ```
 
+`zig build` will build the binaries for:
+
+- [`boot.bin`](./zig-out/firmware/boot.bin) (bootloader)
+- [`lwm2m.bin`](./zig-out/firmware/lwm2m.bin) (LwM2M app)
+- [`mqtt.bin`](./zig-out/firmware/mqtt.bin) (MQTT app)
+
+And the corresponding `elf` files for direct debugger (SWD) deployment.
+
+> Links only work in your local system after build
+
+If using the python-based `ziglang` package:
+>`python -m ziglang build`
+
 ### Automatization and tasks
+
+The automatization toolchain requires Python 3.x and modules like `invoke`/`ìnv`, `doit`.
+Furthermore it also requires a working copy of `OpenSSL`
 
 #### Automatisation
 
@@ -284,6 +300,10 @@ The public key is provided in the configuration file.
 The firmware update process takes the firmware container and the locally stored public key to perform the validation.
 
 > FW download has been tested on a non-public (https://nginx.org) server.
+
+### Notes
+
+> **Some of following actions actions have also corresponding `inv` tasks described previously.**
 
 ### Generate the private key
 
