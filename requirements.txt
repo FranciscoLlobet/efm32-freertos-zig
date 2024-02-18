@@ -1,6 +1,5 @@
 ziglang==0.11.0
-yamllint
-pygount
 ninja
 meson
 invoke
+doit
