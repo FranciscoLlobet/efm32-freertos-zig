@@ -65,7 +65,7 @@ jobs:
 
       # Generate test private key
       - name: Generate test keys and sign firmware
-        run: inv private-key sign_fw_images
+        run: inv private-key sign-fw-images
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
