@@ -29,9 +29,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
           cache: 'pip'
@@ -41,6 +39,7 @@ jobs:
         run: |
           sudo apt-get install -y gcc-arm-none-eabi clang-format
       
+      # Get and install Clang 16 to build picolibc
       - name: Install Clang 16
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -57,10 +56,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel -r requirements.txt
           inv get-mcuboot-deps
-
+      
+      # Clean Zig build
       - name: Clean Zig build
         run: inv clean
 
+      # Build picolibc
       - name: Build picolibc
         run: inv build-picolibc
 
@@ -84,6 +85,8 @@ jobs:
             zig-out/firmware/*.elf
             zig-out/firmware/*.bin
             zig-out/firmware/*.hex
+            signed/*.bin
+            keys/*.pem
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
