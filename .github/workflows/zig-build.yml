@@ -39,7 +39,13 @@ jobs:
       # Not necessary for this workflow, but useful for debugging
       - name: Install arm-none-eabi-gcc
         run: |
-          sudo apt-get install -y gcc-arm-none-eabi clang-format clang-16
+          sudo apt-get install -y gcc-arm-none-eabi clang-format
+      
+      - name: Install Clang 16
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod u+x llvm.sh
+          sudo ./llvm.sh 16
       
       # Not necessary for this workflow, but useful for debugging
       - name: Install Openssl
