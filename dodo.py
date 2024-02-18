@@ -17,9 +17,6 @@ SIG_FW_DIR = Path.cwd() / "signed"
 LWM2M_BIN = "lwm2m.bin"
 MQTT_BIN = "mqtt.bin"
 
-LWM2M_SIG_BIN = SIG_FW_DIR / "lwm2m_sig.bin"
-MQTT_SIG_BIN = SIG_FW_DIR / "mqtt_sig.bin"
-
 IMG_TOOL = Path.cwd() / "csrc" / "mcuboot" / "mcuboot" / "scripts" / "imgtool.py"
 
 MISO_FW_VERSION = "0.1.2"
@@ -91,7 +88,7 @@ def task_verify_fw_images():
 
         yield {
             "name": f"Verify {bin} firmware image.",
-            "actions": [f"{PYTHON_EXE} {IMG_TOOL} verify {LWM2M_SIG_BIN}"],
+            "actions": [f"{PYTHON_EXE} {IMG_TOOL} verify {target_file_name}"],
             "file_dep": [PUB_KEY, target_file_name],
             "verbosity": 2,
         }
