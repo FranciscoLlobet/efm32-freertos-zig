@@ -2,14 +2,8 @@ const std = @import("std");
 const microzig = @import("microzig");
 const freertos = @import("freertos.zig");
 const system = @import("system.zig");
-//const sensors = @import("sensors.zig");
-//const network = @import("network.zig");
-const config = @import("config.zig");
 const leds = @import("leds.zig");
 const buttons = @import("buttons.zig");
-//const usb = @import("usb.zig");
-//const user = @import("user.zig");
-//const events = @import("events.zig");
 const fatfs = @import("fatfs.zig");
 const nvm = @import("nvm.zig");
 const app = @import("boot/app.zig");
@@ -22,38 +16,15 @@ const c = @cImport({
 
 const board = microzig.board;
 
-extern fn xPortSysTickHandler() callconv(.C) void;
-
-export fn vApplicationIdleHook() void {
-    board.watchdogFeed();
-}
+/// Redirecting the common system IRQ handlers
+pub const microzig_options = system.microzig_options;
 
 /// Export the NVM3 handle
 pub export const miso_nvm3_handle = &nvm.miso_nvm3;
 pub export const miso_nvm3_init_handle = &nvm.miso_nvm3_init;
 
-//var timerTask: freertos.StaticTask(@This(), config.rtos_stack_depth_timer_task, "timer", dummyTask) = undefined;
-//var idleTask: freertos.StaticTask(@This(), config.rtos_stack_depth_idle_task, "idle", dummyTask) = undefined;
-
-fn dummyTask(self: *@This()) void {
-    _ = self;
-    unreachable;
-}
-
-//export fn vApplicationGetTimerTaskMemory(ppxTimerTaskTCBBuffer: **freertos.StaticTask_t, ppxTimerTaskStackBuffer: **freertos.StackType_t, pulTimerTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxTimerTaskTCBBuffer.* = &timerTask.staticTask;
-//    ppxTimerTaskStackBuffer.* = &timerTask.stack[0];
-//    pulTimerTaskStackSize.* = timerTask.stack.len;
-//}
-
-//export fn vApplicationGetIdleTaskMemory(ppxIdleTaskTCBBuffer: **freertos.StaticTask_t, ppxIdleTaskStackBuffer: **freertos.StackType_t, pulIdleTaskStackSize: *c_uint) callconv(.C) void {
-//    ppxIdleTaskTCBBuffer.* = &idleTask.staticTask;
-//    ppxIdleTaskStackBuffer.* = &idleTask.stack[0];
-//    pulIdleTaskStackSize.* = idleTask.stack.len;
-//}
-
-export fn vApplicationDaemonTaskStartupHook() void {
-    appStart();
+export fn vApplicationIdleHook() void {
+    board.watchdogFeed();
 }
 
 export fn vApplicationStackOverflowHook() noreturn {
@@ -68,110 +39,12 @@ export fn vApplicationTickHook() void {
     //
 }
 
+export fn vApplicationDaemonTaskStartupHook() void {
+    appStart();
+}
+
 export fn vApplicationGetRandomHeapCanary(pxHeapCanary: [*c]u32) void {
     pxHeapCanary.* = @as(u32, 0xdeadbeef);
-}
-
-pub const microzig_options = struct {
-    pub const interrupts = struct {
-        pub fn GPIO_EVEN() void {
-            c.GPIO_EVEN_IRQHandler();
-        }
-        pub fn GPIO_ODD() void {
-            c.GPIO_ODD_IRQHandler();
-        }
-        pub fn RTC() void {
-            c.RTC_IRQHandler();
-        }
-        pub fn DMA() void {
-            c.DMA_IRQHandler();
-        }
-        pub fn I2C0() void {
-            //c.I2C0_IRQHandler();
-        }
-        pub fn USB() void {
-            //c.USB_IRQHandler();
-        }
-        pub fn TIMER0() void {
-            c.TIMER0_IRQHandler();
-        }
-        pub fn SysTick() void {
-            if (.taskSCHEDULER_NOT_STARTED != freertos.xTaskGetSchedulerState()) {
-                xPortSysTickHandler();
-            }
-        }
-        pub fn PendSV() callconv(.Naked) void {
-            asm volatile (
-                \\mrs r0, psp
-                \\isb
-                \\
-                \\ldr r3, pxCurrentTCBConst
-                \\ldr r2, [r3]
-                \\
-                \\stmdb r0!, {r4-r11}
-                \\str r0, [r2]
-                \\
-                \\stmdb sp!, {r3, r14}
-                \\mov r0, %[priority]
-                \\msr basepri, r0
-                \\bl vTaskSwitchContext
-                \\mov r0, #0
-                \\msr basepri, r0
-                \\ldmia sp!, {r3, r14}
-                \\
-                \\ldr r1, [r3]
-                \\ldr r0, [r1]
-                \\ldmia r0!, {r4-r11}
-                \\msr psp, r0
-                \\isb
-                \\bx r14
-                \\
-                \\.align 4
-                \\pxCurrentTCBConst: .word pxCurrentTCB
-                :
-                : [priority] "i" (freertos.c.configMAX_SYSCALL_INTERRUPT_PRIORITY),
-            );
-        }
-        pub fn SVCall() callconv(.Naked) void {
-            // Copy pasta the assembler code since the call to the naked function was not working
-            asm volatile (
-                \\ldr r3, pxCurrentTCBConst2  /* Restore the context. */
-                \\ldr r1, [r3]                /* Use pxCurrentTCBConst to get the pxCurrentTCB address. */
-                \\ldr r0, [r1]                /* The first item in pxCurrentTCB is the task top of stack. */
-                \\ldmia r0!, {r4-r11}         /* Pop the registers that are not automatically saved on exception entry and the critical nesting count. */
-                \\msr psp, r0                 /* Restore the task stack pointer. */
-                \\isb                         
-                \\mov r0, #0                  
-                \\msr basepri, r0             
-                \\orr r14, #0xd               
-                \\bx r14                      
-                \\                            
-                \\.align 4                  
-                \\pxCurrentTCBConst2: .word pxCurrentTCB
-            );
-        }
-        pub fn HardFault() void {
-            microzig.hang(); //c_board.BOARD_MCU_Reset();
-        }
-        pub fn MemManageFault() void {
-            microzig.hang(); //c_board.BOARD_MCU_Reset();
-        }
-        pub fn BusFault() void {
-            microzig.hang();
-        }
-        pub fn UsageFault() void {
-            microzig.hang();
-        }
-    };
-};
-
-pub export fn SVC7_Handler() callconv(.Naked) void {
-    asm volatile ("nop");
-    //microzig.cpu.regs.CONTROL.modify(.{ .nPRIV = 0 });
-}
-
-pub export fn system_reset() callconv(.C) void {
-    system.reset();
 }
 
 /// Application entry point
@@ -222,37 +95,6 @@ extern fn __libc_init_array() callconv(.C) void;
 extern fn SystemInit() callconv(.C) void;
 
 pub export fn init() void {
-    __libc_init_array();
-
+    //__libc_init_array();
     SystemInit();
-}
-
-// Button On-Change Callback
-pub export fn sl_button_on_change(handle: buttons.button_handle) callconv(.C) void {
-    const instance = buttons.getInstance(handle);
-    const state = instance.getState();
-    switch (instance.getName()) {
-        .button1 => {
-            switch (state) {
-                .pressed => {
-                    leds.red.on();
-                },
-                .released => {
-                    leds.red.off();
-                },
-                else => {},
-            }
-        },
-        .button2 => {
-            switch (state) {
-                .pressed => {
-                    leds.orange.on();
-                },
-                .released => {
-                    leds.orange.off();
-                },
-                else => {},
-            }
-        },
-    }
 }

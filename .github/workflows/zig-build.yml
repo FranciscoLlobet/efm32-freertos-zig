@@ -40,12 +40,20 @@ jobs:
       - name: Install arm-none-eabi-gcc
         run: |
           sudo apt-get install -y gcc-arm-none-eabi clang-format
+      
+      # Not necessary for this workflow, but useful for debugging
+      - name: Install Openssl
+        run: |
+          sudo apt-get install -y openssl
 
       # Installs dependencies using pip
       - name: Install deps
         run: |
           python -m pip install --upgrade pip setuptools wheel -r requirements.txt
-          python -m pip install --upgrade -r csrc/mcuboot/mcuboot/scripts/requirements.txt 
+          inv get-mcuboot-deps
+
+      - name: Clean Zig build
+        run: inv clean
 
       # Runs the Zig formatter and AST checker
       - name: Run Zig formatter
@@ -54,6 +62,10 @@ jobs:
       # Runs Zig using the Python environment
       - name: Run Zig program
         run: python -m ziglang build
+
+      # Generate test private key
+      - name: Generate test keys and sign firmware
+        run: inv private-key sign-fw-images
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

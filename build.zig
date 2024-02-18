@@ -53,11 +53,10 @@ pub fn build(b: *std.Build) !void {
 
         // Core C-source
         "csrc/src/config.c",
-        "csrc/src/network.c",
         "csrc/src/wifi_service.c",
     };
 
-    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION", "-fstack-protector-all" };
+    const c_flags = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_APPLICATION" };
 
     const c_flags_boot = [_][]const u8{ "-O2", "-DEFM32GG390F1024", "-DSL_CATALOG_POWER_MANAGER_PRESENT=1", "-fdata-sections", "-ffunction-sections", "-DMISO_BOOTLOADER" };
 
@@ -77,14 +76,25 @@ pub fn build(b: *std.Build) !void {
     };
 
     const application_target = .{
-        .name = "app",
+        .name = "lwm2m",
         .target = .{
             .preferred_format = .elf,
             .chip = chips.application,
             .board = boards.xdk110,
         },
         .optimize = optimize,
-        .source_file = .{ .path = "src/main.zig" },
+        .source_file = .{ .path = "src/app_lwm2m.zig" },
+    };
+
+    const mqtt_app_target = .{
+        .name = "mqtt",
+        .target = .{
+            .preferred_format = .elf,
+            .chip = chips.application,
+            .board = boards.xdk110,
+        },
+        .optimize = optimize,
+        .source_file = .{ .path = "src/app_mqtt.zig" },
     };
 
     const bootloader = microzig.addFirmware(b, bootloader_target);
@@ -136,10 +146,37 @@ pub fn build(b: *std.Build) !void {
     build_picohttpparser.aggregate(application);
     build_mcuboot.aggregate(application);
 
+    const mqtt_app = microzig.addFirmware(b, mqtt_app_target);
+
+    mqtt_app.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
+    mqtt_app.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
+    mqtt_app.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+
+    for (include_path_array) |path| {
+        mqtt_app.addIncludePath(.{ .path = path });
+    }
+
+    for (src_paths) |path| {
+        mqtt_app.addCSourceFile(.{ .file = .{ .path = path }, .flags = &c_flags });
+    }
+
+    build_ff.build_ff(mqtt_app);
+    build_gecko_sdk.aggregate(mqtt_app);
+    build_freertos.aggregate(mqtt_app);
+    build_sensors.aggregate(mqtt_app);
+    build_cc3100_sdk.aggregate(mqtt_app);
+    build_mbedts.aggregate(mqtt_app);
+    build_wakaama.aggregate(mqtt_app);
+    build_mqtt.aggregate(mqtt_app);
+    build_picohttpparser.aggregate(mqtt_app);
+    build_mcuboot.aggregate(mqtt_app);
+
     microzig.installFirmware(b, bootloader, .{ .format = .elf });
     microzig.installFirmware(b, bootloader, .{ .format = .bin });
-    microzig.installFirmware(b, bootloader, .{ .format = .hex });
+
     microzig.installFirmware(b, application, .{ .format = .elf });
-    microzig.installFirmware(b, application, .{ .format = .hex });
     microzig.installFirmware(b, application, .{ .format = .bin });
+
+    microzig.installFirmware(b, mqtt_app, .{ .format = .elf });
+    microzig.installFirmware(b, mqtt_app, .{ .format = .bin });
 }

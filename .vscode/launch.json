@@ -21,8 +21,8 @@
         },
         {
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceRoot}/zig-out/firmware/app.elf",
-            "name": "Debug Main with JLink MacOs",
+            "executable": "${workspaceRoot}/zig-out/firmware/lwm2m.elf",
+            "name": "LWM2M App MacOS",
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "ResetHandler",
@@ -53,8 +53,8 @@
         },
         {
             "cwd": "${workspaceRoot}",
-            "executable": "${workspaceRoot}/zig-out/firmware/app.elf",
-            "name": "Main Application",
+            "executable": "${workspaceRoot}/zig-out/firmware/lwm2m.elf",
+            "name": "LWM2M App WINDOWS",
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "jlink",

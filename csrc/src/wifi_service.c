@@ -10,7 +10,7 @@
 #include "board_cc3100.h"
 
 #include "simplelink.h"
-
+#include "network.h"
 //#include "mqtt/mqtt_client.h"
 
 #define WIFI_TASK_PRIORITY      (UBaseType_t)( miso_rtos_prio_above_normal )
@@ -189,7 +189,7 @@ void wifi_task(void *param)
 
 				miso_notify_event(miso_connectivity_off);
 
-				vTaskSuspend(network_monitor_task_handle);
+				suspend_network_mediator();
 		
 				sl_iostream_printf(sl_iostream_swo_handle, "Wifi Disconnected %x\n\r",
 						ulNotifiedValue);
@@ -224,7 +224,7 @@ void wifi_task(void *param)
 			if (ulNotifiedValue & ((uint32_t) wifi_ip_v4_acquired | (uint32_t) wifi_ip_v6_acquired))
 			{	
 				// Restart the network monitor
-				vTaskResume(network_monitor_task_handle);
+				resume_network_mediator();
 				miso_notify_event(miso_connectivity_on);
 			}
 
@@ -237,13 +237,13 @@ void wifi_task(void *param)
 			// Wifi Service House-Keeping
 			sl_iostream_printf(sl_iostream_swo_handle, "No event\n\r");
 			// Wake-up services that need networking for house-keeping
-			if((wifi_status.connection == wifi_connected))
+			if(wifi_status.connection == wifi_connected)
 			{
-				if(eTaskGetState(network_monitor_task_handle) == eSuspended)
-				{
-					vTaskResume(network_monitor_task_handle);
-					miso_notify_event(miso_connectivity_on);
-				}
+				//if(eTaskGetState(network_monitor_task_handle) == eSuspended)
+				//{
+				//	resume_network_mediator();
+				//	miso_notify_event(miso_connectivity_on);
+				//}
 			}
 			else
 			{

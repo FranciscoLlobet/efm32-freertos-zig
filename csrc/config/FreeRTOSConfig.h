@@ -228,13 +228,13 @@
  * timer task (in words, not in bytes!).  The timer task is a standard FreeRTOS
  * task.  See https://www.freertos.org/RTOS-software-timer-service-daemon-task.html
  * Only used if configUSE_TIMERS is set to 1. */
-#define configTIMER_TASK_STACK_DEPTH    configMINIMAL_STACK_SIZE
+#define configTIMER_TASK_STACK_DEPTH    512
 
 /* configTIMER_QUEUE_LENGTH sets the length of the queue (the number of discrete
  * items the queue can hold) used to send commands to the timer task.  See
  * https://www.freertos.org/RTOS-software-timer-service-daemon-task.html  Only used
  * if configUSE_TIMERS is set to 1. */
-#define configTIMER_QUEUE_LENGTH        10
+#define configTIMER_QUEUE_LENGTH        5
 
 /******************************************************************************/
 /* Memory allocation related definitions. *************************************/
@@ -258,7 +258,7 @@
  * or heap_4.c are included in the build.  This value is defaulted to 4096 bytes but
  * it must be tailored to each application.  Note the heap will appear in the .bss
  * section.  See https://www.freertos.org/a00111.html. */
-#define configTOTAL_HEAP_SIZE                        (51*1024)
+#define configTOTAL_HEAP_SIZE                        (47*1024)
 
 /* Set configAPPLICATION_ALLOCATED_HEAP to 1 to have the application allocate
  * the array used as the FreeRTOS heap.  Set to 0 to have the linker allocate the
@@ -396,6 +396,8 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 /* Debugging assistance. ******************************************************/
 /******************************************************************************/
 
+extern void hang(void);
+
 /* configASSERT() has the same semantics as the standard C assert().  It can
  * either be defined to take an action when the assertion fails, or not defined
  * at all (i.e. comment out or delete the definitions) to completely remove
@@ -404,13 +406,7 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
  * number of the failing assert (for example, "vAssertCalled( __FILE__, __LINE__ )"
  * or it can simple disable interrupts and sit in a loop to halt all execution
  * on the failing line for viewing in a debugger. */
-#define configASSERT( x )         \
-    if( ( x ) == 0 )              \
-    {                             \
-        taskDISABLE_INTERRUPTS(); \
-        for( ; ; )                \
-        ;                         \
-    }
+#define configASSERT( x )     if( ( x ) == 0 ) {  hang(); }
 
 /******************************************************************************/
 /* FreeRTOS MPU specific definitions. *****************************************/

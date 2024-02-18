@@ -7,6 +7,7 @@
 const std = @import("std");
 const connection = @import("connection.zig");
 const system = @import("system.zig");
+const simpleConnection = @import("simpleConnection.zig");
 
 const sntp_error = error{
     invalid_server_version,
@@ -177,7 +178,7 @@ const sntp_v4_packet = packed struct {
     }
 };
 
-var conn: connection.Connection(.ntp, void) = undefined;
+var conn: simpleConnection.SimpleLinkConnection(.udp_ip4) = undefined;
 
 /// Send an sNTP packet to the given connection.
 fn send(c: *@TypeOf(conn), packet: *sntp_v4_packet) !void {
@@ -191,14 +192,14 @@ fn send(c: *@TypeOf(conn), packet: *sntp_v4_packet) !void {
 /// Get the current time from an sNTP server using the given URI.
 ///
 pub fn getTimeFromServer(uri: std.Uri) !ntp_response {
-    conn.init();
+    //conn.init();
 
     var packet: sntp_v4_packet = undefined;
 
     const originate_timestamp_s: u32 = system.time.getNtpTime();
     const originate_timestamp_frac: u32 = 0;
 
-    try conn.create(uri, 123);
+    try conn.open(uri, 123);
     defer {
         conn.close() catch {};
     }
@@ -207,7 +208,7 @@ pub fn getTimeFromServer(uri: std.Uri) !ntp_response {
 
     try send(&conn, &packet);
 
-    _ = conn.waitRx(2);
+    _ = try conn.waitRx(2);
 
     _ = try conn.recieve(packet.slice());
 

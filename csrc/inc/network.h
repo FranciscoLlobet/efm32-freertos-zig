@@ -178,4 +178,11 @@ int wait_rx(miso_network_ctx_t ctx, uint32_t timeout_s);
 int wait_tx(miso_network_ctx_t ctx, uint32_t timeout_s);
 
 mbedtls_ssl_context * miso_network_get_ssl_ctx(miso_network_ctx_t ctx);
+
+
+// New ZIG based network manager
+extern int create_network_mediator(void);
+extern void suspend_network_mediator(void);
+extern void resume_network_mediator(void);
+//extern void notify_network_mediator(void);
 #endif /* NETWORK_H_ */

@@ -1,5 +1,4 @@
 const std = @import("std");
-//const microzig = @import("microzig");
 const freertos = @import("../freertos.zig");
 const system = @import("../system.zig");
 const config = @import("../config.zig");

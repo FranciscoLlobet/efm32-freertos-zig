@@ -5,14 +5,14 @@ const system = @import("system.zig");
 const connection = @import("connection.zig");
 const file = @import("fatfs.zig").file;
 const led = @import("leds.zig");
-
+const simpleConnection = @import("simpleConnection.zig");
 const c = @cImport({
     @cInclude("board.h");
     @cInclude("picohttpparser.h");
 });
 
 /// Connection instance
-connection: connection.Connection(.http, void),
+connection: connection.Connection(simpleConnection.SimpleLinkConnection(.tcp_ip4)),
 
 /// Array to store parsed header information
 headers: [24]c.phr_header,
@@ -250,7 +250,7 @@ fn recieveResponse(self: *@This()) !rx_response {
             self.rx_mutex.give() catch {};
         }
         while ((pret == -2) and (rx_count < self.rx_buffer.len)) {
-            if (0 == self.connection.waitRx(5)) {
+            if (try self.connection.waitRx(5)) {
                 var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len)]);
 
                 // returns number of bytes consumed if successful, -2 if request is partial, -1 if failed

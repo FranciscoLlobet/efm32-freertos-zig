@@ -1,4 +1,5 @@
 const std = @import("std");
+const root = @import("root");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
 const fatfs = @import("fatfs.zig");
@@ -23,9 +24,9 @@ const task_priorities = enum(freertos.BaseType_t) {
 pub const min_task_stack_depth: u16 = freertos.c.configMINIMAL_STACK_SIZE;
 
 // Enable or Disable features at compile time
-pub const enable_lwm2m = true;
-pub const enable_mqtt = false;
-pub const enable_http = true;
+pub const enable_lwm2m = root.enable_lwm2m;
+pub const enable_mqtt = root.enable_mqtt;
+pub const enable_http = root.enable_http;
 
 pub const rtos_prio_boot_app = @intFromEnum(task_priorities.rtos_prio_highest);
 
@@ -45,7 +46,7 @@ pub const rtos_stack_depth_lwm2m: u16 = if (enable_lwm2m) 2000 else min_task_sta
 
 // MQTT
 pub const rtos_prio_mqtt = @intFromEnum(task_priorities.rtos_prio_normal);
-pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1450 else min_task_stack_depth;
+pub const rtos_stack_depth_mqtt: u16 = if (enable_mqtt) 1600 else min_task_stack_depth;
 
 pub const rtos_prio_user_task = @intFromEnum(task_priorities.rtos_prio_below_normal);
 pub const rtos_stack_depth_user_task: u16 = 2500;
@@ -125,9 +126,6 @@ pub fn calculateFileHash(path: [*:0]const u8, hash: *[32]u8) config_error![]u8 {
 
 /// Calculate SHA256 hash of a slice in memory
 pub fn calculateMemHash(slice: []u8, hash: *[32]u8) config_error![]u8 {
-    // const mem_block = try allocator.alloc(u8, file_block_size);
-    // defer allocator.free(mem_block);
-
     var sha256_ctx = sha256.init();
     defer sha256_ctx.free();
 

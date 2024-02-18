@@ -19,13 +19,13 @@ The current version of `MISO` boasts a set of features, including:
 - read configuration files from a SD card,
 - provide configuration persistance using non-volatile memory (NVM),
 - connect to a designated WiFi AP,
-- get a sNTP timestamp from an internet server and run a real-time clock (RTC),
-- provide a basic secured LWM2M service client with connection management,
-- provide a basic MQTT service client (QOS0 and QOS1 support, QOS2 experimental),
-- provide a HTTP file download client for configuration and firmware updates
+- get a sNTP timestamp from an internet server and run a real-time clock (RTC) with seconds (s) resolution,
+- provide a HTTP file download client for firmware updates
 - mbedTLS PSK and x509 certificate authentication tested with TLS (MQTTS) and DTLS (COAPS),
-- Watchdog
+- HW Watchdog (7s idle timeout)
 - Bootloader with support for MCUBoot firmware containers
+
+Either a binary with LwM2M via secure COAP (DTLS) or MQTT via TLS.
 
 ## Non-Features
 
@@ -47,7 +47,7 @@ Download and install the Zig Compiler
 
 #### Installation Hints
 
-> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip) and macOS (via brew) builds.
+> This software has been tested using the [Windows x86-64Bit 0.11.0](https://ziglang.org/download/0.11.0/zig-windows-x86_64-0.11.0.zip), macOS (via brew) and [python ziglang](https://pypi.org/project/ziglang/) builds.
 
 #### Install the Arm GNU Toolchain
 
@@ -83,6 +83,68 @@ git submodule update
 ```powershell
 zig build
 ```
+
+`zig build` will build the binaries for:
+
+- [`boot.bin`](./zig-out/firmware/boot.bin) (bootloader)
+- [`lwm2m.bin`](./zig-out/firmware/lwm2m.bin) (LwM2M app)
+- [`mqtt.bin`](./zig-out/firmware/mqtt.bin) (MQTT app)
+
+And the corresponding `elf` files for direct debugger (SWD) deployment.
+
+> Links only work in your local system after build
+
+If using the python-based `ziglang` package:
+>`python -m ziglang build`
+
+### Automatization and tasks
+
+The automatization toolchain requires Python 3.x and modules like `invoke`/`ìnv`, `doit`.
+Furthermore it also requires a working copy of `OpenSSL`
+
+#### Automatisation
+
+See the [`zig-build.yml`](./.github/workflows/zig-build.yml) Github workflow for the current automatisation workflow
+
+### Tasks
+
+#### Base dependencies
+
+Get the tooling dependencies
+
+```console
+ python -m pip install --upgrade pip setuptools wheel -r requirements.txt
+ ```
+
+#### mcuboot dependencies
+
+```console
+inv get-mcuboot-deps
+```
+
+#### Generate private FW signing key
+
+To generate the firmware signing key:
+
+```console
+inv private-key
+```
+
+> Keep the private key safe.
+
+#### Sign and verify FW images
+
+- Via invoke:
+
+  ```console
+  inv sign-fw-images
+  ```
+
+- Via do-it:
+
+  ```console
+  doit
+  ```
 
 ## Used 3rd party software
 
@@ -239,6 +301,10 @@ The firmware update process takes the firmware container and the locally stored 
 
 > FW download has been tested on a non-public (https://nginx.org) server.
 
+### Notes
+
+> **Some of following actions actions have also corresponding `inv` tasks described previously.**
+
 ### Generate the private key
 
 > This is an example using openssl. Please keep the private key secret and offline.
@@ -273,16 +339,16 @@ Use the base64 output as a one-line string in the config (`http.key`)
 
 Use the MCUBoot [`imgtool`](https://docs.mcuboot.com/imgtool.html) script to sign and generate the fw container.
 
-The firmware container header is `0x80` (128) bytes long and the start address is currently `0x7800`
+The firmware container header is `0x80` (128) bytes long and the start address is currently `0x40000` (256kB)
 
 ```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x78000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0x78000 --align 4 .\zig-out\firmware\app.bin app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py sign -v "0.1.2" -F 0x40000 -R 0xff --header-size 0x80 --pad-header -k .\fw_private_key.pem --overwrite-only --public-key-format full -S 0xB0000 --align 4 .\zig-out\firmware\lwm2m.bin lwm2m_sig.bin
 ```
 
 Verify the content of the firmware container.
 
 ```console
-python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\app.bin
+python .\csrc\mcuboot\mcuboot\scripts\imgtool.py dumpinfo .\lwm2m_sig.bin
 ```
 
 ## Configuration signature

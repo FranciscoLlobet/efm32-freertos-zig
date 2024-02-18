@@ -499,7 +499,7 @@ int wait_for_rx(void * param, uint32_t wait_s)
 {
 
 	int ret = lwm2mservice_wait_data(param, wait_s);
-	if(0 == ret)
+	if(1 == ret)
 	{
 		xTaskNotify(xTaskGetCurrentTaskHandle(), (uint32_t )lwm2m_notify_message_reception, eSetBits);
 	}

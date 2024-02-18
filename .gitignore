@@ -11,4 +11,6 @@ zig-out
 *.bin
 *.sig
 *.der
+*.pyc
+.doit.db.*
 venv
