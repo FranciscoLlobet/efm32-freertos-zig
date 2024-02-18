@@ -1,4 +1,5 @@
 ziglang==0.11.0
+pyyaml
 ninja
 meson
 invoke
