@@ -55,6 +55,9 @@ jobs:
       - name: Clean Zig build
         run: inv clean
 
+      - name: Build picolibc
+        run: inv build-picolibc
+
       # Runs the Zig formatter and AST checker
       - name: Run Zig formatter
         run: python -m ziglang fmt --check --ast-check --color off .
