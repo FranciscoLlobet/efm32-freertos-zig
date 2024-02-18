@@ -2,9 +2,9 @@
 
 Generates a public key, signs the firmware images, and verifies the signed images.
 """
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 # Define paths
 KEY_DIR = Path.cwd() / "keys"

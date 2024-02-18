@@ -39,7 +39,7 @@ jobs:
       # Not necessary for this workflow, but useful for debugging
       - name: Install arm-none-eabi-gcc
         run: |
-          sudo apt-get install -y gcc-arm-none-eabi clang-format
+          sudo apt-get install -y gcc-arm-none-eabi clang-format clang-16
       
       # Not necessary for this workflow, but useful for debugging
       - name: Install Openssl

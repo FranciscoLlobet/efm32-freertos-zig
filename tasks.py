@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from shutil import rmtree
 
@@ -56,3 +57,17 @@ def sig_fw_dir(c):
 def sign_fw_images(c):
     """Create signed firmware images."""
     c.run("doit")
+
+
+@task
+def build_picolibc(c):
+    """Build picolibc. Run from the root of the project in Ubuntu"""
+    curr_dir = Path.cwd()
+    os.chdir(Path.cwd() / "toolchain" / "picolibc")
+
+    c.run(
+        "meson setup --cross-file scripts/cross-clang-thumbv7m-none-eabi-miso.txt --optimization 2 ./build --wipe"
+    )
+    os.chdir("./build")
+    c.run("meson compile")
+    os.chdir(curr_dir)
