@@ -87,7 +87,7 @@ def task_verify_fw_images():
         target_file_name = SIG_FW_DIR.joinpath(bin.stem + "_sig.bin")
 
         yield {
-            "name": f"Verify {bin} firmware image.",
+            "name": f"Verify {target_file_name} firmware image.",
             "actions": [f"{PYTHON_EXE} {IMG_TOOL} verify {target_file_name}"],
             "file_dep": [PUB_KEY, target_file_name],
             "verbosity": 2,
