@@ -127,13 +127,12 @@ void BOARD_Init(void)
 	/* */
 	CMU_ClockEnable(cmuClock_GPIO, true);
 
-	{
-		/* Setup Interrupts */
-		NVIC_SetPriority(GPIO_ODD_IRQn, 5);
-		NVIC_SetPriority(GPIO_EVEN_IRQn, 5);
+	/* Setup Interrupts */
+	NVIC_SetPriority(GPIO_ODD_IRQn, 5);
+	NVIC_SetPriority(GPIO_EVEN_IRQn, 5);
 
-		GPIOINT_Init();
-	}
+	GPIOINT_Init();
+	
 
 	/* Wifi NRSET port */
 	GPIO_PinModeSet(gpioPortA, 15, gpioModeWiredAnd, 0);
