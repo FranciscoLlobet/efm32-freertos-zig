@@ -100,7 +100,7 @@ pub fn build(b: *std.Build) !void {
     const bootloader = microzig.addFirmware(b, bootloader_target);
     bootloader.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
     bootloader.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
-    bootloader.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+    bootloader.addObjectFile(.{ .path = "csrc/system/gecko_sdk/platform/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
         bootloader.addIncludePath(.{ .path = path });
@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) !void {
 
     application.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
     application.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
-    application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+    application.addObjectFile(.{ .path = "csrc/system/gecko_sdk/platform/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
         application.addIncludePath(.{ .path = path });
@@ -150,7 +150,7 @@ pub fn build(b: *std.Build) !void {
 
     mqtt_app.addSystemIncludePath(.{ .path = "toolchain/clang-compiled/picolibc/include" });
     mqtt_app.addObjectFile(.{ .path = "toolchain/clang-compiled/picolibc/libc.a" });
-    mqtt_app.addObjectFile(.{ .path = "csrc/system/gecko_sdk/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
+    mqtt_app.addObjectFile(.{ .path = "csrc/system/gecko_sdk/platform/emdrv/nvm3/lib/libnvm3_CM3_gcc.a" });
 
     for (include_path_array) |path| {
         mqtt_app.addIncludePath(.{ .path = path });
