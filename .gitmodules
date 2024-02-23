@@ -40,3 +40,6 @@
 [submodule "toolchain/picolibc"]
 	path = toolchain/picolibc
 	url = https://github.com/FranciscoLlobet/picolibc.git
+[submodule "csrc/system/gecko_sdk"]
+	path = csrc/system/gecko_sdk
+	url = git@github.com:FranciscoLlobet/gecko_sdk.git
