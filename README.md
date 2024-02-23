@@ -380,3 +380,9 @@ Verify Configuration
 ```console
 openssl dgst -sha256 -verify config.pub -signature config.sig config.txt
 ```
+
+# Build picolibc
+
+```console
+meson setup --cross-file scripts/cross-clang-thumbv7m-none-eabi-miso.txt --optimization 2 ./build --wipe
+```

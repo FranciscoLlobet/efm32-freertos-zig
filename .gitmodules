@@ -28,24 +28,18 @@
 [submodule "csrc/connectivity/wakaama"]
 	path = csrc/connectivity/wakaama
 	url = git@github.com:FranciscoLlobet/wakaama.git
-[submodule "csrc/connectivity/MQTT-C"]
-	path = csrc/connectivity/MQTT-C
-	url = git@github.com:FranciscoLlobet/MQTT-C.git
 [submodule "csrc/connectivity/paho.mqtt.embedded-c"]
 	path = csrc/connectivity/paho.mqtt.embedded-c
 	url = git@github.com:FranciscoLlobet/paho.mqtt.embedded-c.git
 [submodule "csrc/connectivity/picohttpparser"]
 	path = csrc/connectivity/picohttpparser
 	url = https://github.com/FranciscoLlobet/picohttpparser.git
-[submodule "csrc/mcuboot/--force"]
-	path = csrc/mcuboot/--force
-	url = https://github.com/FranciscoLlobet/mcuboot.git
-[submodule "csrc/mcuboot/mcuboot"]
-	path = csrc/mcuboot/mcuboot
-	url = https://github.com/FranciscoLlobet/mcuboot.git
-[submodule "csrc/picolibc"]
-	path = csrc/picolibc
-	url = git@github.com:FranciscoLlobet/picolibc.git
 [submodule "toolchain/picolibc"]
 	path = toolchain/picolibc
-	url = https://github.com/FranciscoLlobet/picolibc.git
+	url = git@github.com:FranciscoLlobet/picolibc.git
+[submodule "csrc/system/gecko_sdk"]
+	path = csrc/system/gecko_sdk
+	url = git@github.com:FranciscoLlobet/gecko_sdk.git
+[submodule "csrc/mcuboot"]
+	path = csrc/mcuboot
+	url = git@github.com:FranciscoLlobet/mcuboot.git

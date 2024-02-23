@@ -9,7 +9,7 @@ PUB_KEY = KEY_DIR / "fw_public_key.pem"
 SIG_FW_DIR = Path.cwd() / "signed"
 
 MCU_BOOT_DEPS = (
-    Path.cwd() / "csrc" / "mcuboot" / "mcuboot" / "scripts" / "requirements.txt"
+    Path.cwd() / "csrc" / "mcuboot" / "scripts" / "requirements.txt"
 )
 
 
