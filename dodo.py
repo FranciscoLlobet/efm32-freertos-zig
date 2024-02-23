@@ -17,7 +17,7 @@ SIG_FW_DIR = Path.cwd() / "signed"
 LWM2M_BIN = "lwm2m.bin"
 MQTT_BIN = "mqtt.bin"
 
-IMG_TOOL = Path.cwd() / "csrc" / "mcuboot" / "mcuboot" / "scripts" / "imgtool.py"
+IMG_TOOL = Path.cwd() / "csrc" / "mcuboot" / "scripts" / "imgtool.py"
 
 MISO_FW_VERSION = "0.1.2"
 
