@@ -19,7 +19,7 @@ static SemaphoreHandle_t rx_queue = NULL;
 #define CC3100_SPI_RX_TIMEOUT_MS		(1000)
 #define CC3100_SPI_TX_TIMEOUT_MS		(1000)
 
-SPIDRV_HandleData_t cc3100_usart;
+static SPIDRV_HandleData_t cc3100_usart;
 
 const SPIDRV_Init_t cc3100_usart_init_data =
 { .port = WIFI_SERIAL_PORT, .portLocation = _USART_ROUTE_LOCATION_LOC0,

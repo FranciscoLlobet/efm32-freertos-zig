@@ -1,0 +1,42 @@
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  modernize-*,
+  cppcoreguidelines-*,
+  clang-analyzer-*,
+  cert-*
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+FormatStyle: 'file'
+
+CheckOptions:
+  - key:             modernize-use-auto
+    value:           '0'
+  - key:             modernize-use-using
+    value:           '0'
+  - key:             modernize-avoid-bind
+    value:           '0'
+  - key:             modernize-use-nullptr
+    value:           '0'
+  - key:             modernize-use-override
+    value:           '0'
+  - key:             cppcoreguidelines-avoid-magic-numbers
+    value:           '0'
+  - key:             cppcoreguidelines-pro-bounds-array-to-pointer-decay
+    value:           '0'
+  - key:             cppcoreguidelines-pro-type-vararg
+    value:           '0'
+  - key:             readability-magic-numbers
+    value:           '1'
+  - key:             bugprone-exception-escape
+    value:           '0'
+  - key:             cert-msc30-c
+    value:           '0'
+  - key:             cert-msc50-cpp
+    value:           '0'
+  - key:             readability-function-cognitive-complexity-threshold
+    value:           '15'

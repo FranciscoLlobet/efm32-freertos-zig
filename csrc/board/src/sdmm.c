@@ -13,7 +13,7 @@
 
 MODIFICATIONS:
 
-  UISO, 2022-2023
+  MISO, 2022-2024
 
   Modifications to add simplified logic to interface with the board
 
@@ -318,22 +318,6 @@ DSTATUS disk_initialize (
 	CS_H();		/* Initialize port pin tied to CS */
 
 	BOARD_SD_Card_Enable();
-
-	/* SPI DRV Init */
-	SPIDRV_Init_t sd_card_init_data = {
-			  .port = BOARD_SD_CARD_USART,
-			  .portLocation = _USART_ROUTE_LOCATION_LOC1,
-			  .bitRate = BOARD_SD_CARD_WAKEUP_BITRATE,
-			  .frameLength = 8,
-			  .dummyTxValue = 0xFF,
-			  .type = spidrvMaster,
-			  .bitOrder = spidrvBitOrderMsbFirst,
-			  .clockMode = spidrvClockMode0,
-			  .csControl = spidrvCsControlApplication,
-			  .slaveStartMode = spidrvSlaveStartImmediate,
-	};
-
-	SPIDRV_Init(&sd_card_usart, &sd_card_init_data);
 
 	rcvr_mmc(buf, 10);
 
