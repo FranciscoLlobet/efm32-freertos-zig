@@ -34,9 +34,6 @@
 [submodule "csrc/connectivity/picohttpparser"]
 	path = csrc/connectivity/picohttpparser
 	url = https://github.com/FranciscoLlobet/picohttpparser.git
-[submodule "csrc/mcuboot"]
-	path = csrc/mcuboot
-	url = git@github.com:FranciscoLlobet/mcuboot.git
 [submodule "toolchain/picolibc"]
 	path = toolchain/picolibc
 	url = git@github.com:FranciscoLlobet/picolibc.git
