@@ -40,3 +40,6 @@
 [submodule "csrc/system/gecko_sdk"]
 	path = csrc/system/gecko_sdk
 	url = git@github.com:FranciscoLlobet/gecko_sdk.git
+[submodule "csrc/mcuboot"]
+	path = csrc/mcuboot
+	url = git@github.com:FranciscoLlobet/mcuboot.git
