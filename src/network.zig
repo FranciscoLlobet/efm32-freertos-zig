@@ -66,7 +66,6 @@ pub fn start() void {
     _ = c.create_network_mediator();
 
     // Create the SimpleLink Spawn task
-    //_ = c.VStartSimpleLinkSpawnTask(@as(c_ulong, c.miso_task_connectivity_service));
     simpleLinkSpawnTask.init() catch unreachable;
 
     // Create the LWM2M service
