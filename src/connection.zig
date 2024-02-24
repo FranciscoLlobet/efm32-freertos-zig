@@ -174,7 +174,7 @@ pub fn Connection(comptime sslType: type) type {
     };
 }
 
-fn run(self: *@This()) void {
+fn run(self: *@This()) noreturn {
     var read_fd_set: c.SlFdSet_t = undefined;
     var write_fd_set: c.SlFdSet_t = undefined;
 

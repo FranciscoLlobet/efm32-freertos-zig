@@ -235,7 +235,7 @@ fn firmwareUpdateStateMachine(start_phase: ?update_phase) !firmware_update_outco
     return outcome;
 }
 
-fn taskFunction(self: *@This()) void {
+fn taskFunction(self: *@This()) noreturn {
     _ = self;
 
     _ = nvm.init() catch 0;

@@ -102,11 +102,15 @@ pub fn xTaskGetTickCount() TickType_t {
 
 pub inline fn portYIELD_FROM_ISR(xSwitchRequired: BaseType_t) void {
     if (xSwitchRequired != pdFALSE) {
-        cpu.regs.ICSR.modify(.{ .PENDSVSET = 1 });
-
-        cpu.dsb();
-        cpu.isb();
+        portYIELD();
     }
+}
+
+pub inline fn portYIELD() void {
+    cpu.regs.ICSR.modify(.{ .PENDSVSET = 1 });
+
+    cpu.dsb();
+    cpu.isb();
 }
 
 /// Pend function call to the timer service task
@@ -115,7 +119,7 @@ pub fn xTimerPendFunctionCall(xFunctionToPend: PendedFunction_t, pvParameter1: ?
 }
 
 /// Create a Static Task
-pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: [*:0]const u8, comptime taskRunnerFn: *const fn (*T) void) type {
+pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: [*:0]const u8, comptime taskRunnerFn: *const fn (*T) noreturn) type {
     return struct {
         /// Inner Task object
         task: Task = undefined,
@@ -124,7 +128,7 @@ pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: 
         /// Static task object for FreeRTOS
         staticTask: StaticTask_t = undefined,
 
-        fn run(pvParameters: ?*anyopaque) callconv(.C) void {
+        fn run(pvParameters: ?*anyopaque) callconv(.C) noreturn {
             taskRunnerFn(@as(*T, @ptrCast(@alignCast(pvParameters))));
         }
         pub inline fn create(self: *@This(), pvParameters: *T, uxPriority: UBaseType_t) !void {

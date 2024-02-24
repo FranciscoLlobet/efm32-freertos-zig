@@ -60,7 +60,7 @@ TaskHandle_t xSimpleLinkSpawnTaskHndl = NULL;
 
 
 
-
+#if 1 // Used by the driver.c
 /*!
 	\brief 	This function creates a sync object
 
@@ -76,6 +76,8 @@ TaskHandle_t xSimpleLinkSpawnTaskHndl = NULL;
 */
 OsiReturnVal_e osi_SyncObjCreate(OsiSyncObj_t* pSyncObj)
 {
+	
+
     //Check for NULL
     if(NULL == pSyncObj)
     {
@@ -94,7 +96,9 @@ OsiReturnVal_e osi_SyncObjCreate(OsiSyncObj_t* pSyncObj)
         return OSI_OPERATION_FAILED;
     }
 }
+#endif
 
+#if 1 // Used by the driver.c
 /*!
 	\brief 	This function deletes a sync object
 
@@ -115,7 +119,9 @@ OsiReturnVal_e osi_SyncObjDelete(OsiSyncObj_t* pSyncObj)
     vSemaphoreDelete(*pSyncObj );
     return OSI_OK;
 }
+#endif 
 
+#if 1 // Used by driver.c
 /*!
 	\brief 		This function generates a sync signal for the object.
 
@@ -145,6 +151,9 @@ OsiReturnVal_e osi_SyncObjSignal(OsiSyncObj_t* pSyncObj)
 	
     return OSI_OK;
 }
+#endif
+
+#if 1 // driver.c
 /*!
 	\brief 		This function generates a sync signal for the object
 				from ISR context.
@@ -172,7 +181,9 @@ OsiReturnVal_e osi_SyncObjSignalFromISR(OsiSyncObj_t* pSyncObj)
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	return OSI_OK;
 }
+#endif
 
+#if 1 // Used by driver.c
 /*!
 	\brief 	This function waits for a sync signal of the specific sync object
 
@@ -204,7 +215,9 @@ OsiReturnVal_e osi_SyncObjWait(OsiSyncObj_t* pSyncObj , OsiTime_t Timeout)
         return OSI_OPERATION_FAILED;
     }
 }
+#endif
 
+#if 0 // not used
 /*!
 	\brief 	This function clears a sync object
 
@@ -232,7 +245,9 @@ OsiReturnVal_e osi_SyncObjClear(OsiSyncObj_t* pSyncObj)
         return OSI_OPERATION_FAILED;
     }
 }
+#endif
 
+#if 1 // driver.c
 /*!
 	\brief 	This function creates a locking object.
 
@@ -263,7 +278,9 @@ OsiReturnVal_e osi_LockObjCreate(OsiLockObj_t* pLockObj)
         return OSI_OPERATION_FAILED;
     }
 }
+#endif
 
+#if 0
 /*!
 	\brief 	This function creates a Task.
 
@@ -294,8 +311,9 @@ OsiReturnVal_e osi_TaskCreate(P_OSI_TASK_ENTRY pEntry,const signed char * const 
 
 	return OSI_OPERATION_FAILED;	
 }
+#endif
 
-
+#if 0
 /*!
 	\brief 	This function Deletes a Task.
 
@@ -310,9 +328,9 @@ void osi_TaskDelete(OsiTaskHandle* pTaskHandle)
 {
 	vTaskDelete((TaskHandle_t)*pTaskHandle);
 }
+#endif
 
-
-
+#if 1 // driver.c
 /*!
 	\brief 	This function deletes a locking object.
 
@@ -393,7 +411,7 @@ OsiReturnVal_e osi_LockObjUnlock(OsiLockObj_t* pLockObj)
     	return OSI_OPERATION_FAILED;
     }
 }
-
+#endif
 
 /*!
 	\brief 	This function call the pEntry callback from a different context
@@ -412,7 +430,7 @@ OsiReturnVal_e osi_LockObjUnlock(OsiLockObj_t* pLockObj)
 	\note
 	\warning
 */
-
+#if 0 // driver.c
 OsiReturnVal_e osi_Spawn(P_OSI_SPAWN_ENTRY pEntry , void* pValue , unsigned long flags)
 {
 	OsiReturnVal_e ret = OSI_OK;
@@ -443,7 +461,7 @@ OsiReturnVal_e osi_Spawn(P_OSI_SPAWN_ENTRY pEntry , void* pValue , unsigned long
 		return ret;
 	}
 }
-
+#endif
 
 /*!
 	\brief 	This is the simplelink spawn task to call SL callback from a different context 
@@ -499,6 +517,7 @@ OsiReturnVal_e VStartSimpleLinkSpawnTask(unsigned portBASE_TYPE uxPriority)
     return OSI_OPERATION_FAILED;
 }
 
+#if 0
 /*!
 	\brief 	This is the API to delete SL spawn task and delete the SL queue
 
@@ -522,7 +541,8 @@ void VDeleteSimpleLinkSpawnTask( void )
 		xSimpleLinkSpawnQueue = 0;
 	}
 }
-
+#endif
+#if 0
 /*!
 	\brief 	This function is used to create the MsgQ
 
@@ -642,6 +662,9 @@ OsiReturnVal_e osi_MsgQRead(OsiMsgQ_t* pMsgQ, void* pMsg , OsiTime_t Timeout)
 	}
 }
 
+#endif
+
+#if 0
 /*!
 	\brief 	This function to call the memory de-allocation function of the FREERTOS
 
@@ -804,3 +827,5 @@ void osi_ContextRestore()
 {
 
 }
+
+#endif

@@ -77,7 +77,7 @@ fn myNtpTimerFunction(self: *@This()) void {
     self.task.notify(@intFromEnum(notificationValues.ntp_sync), .eSetBits) catch {};
 }
 
-fn myUserTaskFunction(self: *@This()) void {
+fn myUserTaskFunction(self: *@This()) noreturn {
     var wifi_task = freertos.Task.initFromHandle(@as(freertos.TaskHandle_t, @ptrCast(c.wifi_task_handle)));
 
     // Initialize the NVM

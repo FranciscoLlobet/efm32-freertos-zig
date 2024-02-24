@@ -69,7 +69,7 @@ fn authCallback(self: *@This(), security_mode: connection.security_mode) mbedtls
     }
 }
 
-fn taskFunction(self: *@This()) void {
+fn taskFunction(self: *@This()) noreturn {
     var ret: i32 = 0;
 
     self.reg_update.start(null) catch unreachable;
@@ -85,10 +85,10 @@ fn taskFunction(self: *@This()) void {
 
         self.task.delayTask(60 * 1000);
     }
-    system.reset();
+    unreachable;
 }
 
-fn dummyTaskFunction(self: *@This()) void {
+fn dummyTaskFunction(self: *@This()) noreturn {
     while (true) {
         self.task.suspendTask();
     }

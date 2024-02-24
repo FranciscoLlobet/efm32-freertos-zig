@@ -727,7 +727,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     }
 }
 
-fn taskFunction(self: *@This()) void {
+fn taskFunction(self: *@This()) noreturn {
     // Clear the buffers
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
@@ -754,7 +754,7 @@ fn taskFunction(self: *@This()) void {
     // Go to disconnect phase
 }
 
-fn dummyTaskFunction(self: *@This()) void {
+fn dummyTaskFunction(self: *@This()) noreturn {
     while (true) {
         self.task.suspendTask();
     }
