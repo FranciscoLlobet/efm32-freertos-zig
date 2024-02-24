@@ -74,6 +74,8 @@ pub export fn main() noreturn {
 
     network.start();
 
+    usb.usb.init(); // Fixme
+
     _ = c.printf("--- MISO starting FreeRTOS %d---\n\r", appCounter);
 
     // Start the FreeRTOS scheduler
