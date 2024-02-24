@@ -25,7 +25,7 @@ const firmware_update_outcome = enum {
     backup_restore,
 };
 
-fn prepareJump() void {
+fn prepareJump() noreturn {
     board.jumpToApp(app_start_addr);
 }
 
@@ -278,7 +278,6 @@ fn taskFunction(self: *@This()) noreturn {
     }
 
     prepareJump();
-    unreachable;
 }
 
 pub fn init(self: *@This()) void {

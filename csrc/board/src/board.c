@@ -271,9 +271,9 @@ int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 typedef void (*jumpFunction)(void);
 
 // Jump is assigned outside of the stack
-static jumpFunction jump = NULL;
+static volatile jumpFunction jump = NULL;
 
-void BOARD_JumpToAddress(uint32_t * addr)
+void BOARD_JumpToAddress(uint32_t * const addr)
 {
 	jump = (jumpFunction)(addr[1]);
 
@@ -357,13 +357,11 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	__set_PSP(__get_MSP());
 
 	// Perform the Jump using the C-Style function pointer
-	if(NULL != jump)
-	{
-		__set_CONTROL(0x00);
-		__ISB();
-		
-		jump();
-	}
+	__set_CONTROL(0x00);
+	__DSB();
+	__ISB();
+	
+	jump();
 	// unreachable
 }
 

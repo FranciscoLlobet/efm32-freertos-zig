@@ -13,25 +13,29 @@ const c = @cImport({
     @cInclude("lwm2m_client.h");
 });
 
+/// SimpleLink Spawn Queue Executor
 const simpleLinkSpawn = struct {
     task: freertos.StaticTask(@This(), 900, "SimpleLinkSpawnTask", run),
     queue: freertos.StaticQueue(c.tSimpleLinkSpawnMsg, 4),
     stack: usize,
+
+    /// Initialize the SimpleLink Spawn task
     fn init(self: *@This()) !void {
         try self.task.create(self, @as(c_ulong, 5));
         try self.queue.create();
     }
 
+    /// SimpleLink Spawn task
     fn run(self: *@This()) noreturn {
         while (true) {
             if (self.queue.recieve(null)) |msg| {
                 _ = msg.pEntry.?(msg.pValue);
-                self.stack = self.task.getStackHighWaterMark();
             }
         }
     }
 
-    fn sendMsg(self: *@This(), pEntry: c.P_OSI_SPAWN_ENTRY, pValue: ?*anyopaque, flags: u32) !void {
+    /// Send a message to the SimpleLink Spawn task
+    fn sendMsg(self: *@This(), pEntry: c.P_OSI_SPAWN_ENTRY, pValue: ?*anyopaque, flags: c_ulong) !void {
         const msg: c.tSimpleLinkSpawnMsg = .{ .pEntry = pEntry, .pValue = pValue };
         var xHigherPriorityTaskWoken: freertos.BaseType_t = freertos.pdFALSE;
 
