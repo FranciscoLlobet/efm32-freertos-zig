@@ -7,6 +7,7 @@ const gecko_sdk_base_dir = "csrc/system/gecko_sdk/platform";
 
 const include_path = [_][]const u8{
     // Gecko-SDK Defines
+    gecko_sdk_base_dir ++ "/CMSIS/Core/Include",
     gecko_sdk_base_dir ++ "/Device/SiliconLabs/EFM32GG/Include",
     gecko_sdk_base_dir ++ "/common/inc/",
     gecko_sdk_base_dir ++ "/common/errno/inc/",
