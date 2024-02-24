@@ -326,12 +326,12 @@ pub const Semaphore = struct {
 
     /// Give the semaphore
     pub fn give(self: *const @This()) !void {
-        return if (pdTRUE == c.xSemaphoreGive(self.handle)) {} else FreeRtosError.pdFAIL;
+        if (pdTRUE != c.xSemaphoreGive(self.handle)) return FreeRtosError.pdFAIL;
     }
 
     /// Give the semaphore from ISR
     pub inline fn giveFromIsr(self: *const @This(), pxHigherPriorityTaskWoken: *BaseType_t) !void {
-        return if (pdTRUE == c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken)) {} else FreeRtosError.pdFAIL;
+        if (pdTRUE != c.xSemaphoreGiveFromISR(self.handle, pxHigherPriorityTaskWoken)) return FreeRtosError.pdFAIL;
     }
 
     /// Initialize Semaphore from handle
@@ -507,7 +507,7 @@ pub fn StaticMessageBuffer(comptime xBufferSizeBytes: usize) type {
             self.messageBuffer = try MessageBuffer.initStatic(self.buffer[0..], &self.staticMessageBuffer);
         }
 
-        pub inline fn send(self: *const @This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
+        pub inline fn send(self: *const @This(), txData: []const u8, comptime xTicksToWait: ?TickType_t) usize {
             return self.messageBuffer.send(txData, xTicksToWait);
         }
 
@@ -544,7 +544,7 @@ pub const MessageBuffer = struct {
     }
 
     /// Send a message to the message buffer
-    pub inline fn send(self: *const @This(), txData: []u8, comptime xTicksToWait: ?TickType_t) usize {
+    pub inline fn send(self: *const @This(), txData: []const u8, comptime xTicksToWait: ?TickType_t) usize {
         return c.xMessageBufferSend(self.handle, txData.ptr, txData.len, xTicksToWait orelse portMAX_DELAY);
     }
 
@@ -569,7 +569,11 @@ pub fn StaticQueue(comptime itemType: type, comptime numItems: usize) type {
             self.queue.createStatic(self.buffer[0..], &self.staticQueue);
         }
 
-        pub inline fn send(self: *const @This(), item: *itemType, ticks_to_wait: ?TickType_t) !void {
+        pub inline fn delete(self: *@This()) void {
+            self.queue.delete();
+        }
+
+        pub inline fn send(self: *const @This(), item: *const itemType, ticks_to_wait: ?TickType_t) !void {
             return self.queue.send(item, ticks_to_wait);
         }
 
@@ -581,8 +585,11 @@ pub fn StaticQueue(comptime itemType: type, comptime numItems: usize) type {
             return self.queue.recieveFromIsr(pxHigherPriorityTaskWoken);
         }
 
-        pub inline fn sendFromIsr(self: *const @This(), item: *itemType, pxHigherPriorityTaskWoken: *BaseType_t) !void {
+        pub inline fn sendFromIsr(self: *const @This(), item: *const itemType, pxHigherPriorityTaskWoken: *BaseType_t) !void {
             return self.queue.sendFromIsr(item, pxHigherPriorityTaskWoken);
+        }
+        pub inline fn reset(self: *@This()) void {
+            self.queue.reset();
         }
     };
 }
@@ -594,11 +601,14 @@ pub fn Queue(comptime itemType: type, comptime numItems: usize) type {
         fn create(self: *@This()) !void {
             self.handle = c.xQueueCreate(@intCast(numItems), @sizeOf(itemType));
         }
+        fn delete(self: *@This()) void {
+            c.vQueueDelete(self.handle);
+        }
         fn createStatic(self: *@This(), buffer: []itemType, staticQueue: *StaticQueue_t) void {
             self.handle = c.xQueueCreateStatic(numItems, @sizeOf(itemType), @as([*c]u8, @ptrCast(buffer.ptr)), staticQueue);
         }
-        fn send(self: *const @This(), item: *itemType, ticks_to_wait: ?TickType_t) !void {
-            if (pdPASS != c.xQueueSend(self.handle, @as([*c]u8, @ptrCast(item)), ticks_to_wait orelse portMAX_DELAY)) return FreeRtosError.QueueSendFailed;
+        fn send(self: *const @This(), item: *const itemType, ticks_to_wait: ?TickType_t) !void {
+            if (pdPASS != c.xQueueSend(self.handle, @as([*c]u8, @constCast(@ptrCast(item))), ticks_to_wait orelse portMAX_DELAY)) return FreeRtosError.QueueSendFailed;
         }
         fn recieve(self: *const @This(), ticks_to_wait: ?TickType_t) ?itemType {
             var item: itemType = undefined;
@@ -608,8 +618,11 @@ pub fn Queue(comptime itemType: type, comptime numItems: usize) type {
             var item: itemType = undefined;
             return if (pdPASS == c.xQueueReceiveFromISR(self.handle, @ptrCast(&item), pxHigherPriorityTaskWoken)) item else null;
         }
-        fn sendFromIsr(self: *const @This(), item: *itemType, pxHigherPriorityTaskWoken: *BaseType_t) !void {
-            if (pdPASS != c.xQueueSendFromISR(self.handle, @ptrCast(item), pxHigherPriorityTaskWoken)) return FreeRtosError.QueueSendFailed;
+        fn sendFromIsr(self: *const @This(), item: *const itemType, pxHigherPriorityTaskWoken: *BaseType_t) !void {
+            if (pdPASS != c.xQueueSendFromISR(self.handle, @as([*c]u8, @constCast(@ptrCast(item))), pxHigherPriorityTaskWoken)) return FreeRtosError.QueueSendFailed;
+        }
+        fn reset(self: *@This()) void {
+            _ = c.xQueueReset(self.handle);
         }
     };
 }

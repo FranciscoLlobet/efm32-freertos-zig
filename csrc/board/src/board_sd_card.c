@@ -74,6 +74,22 @@ void BOARD_SD_Card_Enable(void)
 		rx_semaphore = xQueueCreate( 1, sizeof(Ecode_t) );
 	}
 
+	/* SPI DRV Init */
+	SPIDRV_Init_t sd_card_init_data = {
+			  .port = BOARD_SD_CARD_USART,
+			  .portLocation = _USART_ROUTE_LOCATION_LOC1,
+			  .bitRate = BOARD_SD_CARD_WAKEUP_BITRATE,
+			  .frameLength = 8,
+			  .dummyTxValue = 0xFF,
+			  .type = spidrvMaster,
+			  .bitOrder = spidrvBitOrderMsbFirst,
+			  .clockMode = spidrvClockMode0,
+			  .csControl = spidrvCsControlApplication,
+			  .slaveStartMode = spidrvSlaveStartImmediate,
+	};
+
+	SPIDRV_Init(&sd_card_usart, &sd_card_init_data);
+
     GPIOINT_CallbackRegister(SD_DETECT_PIN, card_detect_callback);
 
     GPIO_ExtIntConfig(SD_DETECT_PORT,
@@ -130,7 +146,7 @@ void BOARD_SD_CARD_SetSlowBaudrate(void)
 
 
 /* recieve callback for async reception */
-static void _recieve_callback(struct SPIDRV_HandleData *handle,
+static void recieve_callback(struct SPIDRV_HandleData *handle,
                                   Ecode_t transferStatus,
                                   int itemsTransferred)
 {
@@ -145,7 +161,7 @@ static void _recieve_callback(struct SPIDRV_HandleData *handle,
 }
 
 /* tx callback for async tx */
-static void _send_callback(struct SPIDRV_HandleData *handle,
+static void send_callback(struct SPIDRV_HandleData *handle,
                                   Ecode_t transferStatus,
                                   int itemsTransferred)
 {
@@ -163,20 +179,14 @@ static void _send_callback(struct SPIDRV_HandleData *handle,
 uint32_t BOARD_SD_CARD_Recieve(void * buffer, int count)
 {
 	Ecode_t ecode = ECODE_EMDRV_SPIDRV_PARAM_ERROR;
-	if(rx_semaphore != NULL) // Change to check if scheduler is active
-	{
-		ecode = SPIDRV_MReceive(&sd_card_usart, buffer, count, _recieve_callback);
-		if(ECODE_EMDRV_SPIDRV_OK == ecode)
-		{
-			(void)xQueueReceive( rx_semaphore, &ecode, portMAX_DELAY);
-		}
-	}
-	else
-	{
-		// Perform blocking reception
-		ecode = SPIDRV_MReceiveB(&sd_card_usart, buffer, count);
-	}
 
+	(void)xQueueReset(rx_semaphore);
+	ecode = SPIDRV_MReceive(&sd_card_usart, buffer, count, recieve_callback);
+	if(ECODE_EMDRV_SPIDRV_OK == ecode)
+	{
+			(void)xQueueReceive( rx_semaphore, &ecode, portMAX_DELAY);
+	}
+	
 	return (uint32_t)ecode;
 }
 
@@ -184,20 +194,14 @@ uint32_t BOARD_SD_CARD_Recieve(void * buffer, int count)
 uint32_t BOARD_SD_CARD_Send(const void * buffer, int count)
 {
 	Ecode_t ecode = ECODE_EMDRV_SPIDRV_PARAM_ERROR;
-	if(tx_semaphore != NULL) // Change to check if scheduler is active
-	{
-		ecode = SPIDRV_MTransmit(&sd_card_usart, buffer, count, _send_callback);
-		if(ECODE_EMDRV_SPIDRV_OK == ecode)
-		{
-			(void)xQueueReceive( tx_semaphore, &ecode, portMAX_DELAY);
-		}
-	}
-	else
-	{
-		// Perform blocking transmit
-		ecode = SPIDRV_MTransmitB(&sd_card_usart, buffer, count);
-	}
 
+	(void)xQueueReset(tx_semaphore);
+	ecode = SPIDRV_MTransmit(&sd_card_usart, buffer, count, send_callback);
+	if(ECODE_EMDRV_SPIDRV_OK == ecode)
+	{
+		(void)xQueueReceive( tx_semaphore, &ecode, portMAX_DELAY);
+	}
+	
 	return (uint32_t)ecode;
 }
 

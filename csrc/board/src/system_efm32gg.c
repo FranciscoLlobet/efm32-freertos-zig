@@ -104,8 +104,8 @@ uint32_t SystemCoreClock = 14000000UL;
 /*---------------------------------------------------------------------------
    Exception / Interrupt Vector table
  *---------------------------------------------------------------------------*/
-//extern const tVectorEntry __VECTOR_TABLE[16 + EXT_IRQ_COUNT];
-extern const tVectorEntry vector_table[16 + 48];
+extern const tVectorEntry vector_table[16 + EXT_IRQ_COUNT];
+
 /*******************************************************************************
  **************************   GLOBAL FUNCTIONS   *******************************
  ******************************************************************************/
@@ -306,7 +306,7 @@ void SystemHFXOClockSet(uint32_t freq)
  * @note
  *   This function is invoked during system init, before the main() routine
  *   and any data has been initialized. For this reason, it cannot do any
- *   initialization of variables ºetc.
+ *   initialization of variables etc.
  ******************************************************************************/
 void SystemInit(void)
 {
