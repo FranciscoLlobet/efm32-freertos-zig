@@ -196,7 +196,9 @@ void BOARD_Init(void)
 
 	RMU_ResetCauseClear();
 
-	//BOARD_USB_Init();
+	#if(MISO_APPLICATION)
+	BOARD_USB_Init();
+	#endif
 }
 
 
@@ -365,13 +367,25 @@ void BOARD_JumpToAddress(uint32_t * const addr)
 	// unreachable
 }
 
+extern void usb_write_char(uint8_t c);
 
 static int miso_putc(char c, FILE *file)
 {
 	(void)file;
+	#if(MISO_APPLICATION)
+	if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+	{
+		usb_write_char(c);
+	}
+	else
+	{
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
+	}
+	#else
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
+	#endif
 	
-	(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
-
+	
 	return 1;
 }
 

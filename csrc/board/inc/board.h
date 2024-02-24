@@ -371,6 +371,6 @@ extern SPIDRV_HandleData_t cc3100_usart;
 extern UARTDRV_HandleData_t em9301_uart;
 
 extern uint8_t usb_rx_buf[64];
-extern uint8_t usb_tx_buf[64];
+extern uint8_t usb_tx_buf[128];
 
 #endif /* BOARD_H_ */

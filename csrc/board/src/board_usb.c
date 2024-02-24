@@ -7,49 +7,7 @@ USBX_STRING_DESC(usb_serial_string, '0','0','0','0','0','0','0','0','0','0','0',
 USBX_Init_t usbx;
 
 USBX_BUF(usb_rx_buf, 64);
-USBX_BUF(usb_tx_buf, 64);
-
-static uint32_t rx_count = 0;
-
-void BOARD_USB_Callback(void)
-{
-	uint32_t intSource = USBX_getCallbackSource();
-
-	printf("intsrc: %d\r\n", intSource);
-	if(intSource & USBX_RESET)
-	{
-		// USB Reset
-	}
-	if(intSource & USBX_TX_COMPLETE)
-	{
-
-	}
-	if(intSource & USBX_RX_COMPLETE)
-	{
-		printf("USBX_RX_COMPLETE\n");
-	}
-	if(intSource & USBX_DEV_OPEN)
-	{
-
-	}
-	if(intSource & USBX_DEV_CLOSE)
-	{
-
-	}
-	if(intSource & USBX_DEV_CONFIGURED)
-	{
-
-	}
-	if(intSource & USBX_DEV_SUSPEND)
-	{
-
-	}
-	if(intSource & USBX_RX_OVERRUN)
-	{
-		printf("USBX_RX_OVERRUN\n");
-	} 
-}
-
+USBX_BUF(usb_tx_buf, 128);
 
 void BOARD_USB_Init(void)
 {
