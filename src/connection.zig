@@ -233,7 +233,7 @@ fn run(self: *@This()) noreturn {
         }
 
         if ((read_set_ptr != null) or (write_set_ptr != null)) {
-            var res: i16 = 0;
+            var res: i16 = -1;
             // Sem
             if (self.mutex.take(null)) |_| {
                 const tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 0 };
@@ -272,11 +272,11 @@ fn run(self: *@This()) noreturn {
                 // self.task.delayTask(10);
             } else {
                 // Error
-                @breakpoint();
+                _ = c.printf("Select ERROR\n\r");
             }
 
             if (waiting_count > 0) {
-                self.task.delayTask(100);
+                self.task.delayTask(50);
             }
         } else {
             // no deadlines
