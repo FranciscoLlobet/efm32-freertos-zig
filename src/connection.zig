@@ -245,6 +245,7 @@ fn run(self: *@This()) noreturn {
                 //Ignore
             }
 
+            var waiting_count: usize = 0;
             if (res > 0) {
                 if (read_set_ptr) |read_set| {
                     for (&self.connections) |*conn| {
@@ -253,12 +254,29 @@ fn run(self: *@This()) noreturn {
                                 conn.sd = -1;
                                 conn.rx_wait_deadline_ms = 0;
                                 conn.rx_signal.give() catch unreachable;
+                            } else {
+                                waiting_count += 1;
                             }
                         }
                     }
                 }
+            } else if (res == 0) {
+                if (read_set_ptr) |_| {
+                    for (&self.connections) |*conn| {
+                        if (conn.sd >= 0) {
+                            waiting_count += 1;
+                        }
+                    }
+                }
+
+                // self.task.delayTask(10);
             } else {
-                self.task.delayTask(10);
+                // Error
+                @breakpoint();
+            }
+
+            if (waiting_count > 0) {
+                self.task.delayTask(100);
             }
         } else {
             // no deadlines

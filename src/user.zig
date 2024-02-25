@@ -67,9 +67,12 @@ ntpSyncTime: u32,
 /// User Statemachine state
 state: state,
 
+timerWatermark: usize,
+
 const ntpUri = "ntp://1.de.pool.ntp.org:123";
 
 fn myTimerFunction(self: *@This()) void {
+    self.timerWatermark = freertos.Task.initFromCurrentTask().getStackHighWaterMark();
     self.task.notify(@intFromEnum(notificationValues.user_timer), .eSetBits) catch {};
 }
 
@@ -201,7 +204,7 @@ fn myUserTaskFunction(self: *@This()) noreturn {
                     self.state = .working;
                 } else if (notificationValues.isNotification(val, notificationValues.user_timer)) {
                     leds.yellow.toggle();
-                    _ = c.printf("UserTimer: %d\r\n", self.task.getStackHighWaterMark());
+                    _ = c.printf("UserTimer: %d, Timer: %d\r\n", self.task.getStackHighWaterMark(), self.timerWatermark);
                     self.state = .working;
                 }
             }
@@ -230,4 +233,4 @@ pub fn create(self: *@This()) void {
     self.ntpSyncTime = 0;
 }
 
-pub var user_task: @This() = .{ .timer = undefined, .state = undefined, .task = undefined, .ntpTimer = undefined, .ntpSyncTime = 0 };
+pub var user_task: @This() = .{ .timer = undefined, .state = undefined, .task = undefined, .ntpTimer = undefined, .ntpSyncTime = 0, .timerWatermark = 0 };
