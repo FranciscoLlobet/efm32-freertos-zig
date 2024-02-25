@@ -178,7 +178,7 @@ const sntp_v4_packet = packed struct {
     }
 };
 
-var conn: simpleConnection.SimpleLinkConnection(.udp_ip4) = undefined;
+var conn: connection.Connection(simpleConnection.SimpleLinkConnection(.udp_ip4)) = undefined;
 
 /// Send an sNTP packet to the given connection.
 fn send(c: *@TypeOf(conn), packet: *sntp_v4_packet) !void {

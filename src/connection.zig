@@ -156,7 +156,7 @@ pub fn Connection(comptime sslType: type) type {
         pub fn init(self: *@This()) void {
             _ = self;
         }
-        pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
+        pub fn open(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             try self.ssl.open(uri, local_port);
         }
         pub fn close(self: *@This()) !void {

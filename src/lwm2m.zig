@@ -31,7 +31,7 @@ export fn lwm2mservice_create_connection(param: ?*anyopaque, uri: [*c]u8, local_
     self.lwm2m_object = lwm2m_object;
     self.lwm2m_sec_obj_inst_id = sec_obj_inst_id;
 
-    self.connection.create(serviceUri, local_port) catch return -1;
+    self.connection.open(serviceUri, local_port) catch return -1;
     return 0;
 }
 
@@ -107,7 +107,7 @@ pub fn create(self: *@This()) void {
     self.task.suspendTask();
 
     if (config.enable_lwm2m) {
-        self.reg_update.create((5 * 60 * 1000), true, self) catch unreachable;
+        self.reg_update.create((1 * 60 * 1000), true, self) catch unreachable;
         self.timer_update.create((60 * 1000), true, self) catch unreachable;
         self.connection.init();
         self.connection.ssl = @TypeOf(self.connection.ssl).create(self, authCallback, null, null);
