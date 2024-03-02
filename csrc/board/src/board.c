@@ -3,6 +3,14 @@
  *
  *  Created on: 8 nov 2022
  *      Author: Francisco
+ * 
+ * Board driver for the XDK110
+ * 
+ * Includes support for: 
+ * - Picolibc toolchain
+ * - FreeRTOS
+ * - Bootloader
+ * 
  */
 
 #include "board.h"

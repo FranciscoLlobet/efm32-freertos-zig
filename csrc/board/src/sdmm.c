@@ -13,7 +13,7 @@
 
 MODIFICATIONS:
 
-  UISO, 2022-2023
+  MISO, 2022-2024
 
   Modifications to add simplified logic to interface with the board
 

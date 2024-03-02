@@ -25,7 +25,25 @@ The current version of `MISO` boasts a set of features, including:
 - HW Watchdog (7s idle timeout)
 - Bootloader with support for MCUBoot firmware containers
 
-Either a binary with LwM2M via secure COAP (DTLS) or MQTT via TLS.
+Either a binary with LwM2M via secure COAP (DTLS) or MQTT via TLS can be loaded at a time.
+
+## Main bugs
+
+- The LwM2M client will do a watchdog reset after approximately 7 minutes.
+- The current architecture is dependent on FreeRTOS.
+- Current no entropy is being queried when starting MbedTLS functionality.
+
+## Wish List
+
+- Implementation of SimpleLink File Storage
+- Stability improvements of the LwM2M client
+- Stability improvments of the connection manager
+- Memory optimization of statically allocated memory.
+- Improvements on documentation.
+- Programming via openOCD
+- Programming scripts via console
+- HTTP deployment script for FW update
+- MQTT FW update
 
 ## Non-Features
 
