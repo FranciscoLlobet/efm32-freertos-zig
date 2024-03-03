@@ -156,7 +156,7 @@ pub fn Connection(comptime sslType: type) type {
         pub fn init(self: *@This()) void {
             _ = self;
         }
-        pub fn create(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
+        pub fn open(self: *@This(), uri: std.Uri, local_port: ?u16) !void {
             try self.ssl.open(uri, local_port);
         }
         pub fn close(self: *@This()) !void {
@@ -174,7 +174,7 @@ pub fn Connection(comptime sslType: type) type {
     };
 }
 
-fn run(self: *@This()) void {
+fn run(self: *@This()) noreturn {
     var read_fd_set: c.SlFdSet_t = undefined;
     var write_fd_set: c.SlFdSet_t = undefined;
 
@@ -184,6 +184,7 @@ fn run(self: *@This()) void {
     self.mutex.give() catch {};
 
     while (true) {
+        // Start the loop
         var read_set_ptr: ?*c.SlFdSet_t = null;
         var write_set_ptr: ?*c.SlFdSet_t = null;
         var nfsd: i16 = -1;
@@ -197,10 +198,14 @@ fn run(self: *@This()) void {
         for (&self.connections) |*conn| {
             if (conn.sd >= 0) {
                 if (conn.rx_queue.recieve(0)) |msg| {
-                    conn.rx_wait_deadline_ms = msg.deadline;
+                    if (msg.deadline > conn.rx_wait_deadline_ms) {
+                        conn.rx_wait_deadline_ms = msg.deadline;
+                    }
                 }
                 if (conn.tx_queue.recieve(0)) |msg| {
-                    conn.tx_wait_deadline_ms = msg.deadline;
+                    if (msg.deadline > conn.tx_wait_deadline_ms) {
+                        conn.tx_wait_deadline_ms = msg.deadline;
+                    }
                 }
 
                 if (conn.rx_wait_deadline_ms >= current_time) {
@@ -210,7 +215,8 @@ fn run(self: *@This()) void {
                     }
                     read_set_ptr = &read_fd_set;
                 } else {
-                    conn.rx_wait_deadline_ms = 0;
+                    conn.rx_wait_deadline_ms = 0; // reset deadline
+                    conn.rx_signal.give() catch {};
                 }
 
                 if (conn.tx_wait_deadline_ms >= current_time) {
@@ -220,16 +226,17 @@ fn run(self: *@This()) void {
                     }
                     write_set_ptr = &write_fd_set;
                 } else {
-                    conn.tx_wait_deadline_ms = 0;
+                    conn.tx_wait_deadline_ms = 0; // reset deadline
+                    conn.tx_signal.give() catch {};
                 }
             }
         }
 
         if ((read_set_ptr != null) or (write_set_ptr != null)) {
-            var res: i16 = 0;
+            var res: i16 = -1;
             // Sem
-            if (self.mutex.take(1000)) |_| {
-                const tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 10 * 1024 };
+            if (self.mutex.take(null)) |_| {
+                const tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 0 };
 
                 res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, @constCast(&tv));
 
@@ -238,6 +245,7 @@ fn run(self: *@This()) void {
                 //Ignore
             }
 
+            var waiting_count: usize = 0;
             if (res > 0) {
                 if (read_set_ptr) |read_set| {
                     for (&self.connections) |*conn| {
@@ -246,10 +254,29 @@ fn run(self: *@This()) void {
                                 conn.sd = -1;
                                 conn.rx_wait_deadline_ms = 0;
                                 conn.rx_signal.give() catch unreachable;
+                            } else {
+                                waiting_count += 1;
                             }
                         }
                     }
                 }
+            } else if (res == 0) {
+                if (read_set_ptr) |_| {
+                    for (&self.connections) |*conn| {
+                        if (conn.sd >= 0) {
+                            waiting_count += 1;
+                        }
+                    }
+                }
+
+                // self.task.delayTask(10);
+            } else {
+                // Error
+                _ = c.printf("Select ERROR\n\r");
+            }
+
+            if (waiting_count > 0) {
+                self.task.delayTask(50);
             }
         } else {
             // no deadlines
@@ -291,6 +318,7 @@ task: freertos.StaticTask(@This(), 1200, "select_task", run),
 mutex: freertos.StaticMutex(),
 connections: [4]connectionManagerElement = undefined,
 
+/// Look if socket is already in the pool
 fn findSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
     for (&self.connections) |*conn| {
         if (conn.sd == sd) {
@@ -300,6 +328,7 @@ fn findSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
     return null;
 }
 
+/// Look for the first free position in the pool
 fn findFreeSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
     for (&self.connections) |*conn| {
         if (conn.sd < 0) {
@@ -330,9 +359,12 @@ pub fn wait_rx(self: *@This(), sd: i16, timeout_s: u32) !bool {
 
     const msg: timeout_msg = .{ .deadline = deadline_ms };
 
+    // Find a connection in the pool.
     var conn: *connectionManagerElement = self.findSocket(sd) orelse (self.findFreeSocket(sd) orelse unreachable);
 
-    try conn.rx_queue.send(@constCast(&msg), timeout_ms);
+    _ = conn.rx_signal.take(0) catch false; // Dummy take to block the signal
+
+    try conn.rx_queue.send(&msg, timeout_ms);
 
     self.task.notify(1, .eIncrement) catch {};
 

@@ -3,6 +3,14 @@
  *
  *  Created on: 8 nov 2022
  *      Author: Francisco
+ * 
+ * Board driver for the XDK110
+ * 
+ * Includes support for: 
+ * - Picolibc toolchain
+ * - FreeRTOS
+ * - Bootloader
+ * 
  */
 
 #include "board.h"
@@ -196,7 +204,9 @@ void BOARD_Init(void)
 
 	RMU_ResetCauseClear();
 
-	//BOARD_USB_Init();
+	#if(MISO_APPLICATION)
+	BOARD_USB_Init();
+	#endif
 }
 
 
@@ -271,9 +281,9 @@ int gettimeofday(struct timeval* ptimeval, void * ptimezone)
 typedef void (*jumpFunction)(void);
 
 // Jump is assigned outside of the stack
-static jumpFunction jump = NULL;
+static volatile jumpFunction jump = NULL;
 
-void BOARD_JumpToAddress(uint32_t * addr)
+void BOARD_JumpToAddress(uint32_t * const addr)
 {
 	jump = (jumpFunction)(addr[1]);
 
@@ -357,23 +367,33 @@ void BOARD_JumpToAddress(uint32_t * addr)
 	__set_PSP(__get_MSP());
 
 	// Perform the Jump using the C-Style function pointer
-	if(NULL != jump)
-	{
-		__set_CONTROL(0x00);
-		__ISB();
-		
-		jump();
-	}
+	__set_CONTROL(0x00);
+	__DSB();
+	__ISB();
+	
+	jump();
 	// unreachable
 }
 
+extern void usb_write_char(uint8_t c);
 
 static int miso_putc(char c, FILE *file)
 {
 	(void)file;
+	#if(MISO_APPLICATION)
+	if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+	{
+		usb_write_char(c);
+	}
+	else
+	{
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
+	}
+	#else
+		(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
+	#endif
 	
-	(void)sl_iostream_putchar(SL_IOSTREAM_STDOUT, c);
-
+	
 	return 1;
 }
 

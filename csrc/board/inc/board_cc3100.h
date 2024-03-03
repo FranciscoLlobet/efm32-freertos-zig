@@ -3,6 +3,9 @@
  *
  *  Created on: 11 nov 2022
  *      Author: Francisco
+ * 
+ * Board support component for the CC3100 Wifi module
+ * 
  */
 
 #ifndef BOARD_CC3100_H_

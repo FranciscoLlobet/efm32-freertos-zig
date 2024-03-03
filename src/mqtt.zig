@@ -727,7 +727,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     }
 }
 
-fn taskFunction(self: *@This()) void {
+fn taskFunction(self: *@This()) noreturn {
     // Clear the buffers
     @memset(&txBuffer, 0);
     @memset(&rxBuffer, 0);
@@ -754,7 +754,7 @@ fn taskFunction(self: *@This()) void {
     // Go to disconnect phase
 }
 
-fn dummyTaskFunction(self: *@This()) void {
+fn dummyTaskFunction(self: *@This()) noreturn {
     while (true) {
         self.task.suspendTask();
     }
@@ -797,7 +797,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
         self.connection.close() catch {};
     }
 
-    try self.connection.create(uri, null);
+    try self.connection.open(uri, null);
 
     _ = try self.packet.prepareConnectPacket(self.device_id[0..c.strlen(self.device_id)], null, null);
 

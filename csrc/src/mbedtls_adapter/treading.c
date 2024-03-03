@@ -9,21 +9,17 @@
 
 void miso_mbedtls_mutex_init( mbedtls_threading_mutex_t * mutex )
 {
-	if(NULL == mutex)
-	{
-		// Error
-	}
-	else
+	if(NULL != mutex)
 	{
 	    mutex->mutex = xSemaphoreCreateMutex();
 
-	    if( mutex->mutex != NULL )
+	    if(mutex->mutex == NULL)
 	    {
-	        mutex->is_valid = 1;
+	        mutex->is_valid = pdFALSE;
 	    }
 	    else
 	    {
-	        mutex->is_valid = 0;
+	        mutex->is_valid = pdTRUE;
 	    }
 	}
 }
@@ -32,10 +28,10 @@ void miso_mbedtls_mutex_free( mbedtls_threading_mutex_t * mutex )
 {
 	if(NULL != mutex)
 	{
-	    if( mutex->is_valid == 1 )
+	    if( mutex->is_valid == pdTRUE )
 	    {
 	        vSemaphoreDelete( mutex->mutex );
-	        mutex->is_valid = 0;
+	        mutex->is_valid = pdFALSE;
 	    }
 	}
 }
@@ -46,9 +42,9 @@ int miso_mbedtls_mutex_lock( mbedtls_threading_mutex_t * mutex )
 
     if(NULL != mutex)
     {
-        if( mutex->is_valid == 1 )
+        if( mutex->is_valid == pdTRUE )
         {
-            if( xSemaphoreTake( mutex->mutex, portMAX_DELAY ) )
+            if(pdPASS == xSemaphoreTake( mutex->mutex, portMAX_DELAY ))
             {
                 ret = 0;
             }
@@ -69,9 +65,9 @@ int miso_mbedtls_mutex_unlock( mbedtls_threading_mutex_t * mutex )
 
     if(NULL != mutex)
     {
-        if( mutex->is_valid == 1 )
+        if( mutex->is_valid == pdTRUE )
         {
-            if( xSemaphoreGive( mutex->mutex ) )
+            if(pdPASS == xSemaphoreGive( mutex->mutex ) )
             {
                 ret = 0;
             }

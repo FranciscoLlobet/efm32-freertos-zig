@@ -25,7 +25,7 @@ const firmware_update_outcome = enum {
     backup_restore,
 };
 
-fn prepareJump() void {
+fn prepareJump() noreturn {
     board.jumpToApp(app_start_addr);
 }
 
@@ -235,7 +235,7 @@ fn firmwareUpdateStateMachine(start_phase: ?update_phase) !firmware_update_outco
     return outcome;
 }
 
-fn taskFunction(self: *@This()) void {
+fn taskFunction(self: *@This()) noreturn {
     _ = self;
 
     _ = nvm.init() catch 0;
@@ -278,7 +278,6 @@ fn taskFunction(self: *@This()) void {
     }
 
     prepareJump();
-    unreachable;
 }
 
 pub fn init(self: *@This()) void {

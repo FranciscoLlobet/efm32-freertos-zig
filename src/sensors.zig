@@ -19,7 +19,7 @@ fn tempTimerCallback(self: *@This()) void {
     self.task.notify(1, .eSetBits) catch {};
 }
 
-fn sensorSampingTask(self: *@This()) void {
+fn sensorSampingTask(self: *@This()) noreturn {
     var bme280_sensor = bme280.init(@ptrCast(board.bme280_dev)) catch unreachable;
     var bma280_sensor = bma280.init(@ptrCast(board.bma280_dev)) catch unreachable;
     _ = bma280_sensor;

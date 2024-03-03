@@ -17,12 +17,6 @@ connection: connection.Connection(simpleConnection.SimpleLinkConnection(.tcp_ip4
 /// Array to store parsed header information
 headers: [24]c.phr_header,
 
-/// TX Buffer mutex
-tx_mutex: freertos.StaticMutex(),
-
-/// Rx Buffer mutex
-rx_mutex: freertos.StaticMutex(),
-
 /// TX Buffer
 tx_buffer: [256]u8 align(@alignOf(u32)),
 
@@ -197,11 +191,8 @@ const parsedResponse = struct {
 pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
     var uri = try std.Uri.parse(url);
 
-    if (self.tx_mutex.take(null)) {
-        const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
-        try self.connection.send(@ptrCast(request), request.len);
-        _ = self.tx_mutex.give();
-    }
+    const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
+    try self.connection.send(@ptrCast(request), request.len);
 }
 
 /// Function to send an HTTP GET request with a specific byte range.
@@ -209,13 +200,8 @@ pub fn sendGetRequest(self: *@This(), url: []const u8) !void {
 pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: usize) !void {
     var uri = try std.Uri.parse(url);
 
-    if (try self.tx_mutex.take(null)) {
-        defer {
-            self.tx_mutex.give() catch {};
-        }
-        const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end });
-        _ = try self.connection.send(request);
-    }
+    const request = try std.fmt.bufPrint(&self.tx_buffer, "GET {s} HTTP/1.1\r\nHost: {s}\r\nRange: bytes={d}-{d}\r\n\r\n", .{ uri.path, uri.host.?, start, end });
+    _ = try self.connection.send(request);
 }
 
 /// Function to send an HTTP HEAD request to a specified URL.
@@ -223,13 +209,8 @@ pub fn sendGetRangeRequest(self: *@This(), url: []const u8, start: usize, end: u
 pub fn sendHeadRequest(self: *@This(), url: []const u8) !void {
     var uri = try std.Uri.parse(url);
 
-    if (try self.tx_mutex.take(null)) {
-        defer {
-            self.tx_mutex.give() catch {};
-        }
-        const request = try std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
-        _ = try self.connection.send(request);
-    }
+    const request = try std.fmt.bufPrint(&self.tx_buffer, "HEAD {s} HTTP/1.1\r\nHost: {s}\r\n\r\n", .{ uri.path, uri.host.? });
+    _ = try self.connection.send(request);
 }
 
 /// Recieve an HTTP response from the server.
@@ -245,34 +226,28 @@ fn recieveResponse(self: *@This()) !rx_response {
     var num_headers: usize = self.headers.len;
     var payload_len: usize = undefined;
     var payload: ?[]u8 = null;
-    if (try self.rx_mutex.take(null)) {
-        defer {
-            self.rx_mutex.give() catch {};
-        }
-        while ((pret == -2) and (rx_count < self.rx_buffer.len)) {
-            if (try self.connection.waitRx(5)) {
-                var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len)]);
 
-                // returns number of bytes consumed if successful, -2 if request is partial, -1 if failed
-                pret = c.phr_parse_response(rec.ptr, rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
-                prevbuflen = rx_count;
-                rx_count += rec.len;
-            } else {
-                // rx Timeout
-            }
-        }
+    while ((pret == -2) and (rx_count < self.rx_buffer.len)) {
+        if (try self.connection.waitRx(5)) {
+            var rec = try self.connection.recieve(self.rx_buffer[rx_count..(self.rx_buffer.len)]);
 
-        if (pret > 0) {
-            payload_len = rx_count - @as(usize, @intCast(pret));
-            payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
-        } else if (pret == -1) {
-            // PHR parse response failed for some reason
-            return @"error".phr_library_parse_failed;
+            // returns number of bytes consumed if successful, -2 if request is partial, -1 if failed
+            pret = c.phr_parse_response(rec.ptr, rec.len, &minor_version, &status, &msg, &msg_len, &self.headers, &num_headers, prevbuflen);
+            prevbuflen = rx_count;
+            rx_count += rec.len;
         } else {
-            return @"error".rx_error;
+            // rx Timeout
         }
+    }
+
+    if (pret > 0) {
+        payload_len = rx_count - @as(usize, @intCast(pret));
+        payload = if (payload_len != 0) self.rx_buffer[(rx_count - payload_len)..rx_count] else null;
+    } else if (pret == -1) {
+        // PHR parse response failed for some reason
+        return @"error".phr_library_parse_failed;
     } else {
-        return @"error".timeout; // Could not take the mutex
+        return @"error".rx_error;
     }
 
     return .{ .payload = payload, .headers = self.headers[0..num_headers], .status = @intCast(status) };
@@ -295,7 +270,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
         self.connection.close() catch {};
     }
 
-    try self.connection.create(uri, null);
+    try self.connection.open(uri, null);
     defer {
         self.connection.close() catch {};
     }
@@ -385,7 +360,7 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
                 // Reconnect logic
                 try self.connection.close();
 
-                try self.connection.create(uri, null);
+                try self.connection.open(uri, null);
             } else {
                 //  Keep Alive
             }
@@ -405,9 +380,7 @@ pub fn eTag(self: *@This()) ?[]const u8 {
 
 pub fn create(self: *@This()) void {
     if (config.enable_http) {
-        self.connection.init(); // mem corruption
-        self.tx_mutex.create() catch unreachable;
-        self.rx_mutex.create() catch unreachable;
+        self.connection.init();
     }
 }
 
