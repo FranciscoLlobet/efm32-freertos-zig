@@ -8,17 +8,17 @@
 #ifndef LWM2M_LIGHTCLIENT_LWM2M_CLIENT_H_
 #define LWM2M_LIGHTCLIENT_LWM2M_CLIENT_H_
 
-#include "miso.h"
 #include "liblwm2m.h"
+#include "miso.h"
 
 enum
 {
-	lwm2m_notify_registration = (1 << 0),
-	lwm2m_notify_timestamp = (1 << 1),
-	lwm2m_notify_temperature = (1 << 2),
-	lwm2m_notify_accelerometer = (1 << 3),
-	lwm2m_notify_message_reception = (1 << 4),
-	lwm2m_notify_suspend = (1 << 5)
+    lwm2m_notify_registration      = (1 << 0),
+    lwm2m_notify_timestamp         = (1 << 1),
+    lwm2m_notify_temperature       = (1 << 2),
+    lwm2m_notify_accelerometer     = (1 << 3),
+    lwm2m_notify_message_reception = (1 << 4),
+    lwm2m_notify_suspend           = (1 << 5)
 };
 /**
  * Notify of temperature value change

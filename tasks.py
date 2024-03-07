@@ -61,4 +61,9 @@ def sign_fw_images(c):
 @task
 def format_c_code(c):
     """Format C code."""
-    c.run("clang-format -i ./csrc/board/inc/*.h ./csrc/board/src/*.c")
+    c.run("clang-format -i ./csrc/board/inc/*.h ./csrc/board/src/*.c ./csrc/inc/*.h ./csrc/src/*.c")
+    
+@task
+def format_zig_code(c):
+    """Format Zig code."""
+    c.run("zig fmt --ast-check --color off .")

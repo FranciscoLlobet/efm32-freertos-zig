@@ -8,28 +8,18 @@
 #ifndef WIFI_SERVICE_H_
 #define WIFI_SERVICE_H_
 
-#include "miso.h"
-
 #include "FreeRTOS.h"
+#include "miso.h"
+#include "semphr.h"
 #include "task.h"
 #include "timers.h"
-#include "semphr.h"
-
-
-
-
-
-
-
-
 
 void create_wifi_service_task(void);
 
-
-#define MONITOR_MAX_RESPONSE_S    2
+#define MONITOR_MAX_RESPONSE_S 2
 
 extern TaskHandle_t wifi_task_handle;
-//extern TaskHandle_t network_monitor_task_handle;
+// extern TaskHandle_t network_monitor_task_handle;
 int create_network_mediator(void);
 
 extern TaskHandle_t get_lwm2m_task_handle(void);
