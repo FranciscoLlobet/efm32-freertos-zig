@@ -56,3 +56,9 @@ def sig_fw_dir(c):
 def sign_fw_images(c):
     """Create signed firmware images."""
     c.run("doit")
+
+
+@task
+def format_c_code(c):
+    """Format C code."""
+    c.run("clang-format -i ./csrc/board/inc/*.h ./csrc/board/src/*.c")

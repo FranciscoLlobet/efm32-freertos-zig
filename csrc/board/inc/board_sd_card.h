@@ -5,8 +5,4 @@
  *      Author: Francisco
  */
 
-
-
-
 void BOARD_SD_Card_Init(void);
-

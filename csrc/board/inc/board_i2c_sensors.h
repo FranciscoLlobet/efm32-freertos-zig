@@ -8,14 +8,13 @@
 #ifndef BOARD_I2C_SENSORS_H_
 #define BOARD_I2C_SENSORS_H_
 
-#include "board.h"
-#include "sl_i2cspm.h"
-
 #include "bma2.h"
-#include "bmm150.h"
 #include "bme280.h"
 #include "bmg160.h"
 #include "bmi160.h"
+#include "bmm150.h"
+#include "board.h"
+#include "sl_i2cspm.h"
 
 extern I2CSPM_Init_TypeDef init_i2c0;
 
