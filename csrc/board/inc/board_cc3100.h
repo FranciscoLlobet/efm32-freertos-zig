@@ -24,9 +24,9 @@ typedef int Fd_t;
 typedef void (*P_EVENT_HANDLER)(void* pValue);
 
 /* Interface Adaption */
-int CC3100_IfOpen(char* pIfName, unsigned long flags);
+int CC3100_IfOpen(const char* pIfName, unsigned long flags);
 int CC3100_IfClose(Fd_t Fd);
-int CC3100_IfWrite(Fd_t Fd, uint8_t* pBuff, int Len);
+int CC3100_IfWrite(Fd_t Fd, const uint8_t* pBuff, int Len);
 int CC3100_IfRead(Fd_t Fd, uint8_t* pBuff, int Len);
 
 void CC3100_IfRegIntHdlr(P_EVENT_HANDLER interruptHdl, void* pValue);

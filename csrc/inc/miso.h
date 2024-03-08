@@ -33,14 +33,6 @@ enum
     miso_rtos_prio_highest      = 6
 };
 
-/* New */
-
-/* LWM2M, MQTT */
-/* Select task */
-/* Wifi Service */
-/* SL Spawn */
-/* Timer */
-
 enum
 {
     miso_task_prio_idle             = miso_rtos_prio_idle,

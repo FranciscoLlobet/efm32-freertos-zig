@@ -168,7 +168,7 @@ void CC3100_DeviceDisable(void)
     }
 }
 
-int CC3100_IfOpen(char *pIfName, unsigned long flags)
+int CC3100_IfOpen(const char *pIfName, unsigned long flags)
 {
     (void)flags;
     int ret = -1;
@@ -192,18 +192,15 @@ int CC3100_IfOpen(char *pIfName, unsigned long flags)
 
 int CC3100_IfClose(Fd_t Fd)
 {
-    int ret = 0;
+    int ret = -1;
 
-    if (BOARD_CC3100_FD != Fd)
+    if (BOARD_CC3100_FD == Fd)
     {
-        ret = -1;
-    }
-
-    cc3100_spi_deselect();
-
-    if (ECODE_EMDRV_SPIDRV_OK != SPIDRV_DeInit(&cc3100_usart))
-    {
-        ret = -1;
+        cc3100_spi_deselect();
+        if (ECODE_EMDRV_SPIDRV_OK == SPIDRV_DeInit(&cc3100_usart))
+        {
+            ret = 0;
+        }
     }
 
     return ret;
@@ -248,7 +245,7 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
     return retVal;
 }
 
-int CC3100_IfWrite(Fd_t Fd, uint8_t *pBuff, int Len)
+int CC3100_IfWrite(Fd_t Fd, const uint8_t *pBuff, int Len)
 {
     if ((NULL == pBuff) || (Len <= 0) || (BOARD_CC3100_FD != Fd))
     {
