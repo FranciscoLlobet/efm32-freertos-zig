@@ -37,7 +37,7 @@ Either a binary with LwM2M via secure COAP (DTLS) or MQTT via TLS can be loaded 
 
 - Implementation of SimpleLink File Storage
 - Stability improvements of the LwM2M client
-- Stability improvments of the connection manager
+- Stability improvements of the connection manager
 - Memory optimization of statically allocated memory.
 - Improvements on documentation.
 - Programming via openOCD
