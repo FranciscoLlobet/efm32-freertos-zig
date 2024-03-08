@@ -7,7 +7,6 @@
 #include "board_i2c_sensors.h"
 
 struct bma2_dev board_bma280;
-
 static uint32_t dummy_val = 0;
 
 static BMA2_INTF_RET_TYPE _bma280_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
@@ -15,17 +14,20 @@ static BMA2_INTF_RET_TYPE _bma280_read(uint8_t reg_addr, uint8_t *reg_data, uint
     (void)intf_ptr;
     BMA2_INTF_RET_TYPE ret = BMA2_E_COM_FAIL;
 
-    I2C_TransferSeq_TypeDef transfer;
-    transfer.addr        = (BMA2_I2C_ADDR1 << 1);
-    transfer.buf[0].data = &reg_addr;
-    transfer.buf[0].len  = 1;
-    transfer.buf[1].data = reg_data;
-    transfer.buf[1].len  = len;
-    transfer.flags       = I2C_FLAG_WRITE_READ;
-
-    if (i2cTransferDone == board_i2c0_transfer(&transfer))
+    if (intf_ptr == &dummy_val)
     {
-        ret = BMA2_OK;
+        I2C_TransferSeq_TypeDef transfer;
+        transfer.addr        = (BMA2_I2C_ADDR1 << 1);
+        transfer.buf[0].data = &reg_addr;
+        transfer.buf[0].len  = 1;
+        transfer.buf[1].data = reg_data;
+        transfer.buf[1].len  = len;
+        transfer.flags       = I2C_FLAG_WRITE_READ;
+
+        if (i2cTransferDone == board_i2c0_transfer(&transfer))
+        {
+            ret = BMA2_OK;
+        }
     }
 
     return ret;
@@ -33,29 +35,39 @@ static BMA2_INTF_RET_TYPE _bma280_read(uint8_t reg_addr, uint8_t *reg_data, uint
 
 static BMA2_INTF_RET_TYPE _bma280_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    (void)intf_ptr;
     BMA2_INTF_RET_TYPE ret = BMA2_E_COM_FAIL;
 
-    I2C_TransferSeq_TypeDef transfer;
-    transfer.addr        = (BMA2_I2C_ADDR1 << 1);
-    transfer.buf[0].data = &reg_addr;
-    transfer.buf[0].len  = 1;
-    transfer.buf[1].data = reg_data;
-    transfer.buf[1].len  = len;
-    transfer.flags       = I2C_FLAG_WRITE_WRITE;
-
-    if (i2cTransferDone == board_i2c0_transfer(&transfer))
+    if (intf_ptr == &dummy_val)
     {
-        ret = BMA2_OK;
-    }
+        I2C_TransferSeq_TypeDef transfer;
+        transfer.addr        = (BMA2_I2C_ADDR1 << 1);
+        transfer.buf[0].data = &reg_addr;
+        transfer.buf[0].len  = 1;
+        transfer.buf[1].data = reg_data;
+        transfer.buf[1].len  = len;
+        transfer.flags       = I2C_FLAG_WRITE_WRITE;
 
+        if (i2cTransferDone == board_i2c0_transfer(&transfer))
+        {
+            ret = BMA2_OK;
+        }
+    }
     return ret;
 }
 
 static void _bma280_delay_us(uint32_t period, void *intf_ptr)
 {
-    (void)intf_ptr;
-    BOARD_usDelay(period);
+    if (intf_ptr == &dummy_val)
+    {
+        BOARD_usDelay(period);
+    }
+    else
+    {
+        while (1)
+        {
+            __NOP();
+        }
+    }
 }
 
 void board_bma280_enable(void)

@@ -12,26 +12,36 @@ uint32_t bmm150_intf_val = 0;
 
 static void _bmm150_delay_us(uint32_t period, void *intf_ptr)
 {
-    (void)intf_ptr;
-    BOARD_usDelay(period);
+    if (intf_ptr == &bmm150_intf_val)
+    {
+        BOARD_usDelay(period);
+    }
+    else
+    {
+        while (1)
+        {
+            __NOP();
+        }
+    }
 }
 
 static BMM150_INTF_RET_TYPE _bmm150_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr)
 {
-    (void)intf_ptr;
     BMM150_INTF_RET_TYPE ret = BMM150_E_COM_FAIL;
-
-    I2C_TransferSeq_TypeDef transfer;
-    transfer.addr        = (BMM150_DEFAULT_I2C_ADDRESS << 1);
-    transfer.buf[0].data = &reg_addr;
-    transfer.buf[0].len  = 1;
-    transfer.buf[1].data = reg_data;
-    transfer.buf[1].len  = length;
-    transfer.flags       = I2C_FLAG_WRITE_READ;
-
-    if (i2cTransferDone == board_i2c0_transfer(&transfer))
+    if (intf_ptr == &bmm150_intf_val)
     {
-        ret = BMM150_INTF_RET_SUCCESS;
+        I2C_TransferSeq_TypeDef transfer;
+        transfer.addr        = (BMM150_DEFAULT_I2C_ADDRESS << 1);
+        transfer.buf[0].data = &reg_addr;
+        transfer.buf[0].len  = 1;
+        transfer.buf[1].data = reg_data;
+        transfer.buf[1].len  = length;
+        transfer.flags       = I2C_FLAG_WRITE_READ;
+
+        if (i2cTransferDone == board_i2c0_transfer(&transfer))
+        {
+            ret = BMM150_INTF_RET_SUCCESS;
+        }
     }
 
     return ret;
@@ -42,19 +52,21 @@ static BMM150_INTF_RET_TYPE _bmm150_write(uint8_t reg_addr, const uint8_t *reg_d
     (void)intf_ptr;
     BMM150_INTF_RET_TYPE ret = BMM150_E_COM_FAIL;
 
-    I2C_TransferSeq_TypeDef transfer;
-    transfer.addr        = (BMM150_DEFAULT_I2C_ADDRESS << 1);
-    transfer.buf[0].data = &reg_addr;
-    transfer.buf[0].len  = 1;
-    transfer.buf[1].data = reg_data;
-    transfer.buf[1].len  = length;
-    transfer.flags       = I2C_FLAG_WRITE_WRITE;
-
-    if (i2cTransferDone == board_i2c0_transfer(&transfer))
+    if (intf_ptr == &bmm150_intf_val)
     {
-        ret = BMM150_INTF_RET_SUCCESS;
-    }
+        I2C_TransferSeq_TypeDef transfer;
+        transfer.addr        = (BMM150_DEFAULT_I2C_ADDRESS << 1);
+        transfer.buf[0].data = &reg_addr;
+        transfer.buf[0].len  = 1;
+        transfer.buf[1].data = reg_data;
+        transfer.buf[1].len  = length;
+        transfer.flags       = I2C_FLAG_WRITE_WRITE;
 
+        if (i2cTransferDone == board_i2c0_transfer(&transfer))
+        {
+            ret = BMM150_INTF_RET_SUCCESS;
+        }
+    }
     return ret;
 }
 

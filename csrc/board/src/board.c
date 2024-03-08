@@ -116,6 +116,8 @@ void BOARD_Init(void)
 
     CMU_ClockEnable(cmuClock_GPIO, true);
 
+    CMU_OscillatorEnable(cmuOsc_ULFRCO, true, true);
+
     /* ENABLE SWO */
     sl_debug_swo_init();
 

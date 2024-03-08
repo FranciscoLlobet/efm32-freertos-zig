@@ -158,6 +158,9 @@ pub fn StaticTask(comptime T: type, comptime stackSize: usize, comptime pcName: 
         pub inline fn getHandle(self: *const @This()) TaskHandle_t {
             return self.task.getHandle();
         }
+        pub inline fn getTickCount(self: *const @This()) TickType_t {
+            return self.task.getTickCount();
+        }
     };
 }
 
@@ -255,6 +258,12 @@ pub const Task = struct {
     pub inline fn delayTask(self: *const @This(), xTicksToDelay: TickType_t) void {
         _ = self;
         c.vTaskDelay(xTicksToDelay);
+    }
+
+    /// Get the current tick time
+    pub inline fn getTickCount(self: *const @This()) TickType_t {
+        _ = self;
+        return c.xTaskGetTickCount();
     }
 };
 

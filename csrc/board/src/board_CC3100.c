@@ -41,29 +41,34 @@ struct transfer_status_s
 };
 
 static volatile P_EVENT_HANDLER interrupt_handler_callback = NULL;
-static void *interrupt_handler_pValue                      = NULL;
+static volatile void *interrupt_handler_pValue             = NULL;
+
+extern void system_reset(void);
 
 static void cc3100_interrupt_callback(uint8_t intNo)
 {
-    (void)intNo;  // Validate interrupt ?
-
-    if (NULL != interrupt_handler_callback)
+    if ((uint8_t)WIFI_INT_PIN == intNo)
     {
-        interrupt_handler_callback(interrupt_handler_pValue);
+        if (NULL != interrupt_handler_callback)
+        {
+            interrupt_handler_callback(interrupt_handler_pValue);
+        }
     }
 }
 
 static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStatus, int itemsTransferred)
 {
-    (void)handle;  // Validate handle ?
-    struct transfer_status_s transfer_status_information = {.transferStatus   = transferStatus,
-                                                            .itemsTransferred = itemsTransferred};
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    BaseType_t xHigherPriorityTaskWoken                  = pdFALSE;
-
-    if (NULL != rx_queue)
+    if (handle == &cc3100_usart)
     {
-        (void)xQueueSendFromISR(rx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
+        struct transfer_status_s transfer_status_information = {.transferStatus   = transferStatus,
+                                                                .itemsTransferred = itemsTransferred};
+
+        if (NULL != rx_queue)
+        {
+            (void)xQueueSendFromISR(rx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
+        }
     }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -71,15 +76,16 @@ static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferS
 
 static void send_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStatus, int itemsTransferred)
 {
-    (void)handle;  // Validate handle ?
-    struct transfer_status_s transfer_status_information = {.transferStatus   = transferStatus,
-                                                            .itemsTransferred = itemsTransferred};
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    BaseType_t xHigherPriorityTaskWoken                  = pdFALSE;
-
-    if (NULL != tx_queue)
+    if (handle == &cc3100_usart)
     {
-        (void)xQueueSendFromISR(tx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
+        struct transfer_status_s transfer_status_information = {.transferStatus   = transferStatus,
+                                                                .itemsTransferred = itemsTransferred};
+        if (NULL != tx_queue)
+        {
+            (void)xQueueSendFromISR(tx_queue, &transfer_status_information, &xHigherPriorityTaskWoken);
+        }
     }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -170,11 +176,10 @@ void CC3100_DeviceDisable(void)
 
 int CC3100_IfOpen(const char *pIfName, unsigned long flags)
 {
-    (void)flags;
     int ret = -1;
     // Success: FD (positive integer)
     // Failure: -1
-    if (strncmp(pIfName, CC3100_DEVICE_NAME, strlen(CC3100_DEVICE_NAME)) == 0)
+    if ((strncmp(pIfName, CC3100_DEVICE_NAME, strlen(CC3100_DEVICE_NAME)) == 0) && (flags == 0))
     {
         if (ECODE_OK == SPIDRV_Init(&cc3100_usart, &cc3100_usart_init_data))
         {
@@ -213,13 +218,13 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
         return -1;
     }
 
-    int retVal                               = -1;
-    struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, 0};
-
+    int retVal = -1;
     cc3100_spi_select();
 
     if (rx_queue != NULL)  // Change to check if scheduler is active
     {
+        struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, -1};
+
         (void)xQueueReset(rx_queue);
 
         Ecode_t ecode = SPIDRV_MReceive(&cc3100_usart, pBuff, Len, recieve_callback);
@@ -233,11 +238,11 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
             {
                 ecode = ECODE_EMDRV_SPIDRV_TIMEOUT;
             }
+        }
 
-            if (ECODE_EMDRV_SPIDRV_OK == ecode)
-            {
-                retVal = transfer_status.itemsTransferred;
-            }
+        if (ECODE_EMDRV_SPIDRV_OK == ecode)
+        {
+            retVal = transfer_status.itemsTransferred;
         }
     }
 
@@ -252,15 +257,15 @@ int CC3100_IfWrite(Fd_t Fd, const uint8_t *pBuff, int Len)
         return -1;
     }
 
-    int retVal                               = -1;
-    struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, 0};
+    int retVal = -1;
 
     cc3100_spi_select();
 
     if (tx_queue != NULL)  // Change to check if scheduler is active
     {
-        xQueueReset(tx_queue);
+        struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, -1};
 
+        xQueueReset(tx_queue);
         Ecode_t ecode = SPIDRV_MTransmit(&cc3100_usart, pBuff, Len, send_callback);
         if (ECODE_EMDRV_SPIDRV_OK == ecode)
         {
@@ -293,8 +298,6 @@ void CC3100_IfRegIntHdlr(P_EVENT_HANDLER interruptHdl, void *pValue)
 void CC3100_MaskIntHdlr(void) { ; }
 
 void CC3100_UnmaskIntHdlr(void) { ; }
-
-extern void system_reset(void);
 
 /* General Event Handler */
 void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)

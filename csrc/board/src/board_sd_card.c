@@ -26,6 +26,12 @@ static void card_detect_callback(uint8_t intNo);
 static SemaphoreHandle_t tx_semaphore = NULL;
 static SemaphoreHandle_t rx_semaphore = NULL;
 
+struct transfer_status_s
+{
+    Ecode_t transferStatus;  // status
+    int itemsTransferred;    // items_transferred
+};
+
 uint32_t BOARD_SD_CARD_IsInserted(void)
 {
     return (0 == GPIO_PinInGet(SD_DETECT_PORT, SD_DETECT_PIN)) ? (uint32_t)UINT32_C(1) : (uint32_t)UINT32_C(0);
@@ -123,7 +129,10 @@ static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferS
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if (NULL != rx_semaphore) xQueueSendFromISR(rx_semaphore, &transferStatus, &xHigherPriorityTaskWoken);
+    if (handle == &sd_card_usart)
+    {
+        if (NULL != rx_semaphore) xQueueSendFromISR(rx_semaphore, &transferStatus, &xHigherPriorityTaskWoken);
+    }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -131,12 +140,14 @@ static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferS
 /* tx callback for async tx */
 static void send_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStatus, int itemsTransferred)
 {
-    (void)handle;
     (void)itemsTransferred;
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if (NULL != tx_semaphore) xQueueSendFromISR(tx_semaphore, &transferStatus, &xHigherPriorityTaskWoken);
+    if (handle == &sd_card_usart)
+    {
+        if (NULL != tx_semaphore) xQueueSendFromISR(tx_semaphore, &transferStatus, &xHigherPriorityTaskWoken);
+    }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }

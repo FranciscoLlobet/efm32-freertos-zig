@@ -92,11 +92,12 @@ const fw_update_topic = "zig/fw";
 const conf_update_topic = "zig/conf";
 const reset_topic = "zig/reset";
 
-const connectionType = connection.Connection(mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.no_protocol), .psk));
+const connectionType = connection.Connection(mbedtls.TlsContext(@This(), simpleConnection.SimpleLinkConnection(.tls_ip4), .psk));
 
 connection: connectionType,
 connectionCounter: usize,
 disconnectionCounter: usize,
+pingCounter: usize,
 
 pingTimer: freertos.StaticTimer(@This(), "pingTimer", pingTimer),
 pubTimer: freertos.StaticTimer(@This(), "pubTimer", pubTimer),
@@ -113,27 +114,31 @@ qosQueue: QueuedMessgeQueue,
 /// QoS2 rx queue
 qos2Queue: QueuedMessgeQueue,
 
+/// Ping message queue
+pingQueue: freertos.StaticQueue(freertos.TickType_t, 1),
+
 var txBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 var rxBuffer: [512]u8 align(@alignOf(u32)) = undefined;
 var workBuffer: [256]u8 align(@alignOf(u32)) = undefined;
 
 /// Init a MQTT String using slice.
 /// Has been tested in comptime
-inline fn initMQTTString(data: []const u8) MQTTString {
-    return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(data.len), .data = @constCast(data.ptr) } };
-}
-
-/// Init a MQTT String using a pointer and asuming a 0-terminated C-String
-inline fn initMQTTCstring(data: [*:0]u8) MQTTString {
-    return MQTTString{ .cstring = @ptrCast(data), .lenstring = .{ .len = 0, .data = null } };
+inline fn initMQTTString(data: ?[]const u8) MQTTString {
+    if (data) |val| {
+        return MQTTString{ .cstring = null, .lenstring = .{ .len = @intCast(val.len), .data = @constCast(val.ptr) } };
+    } else {
+        return MQTTString_initializer;
+    }
 }
 
 /// Get MQTT String as slice
 inline fn getMQTTString(data: MQTTString) []u8 {
     if (data.cstring) |cstring| {
         return cstring[0..c.strlen(cstring)];
-    } else {
+    } else if ((data.lenstring.data != null) and (data.lenstring.len > 0)) {
         return data.lenstring.data[0..@intCast(data.lenstring.len)];
+    } else {
+        return undefined;
     }
 }
 
@@ -146,11 +151,13 @@ fn init() @This() {
         .pubTimer = undefined,
         .task = undefined,
         .state = .not_connected,
-        .packet = packet.init(0x5555),
+        .packet = packet.init(),
         .uri_string = undefined,
         .device_id = undefined,
         .qosQueue = QueuedMessgeQueue.init(freertos.allocator),
         .qos2Queue = QueuedMessgeQueue.init(freertos.allocator),
+        .pingCounter = 0,
+        .pingQueue = undefined,
     };
 }
 
@@ -176,7 +183,20 @@ fn processSendQueue(self: *@This()) !void {
 }
 
 /// Quality of Service
-const QoS = enum(c_int) { qos0 = 0, qos1 = 1, qos2 = 2 };
+const QoS = enum(c_int) {
+    qos0 = 0,
+    qos1 = 1,
+    qos2 = 2,
+
+    fn fromInt(x: c_int) !QoS {
+        return switch (x) {
+            0 => .qos0,
+            1 => .qos1,
+            2 => .qos2,
+            else => mqtt_error.qos_not_supported,
+        };
+    }
+};
 
 /// Queued message
 const QueuedMessage = struct {
@@ -281,7 +301,7 @@ const packet = struct {
         payload: []u8,
     };
 
-    pub fn init(comptime packetId: u16) @This() {
+    pub fn init() @This() {
         return @This(){ .transport = .{
             .getfn = getFn,
             .sck = undefined,
@@ -289,7 +309,7 @@ const packet = struct {
             .rem_len = undefined,
             .len = undefined,
             .state = undefined,
-        }, .packetIdState = packetId, .workBufferMutex = undefined, .txQueue = undefined };
+        }, .packetIdState = 1, .workBufferMutex = undefined, .txQueue = undefined };
     }
 
     pub fn create(self: *@This(), conn: *connectionType) void {
@@ -300,7 +320,8 @@ const packet = struct {
         self.txQueue.create() catch unreachable; // Create message buffer
     }
 
-    /// Generate Packet ID
+    /// Generate Packet ID using pseudo random number generator
+    ///
     /// Uses XorShift Algorithm to generate the packet id
     fn generatePacketId(self: *@This()) u16 {
         if (self.packetIdState != 0) {
@@ -333,7 +354,7 @@ const packet = struct {
     }
 
     /// Deserialize a publish packet from buffer and converts it into a `publish_response`
-    fn deserializePublish(self: *@This(), buffer: []u8) !publish_response {
+    fn deserializePublish(self: *@This(), buffer: []const u8) !publish_response {
         _ = self;
         var topicName = MQTTString_initializer;
         var payload: [*c]u8 = undefined;
@@ -343,27 +364,22 @@ const packet = struct {
         var dup: u8 = undefined;
         var qos: c_int = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_publish(&dup, &qos, &retained, &packetId, &topicName, &payload, &payloadLen, buffer.ptr, @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_publish(&dup, &qos, &retained, &packetId, &topicName, &payload, &payloadLen, @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
 
-        const retQos: QoS = switch (qos) {
-            0 => .qos0,
-            1 => .qos1,
-            2 => .qos2,
-            else => return mqtt_error.qos_not_supported,
-        };
+        const retQos = try QoS.fromInt(qos);
 
         return publish_response{ .packetId = packetId, .qos = retQos, .dup = (if (dup == 0) false else true), .retained = (if (retained == 0) false else true), .topic = getMQTTString(topicName), .payload = payload[0..@intCast(payloadLen)] };
     }
 
-    fn deserializePuback(self: *@This(), buffer: []u8) !struct { packetId: u16, dup: bool } {
+    fn deserializePuback(self: *@This(), buffer: []const u8) !struct { packetId: u16, dup: bool } {
         _ = self;
         var packetId: u16 = undefined;
         var dup: u8 = undefined;
         var packetType: u8 = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         if (packetType != c.PUBACK) {
@@ -373,13 +389,13 @@ const packet = struct {
     }
 
     /// Deserialize a pubrel packet from buffer
-    fn deserializePubrel(self: *@This(), buffer: []u8) !struct { packetId: u16, dup: bool } {
+    fn deserializePubrel(self: *@This(), buffer: []const u8) !struct { packetId: u16, dup: bool } {
         _ = self;
         var packetId: u16 = undefined;
         var dup: u8 = undefined;
         var packetType: u8 = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         if (packetType != c.PUBREL) {
@@ -389,13 +405,13 @@ const packet = struct {
     }
 
     /// Deserialize a pubrec packet from buffer
-    fn deserializePubrec(self: *@This(), buffer: []u8) !u16 {
+    fn deserializePubrec(self: *@This(), buffer: []const u8) !u16 {
         _ = self;
         var packetId: u16 = undefined;
         var dup: u8 = undefined;
         var packetType: u8 = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         if (packetType != c.PUBREC) {
@@ -406,13 +422,13 @@ const packet = struct {
     }
 
     /// Deserialize a pubcomp packet from buffer
-    fn deserializePubcomp(self: *@This(), buffer: []u8) !u16 {
+    fn deserializePubcomp(self: *@This(), buffer: []const u8) !u16 {
         _ = self;
         var packetId: u16 = undefined;
         var dup: u8 = undefined;
         var packetType: u8 = undefined;
 
-        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @ptrCast(&buffer[0]), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_ack(&packetType, &dup, &packetId, @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         if (packetType != c.PUBCOMP) {
@@ -423,12 +439,12 @@ const packet = struct {
     }
 
     /// Deserialize a suback packet from buffer
-    fn deserializeSubAck(self: *@This(), buffer: []u8, qos: []QoS) !struct { packetId: u16, qos: []QoS } {
+    fn deserializeSubAck(self: *@This(), buffer: []const u8, qos: []QoS) !struct { packetId: u16, qos: []QoS } {
         _ = self;
         var packetId: u16 = undefined;
         var count: c_int = 0;
 
-        if (mqtt_ok != c.MQTTDeserialize_suback(&packetId, @intCast(qos.len), &count, @ptrCast(qos.ptr), @ptrCast(buffer.ptr), @intCast(buffer.len))) {
+        if (mqtt_ok != c.MQTTDeserialize_suback(&packetId, @intCast(qos.len), &count, @ptrCast(qos.ptr), @constCast(buffer.ptr), @intCast(buffer.len))) {
             return mqtt_error.parse_failed;
         }
         return .{ .packetId = packetId, .qos = qos[0..@as(usize, @intCast(count))] };
@@ -451,14 +467,8 @@ const packet = struct {
         var connectPacket = MQTTPacket_connectData_initializer;
         connectPacket.clientID = initMQTTString(clientID);
 
-        if (username) |un| {
-            connectPacket.username = initMQTTString(un);
-        }
-
-        if (password) |pw| {
-            connectPacket.password = initMQTTString(pw);
-        }
-
+        connectPacket.username = initMQTTString(username);
+        connectPacket.password = initMQTTString(password);
         connectPacket.keepAliveInterval = 400;
 
         _ = try self.workBufferMutex.take(null);
@@ -571,6 +581,9 @@ fn loop(self: *@This(), uri: std.Uri) !void {
     defer self.disconnect() catch {};
 
     while (true) {
+        const current_cycle_time = freertos.xTaskGetTickCount(); // Get current cycle time
+        _ = current_cycle_time;
+
         // process the QoS1 tx queue
         while (self.qosQueue.prune()) |msg| {
             switch (msg.packetType) {
@@ -595,7 +608,8 @@ fn loop(self: *@This(), uri: std.Uri) !void {
 
         try self.processSendQueue();
 
-        if (self.connection.waitRx(1) catch false) {
+        // Think if I make this into a while
+        while (self.connection.waitRx(1) catch false) {
             var readRet = self.packet.read(&rxBuffer);
             switch (readRet) {
                 .try_again => {},
@@ -648,7 +662,9 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     }
                 },
                 .pingresp => {
-                    _ = c.printf("pingresp!\r\n");
+                    const ping_timestamp = self.pingQueue.recieve(0).?;
+
+                    _ = c.printf("pingresp! %d, %d\r\n", self.pingCounter, ping_timestamp);
                 },
                 .connack => try self.packet.processConnAck(&rxBuffer),
                 .connect, .subscribe, .disconnect, .unsubscribe, .pingreq => break, // Broker messages
@@ -715,7 +731,7 @@ fn loop(self: *@This(), uri: std.Uri) !void {
                     if (false == try self.qosQueue.acknowledge(resp, .pubrel)) {
                         return mqtt_error.pubrel_packet_not_found;
                     } else {
-                        _ = c.printf("pubcomp received for packetId\r\n", resp);
+                        _ = c.printf("pubcomp received for packetId %d\r\n", resp);
                     }
                 },
                 .err_msg => break,
@@ -735,6 +751,8 @@ fn taskFunction(self: *@This()) noreturn {
 
     self.connectionCounter = 0;
     self.disconnectionCounter = 0;
+    self.pingCounter = 0;
+    self.pingQueue.create() catch unreachable;
 
     self.uri_string = c.config_get_mqtt_url();
     self.device_id = c.config_get_mqtt_device_id();
@@ -745,6 +763,7 @@ fn taskFunction(self: *@This()) noreturn {
 
         self.loop(uri) catch |err| {
             if (err == connection.connection_error.create_error) {
+                self.pingQueue.reset();
                 self.task.delayTask(1000);
             }
             _ = c.printf("Disconnected... reconnect: %d. %d \r\n", self.connectionCounter, @intFromError(err));
@@ -761,6 +780,11 @@ fn dummyTaskFunction(self: *@This()) noreturn {
 }
 
 fn pingTimer(self: *@This()) void {
+    const curr_tick = self.task.getTickCount();
+
+    self.pingQueue.send(&curr_tick, 0) catch unreachable;
+    self.pingCounter += 1;
+
     _ = self.packet.preparePingPacket() catch unreachable;
 }
 
@@ -838,6 +862,7 @@ pub fn connect(self: *@This(), uri: std.Uri) !void {
 
 pub fn disconnect(self: *@This()) !void {
     self.pingTimer.stop(null) catch {};
+    self.pubTimer.stop(null) catch {};
     defer {
         self.connection.close() catch {};
         self.disconnectionCounter += 1;
