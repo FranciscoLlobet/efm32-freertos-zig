@@ -218,7 +218,6 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
 
     int retVal                               = -1;
     struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, 0};
-    Ecode_t ecode                            = ECODE_EMDRV_SPIDRV_PARAM_ERROR;
 
     cc3100_spi_select();
 
@@ -226,7 +225,7 @@ int CC3100_IfRead(Fd_t Fd, uint8_t *pBuff, int Len)
     {
         (void)xQueueReset(rx_queue);
 
-        ecode = SPIDRV_MReceive(&cc3100_usart, pBuff, Len, recieve_callback);
+        Ecode_t ecode = SPIDRV_MReceive(&cc3100_usart, pBuff, Len, recieve_callback);
         if (ECODE_EMDRV_SPIDRV_OK == ecode)
         {
             if (pdTRUE == xQueueReceive(rx_queue, &transfer_status, CC3100_SPI_RX_TIMEOUT_MS))  // Added rx timeout
@@ -258,7 +257,6 @@ int CC3100_IfWrite(Fd_t Fd, uint8_t *pBuff, int Len)
 
     int retVal                               = -1;
     struct transfer_status_s transfer_status = {ECODE_EMDRV_SPIDRV_PARAM_ERROR, 0};
-    Ecode_t ecode                            = ECODE_EMDRV_SPIDRV_PARAM_ERROR;
 
     cc3100_spi_select();
 
@@ -266,7 +264,7 @@ int CC3100_IfWrite(Fd_t Fd, uint8_t *pBuff, int Len)
     {
         xQueueReset(tx_queue);
 
-        ecode = SPIDRV_MTransmit(&cc3100_usart, pBuff, Len, send_callback);
+        Ecode_t ecode = SPIDRV_MTransmit(&cc3100_usart, pBuff, Len, send_callback);
         if (ECODE_EMDRV_SPIDRV_OK == ecode)
         {
             if (pdTRUE == xQueueReceive(tx_queue, &transfer_status, CC3100_SPI_TX_TIMEOUT_MS))
@@ -318,7 +316,7 @@ void CC3100_GeneralEvtHdlr(SlDeviceEvent_t *slGeneralEvent)
             system_reset();
             break;
         case SL_DEVICE_ABORT_ERROR_EVENT:
-            printf("Abort Error: AbortType=%u, AbortData=%u\n", slGeneralEvent->EventData.deviceReport.AbortType,
+            printf("Abort Error: AbortType=%l, AbortData=%l\n", slGeneralEvent->EventData.deviceReport.AbortType,
                    slGeneralEvent->EventData.deviceReport.AbortData);
             system_reset();
             break;
