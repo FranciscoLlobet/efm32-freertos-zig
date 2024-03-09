@@ -7,6 +7,7 @@
 
 #include "FreeRTOS.h"
 #include "board.h"
+#include "timers.h"
 #include "semphr.h"
 #include "simplelink.h"
 
@@ -41,16 +42,31 @@ struct transfer_status_s
 };
 
 static volatile P_EVENT_HANDLER interrupt_handler_callback = NULL;
-static volatile void *interrupt_handler_pValue             = NULL;
+static void *interrupt_handler_pValue             = NULL;
 
 extern void system_reset(void);
 
-static void cc3100_interrupt_callback(uint8_t intNo)
+static void timerContextCallback(void * param1, uint32_t param2)
 {
-    if (((uint8_t)WIFI_INT_PIN == intNo) && (NULL != interrupt_handler_callback))
+    (void)param1;
+    (void)param2;
+
+    if (NULL != interrupt_handler_callback)
     {
         interrupt_handler_callback(interrupt_handler_pValue);
     }
+}
+
+static void cc3100_interrupt_callback(uint8_t intNo)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if (((uint8_t)WIFI_INT_PIN == intNo) && (NULL != interrupt_handler_callback))
+    {
+        (void)xTimerPendFunctionCallFromISR(timerContextCallback, (void *)interrupt_handler_callback, (uint32_t)interrupt_handler_pValue, &xHigherPriorityTaskWoken);
+    }
+
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 static void recieve_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStatus, int itemsTransferred)
