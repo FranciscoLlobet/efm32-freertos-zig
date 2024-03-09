@@ -358,7 +358,7 @@ pub fn wait_rx(self: *@This(), sd: i16, timeout_s: u32) !bool {
         if (1 == resp.timeout) {
             return true;
         } else {
-            _ = c.printf("Deadline missed: %d\n\r", freertos.xTaskGetTickCount() - deadline_ms);
+            // _ = c.printf("Deadline missed: %d\n\r", freertos.xTaskGetTickCount() - deadline_ms);
             return false;
         }
     } else {

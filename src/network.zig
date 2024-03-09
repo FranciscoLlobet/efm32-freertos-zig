@@ -15,7 +15,7 @@ const c = @cImport({
 
 /// SimpleLink Spawn Queue Executor
 const simpleLinkSpawn = struct {
-    task: freertos.StaticTask(@This(), 900, "SimpleLinkSpawnTask", run),
+    task: freertos.StaticTask(@This(), 900, "SimpleLinkSpawn", run),
     queue: freertos.StaticQueue(c.tSimpleLinkSpawnMsg, 4),
     stack: usize,
 
@@ -37,15 +37,12 @@ const simpleLinkSpawn = struct {
     /// Send a message to the SimpleLink Spawn task
     fn sendMsg(self: *@This(), pEntry: c.P_OSI_SPAWN_ENTRY, pValue: ?*anyopaque, flags: c_ulong) !void {
         const msg: c.tSimpleLinkSpawnMsg = .{ .pEntry = pEntry, .pValue = pValue };
-        var xHigherPriorityTaskWoken: freertos.BaseType_t = freertos.pdFALSE;
+        defer freertos.portYIELD();
 
         if (flags == 1) {
-            defer freertos.portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-
-            try self.queue.sendFromIsr(&msg, &xHigherPriorityTaskWoken);
+            try self.queue.send(&msg, 0);
         } else {
             try self.queue.send(&msg, null);
-            defer freertos.portYIELD();
         }
     }
 };
