@@ -47,12 +47,9 @@ extern void system_reset(void);
 
 static void cc3100_interrupt_callback(uint8_t intNo)
 {
-    if ((uint8_t)WIFI_INT_PIN == intNo)
+    if (((uint8_t)WIFI_INT_PIN == intNo) && (NULL != interrupt_handler_callback))
     {
-        if (NULL != interrupt_handler_callback)
-        {
-            interrupt_handler_callback(interrupt_handler_pValue);
-        }
+        interrupt_handler_callback(interrupt_handler_pValue);
     }
 }
 
@@ -91,9 +88,17 @@ static void send_callback(struct SPIDRV_HandleData *handle, Ecode_t transferStat
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-static void cc3100_spi_select(void) { GPIO_PinOutClear(WIFI_CSN_PORT, WIFI_CSN_PIN); }
+static void cc3100_spi_select(void)
+{
+    GPIO_PinOutClear(WIFI_CSN_PORT, WIFI_CSN_PIN);
+    BOARD_usDelay(1);
+}
 
-static void cc3100_spi_deselect(void) { GPIO_PinOutSet(WIFI_CSN_PORT, WIFI_CSN_PIN); }
+static void cc3100_spi_deselect(void)
+{
+    BOARD_usDelay(1);
+    GPIO_PinOutSet(WIFI_CSN_PORT, WIFI_CSN_PIN);
+}
 
 void Board_CC3100_Init(void)
 {
@@ -119,59 +124,26 @@ void CC3100_DeviceEnablePreamble(void)
 
     GPIO_PinOutClear(WIFI_NRESET_PORT, WIFI_NRESET_PIN);
     BOARD_msDelay(WIFI_MIN_RESET_DELAY_MS);
+
     GPIO_PinOutSet(WIFI_NRESET_PORT, WIFI_NRESET_PIN);
-    BOARD_msDelay(WIFI_PWRON_HW_WAKEUP_DELAY_MS);
-    BOARD_msDelay(WIFI_INIT_DELAY_MS);
+    BOARD_msDelay(WIFI_PWRON_HW_WAKEUP_DELAY_MS + WIFI_INIT_DELAY_MS);
 }
 
 void CC3100_DeviceEnable(void)
 {
-    if (tx_queue == NULL)
-    {
-        tx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
-    }
-
-    if (rx_queue == NULL)
-    {
-        rx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
-    }
-
     GPIO_PinOutSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
-    GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_MODE, 0);
-    GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, true);
+    BOARD_msDelay(50);  // Wakeup from hybernate
+
+    //GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_MODE, 0);
+    //GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, true); // Enable Interrupt active high
 }
 
 void CC3100_DeviceDisable(void)
 {
-    GPIO_PinOutClear(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
     GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, false);
-    BOARD_msDelay(1);  // Very important (!)
-
-    // GPIO_PinOutClear(WIFI_NRESET_PORT, WIFI_NRESET_PIN);
-    // GPIO_PinOutClear(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
-    // GPIO_PinOutClear(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN);
-    // GPIO_PinOutSet(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN);
-    // BOARD_msDelay(19);
-
-    //	GPIO_PinModeSet(VDD_WIFI_EN_PORT, VDD_WIFI_EN_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_CSN_PORT, WIFI_CSN_PIN, gpioModeDisabled, 0);
     GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_NRESET_PORT, WIFI_NRESET_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_SPI0_MISO_PORT, WIFI_SPI0_MISO_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_SPI0_MOSI_PORT, WIFI_SPI0_MOSI_PIN, gpioModeDisabled, 0);
-    //	GPIO_PinModeSet(WIFI_SPI0_SCK_PORT, WIFI_SPI0_SCK_PIN, gpioModeDisabled, 0);
-
-    if (NULL != tx_queue)
-    {
-        vQueueDelete(tx_queue);
-        tx_queue = NULL;
-    }
-    if (NULL != rx_queue)
-    {
-        vQueueDelete(rx_queue);
-        rx_queue = NULL;
-    }
+    GPIO_PinOutClear(WIFI_NHIB_PORT, WIFI_NHIB_PIN);  // Set to Hybernate
+    BOARD_msDelay(10);                                // Hybernate low pulse
 }
 
 int CC3100_IfOpen(const char *pIfName, unsigned long flags)
@@ -179,14 +151,26 @@ int CC3100_IfOpen(const char *pIfName, unsigned long flags)
     int ret = -1;
     // Success: FD (positive integer)
     // Failure: -1
+
+    // Plausibility Check for the IfOpen
     if ((strncmp(pIfName, CC3100_DEVICE_NAME, strlen(CC3100_DEVICE_NAME)) == 0) && (flags == 0))
     {
+        if (tx_queue == NULL)
+        {
+            tx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
+        }
+
+        if (rx_queue == NULL)
+        {
+            rx_queue = xQueueCreate(1, sizeof(struct transfer_status_s));
+        }
+
         if (ECODE_OK == SPIDRV_Init(&cc3100_usart, &cc3100_usart_init_data))
         {
             NVIC_SetPriority(USART0_RX_IRQn, 5);
             NVIC_SetPriority(USART0_TX_IRQn, 6);
             GPIO_PinOutSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN);  // Clear Hybernate
-            BOARD_msDelay(50);
+            BOARD_msDelay(50);                              // Wakeup delay
             cc3100_spi_deselect();
             ret = BOARD_CC3100_FD;
         }
@@ -205,6 +189,16 @@ int CC3100_IfClose(Fd_t Fd)
         if (ECODE_EMDRV_SPIDRV_OK == SPIDRV_DeInit(&cc3100_usart))
         {
             ret = 0;
+        }
+        if (NULL != tx_queue)
+        {
+            vQueueDelete(tx_queue);
+            tx_queue = NULL;
+        }
+        if (NULL != rx_queue)
+        {
+            vQueueDelete(rx_queue);
+            rx_queue = NULL;
         }
     }
 
@@ -293,6 +287,17 @@ void CC3100_IfRegIntHdlr(P_EVENT_HANDLER interruptHdl, void *pValue)
 {
     interrupt_handler_callback = interruptHdl;
     interrupt_handler_pValue   = pValue;
+
+    if(interruptHdl == NULL)
+    {
+        GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, false);
+        GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, gpioModeDisabled, 0);
+    }
+    else
+    {
+        GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, gpioModeInput, 0);
+        GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, true);
+    }
 }
 
 void CC3100_MaskIntHdlr(void) { ; }

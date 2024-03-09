@@ -14,7 +14,7 @@ void BOARD_Watchdog_Init(void)
 {
     WDOG_Init_TypeDef wdog_init = WDOG_INIT_DEFAULT;
     wdog_init.clkSel            = wdogClkSelULFRCO;
-    wdog_init.debugRun          = false;            // When in debug mode, the watchdog is disabled.
+    wdog_init.debugRun          = false;          // When in debug mode, the watchdog is disabled.
     wdog_init.perSel            = wdogPeriod_8k;  //(8s)
     wdog_init.lock              = false;
     wdog_init.enable            = false;

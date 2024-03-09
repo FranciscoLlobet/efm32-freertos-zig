@@ -26,7 +26,7 @@ const SL_IPROTO_TCP: i16 = c.SL_IPPROTO_TCP;
 const SL_AF_INET: i16 = c.SL_AF_INET;
 
 const SL_SEC_SOCKET: i16 = c.SL_SEC_SOCKET;
-const SL_MAX_SOCKETS: i16 = @intCast(c.SL_MAX_SOCKETS);
+const SL_MAX_SOCKETS: i16 = c.SL_MAX_SOCKETS;
 
 const RET_VAL_OK: i32 = 0;
 /// Address Family

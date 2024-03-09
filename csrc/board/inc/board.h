@@ -142,13 +142,13 @@
 #define WIFI_SERIAL_PORT              USART0
 #define WIFI_SPI_BAUDRATE             UINT32_C(10000000)
 
-#define WIFI_SUPPLY_SETTING_DELAY_MS  UINT32_C(3)
-#define WIFI_PWRON_HW_WAKEUP_DELAY_MS UINT32_C(25)
-#define WIFI_INIT_DELAY_MS            UINT32_C(1350)
-#define WIFI_MIN_HIB_DELAY_MS         UINT32_C(10)
-#define WIFI_HIB_WAKEUP_DELAY_MS      UINT32_C(50)
-#define WIFI_MIN_RESET_DELAY_MS       UINT32_C(5)
-#define WIFI_POWER_OFF_DELAY_MS       UINT32_C(20)
+#define WIFI_SUPPLY_SETTING_DELAY_MS  (4)
+#define WIFI_PWRON_HW_WAKEUP_DELAY_MS (25)
+#define WIFI_INIT_DELAY_MS            (1350)
+#define WIFI_MIN_HIB_DELAY_MS         (10)
+#define WIFI_HIB_WAKEUP_DELAY_MS      (50)
+#define WIFI_MIN_RESET_DELAY_MS       (5)
+#define WIFI_POWER_OFF_DELAY_MS       (20)
 
 #define VDD_WIFI_EN_PIN               (8)
 #define VDD_WIFI_EN_PORT              (gpioPortA)
@@ -161,8 +161,6 @@
 #define WIFI_INT_PIN                  (10)
 #define WIFI_INT_PORT                 (gpioPortA)
 #define WIFI_INT_MODE                 (gpioModeInput)
-#define WIFI_INT_EDGE_RISING          true
-#define WIFI_INT_EDGE_FALLING         false
 
 #define WIFI_NHIB_PIN                 (11)
 #define WIFI_NHIB_PORT                (gpioPortA)

@@ -265,10 +265,6 @@ pub fn filedownload(self: *@This(), url: []const u8, file_name: [*:0]const u8, c
 
     // Parse the URI
     var uri = try std.Uri.parse(url);
-    errdefer {
-        self.file.close() catch {};
-        self.connection.close() catch {};
-    }
 
     try self.connection.open(uri, null);
     defer {
