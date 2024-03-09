@@ -1,15 +1,37 @@
 /*
- * Board_CC310.c
+ * Copyright (c) 2022-2024 Francisco Llobet-Blandino and the "Miso Project".
  *
- *  Created on: 11 nov 2022
- *      Author: Francisco
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "FreeRTOS.h"
 #include "board.h"
-#include "timers.h"
 #include "semphr.h"
 #include "simplelink.h"
+#include "timers.h"
 
 #define BOARD_CC3100_FD ((int)INT32_C(1))
 
@@ -42,11 +64,11 @@ struct transfer_status_s
 };
 
 static volatile P_EVENT_HANDLER interrupt_handler_callback = NULL;
-static void *interrupt_handler_pValue             = NULL;
+static void *interrupt_handler_pValue                      = NULL;
 
 extern void system_reset(void);
 
-static void timerContextCallback(void * param1, uint32_t param2)
+static void timerContextCallback(void *param1, uint32_t param2)
 {
     (void)param1;
     (void)param2;
@@ -63,7 +85,8 @@ static void cc3100_interrupt_callback(uint8_t intNo)
 
     if (((uint8_t)WIFI_INT_PIN == intNo) && (NULL != interrupt_handler_callback))
     {
-        (void)xTimerPendFunctionCallFromISR(timerContextCallback, (void *)interrupt_handler_callback, (uint32_t)interrupt_handler_pValue, &xHigherPriorityTaskWoken);
+        (void)xTimerPendFunctionCallFromISR(timerContextCallback, (void *)interrupt_handler_callback,
+                                            (uint32_t)interrupt_handler_pValue, &xHigherPriorityTaskWoken);
     }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
