@@ -134,8 +134,8 @@ void CC3100_DeviceEnable(void)
     GPIO_PinOutSet(WIFI_NHIB_PORT, WIFI_NHIB_PIN);
     BOARD_msDelay(50);  // Wakeup from hybernate
 
-    //GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_MODE, 0);
-    //GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, true); // Enable Interrupt active high
+    // GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_MODE, 0);
+    // GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, true); // Enable Interrupt active high
 }
 
 void CC3100_DeviceDisable(void)
@@ -288,7 +288,7 @@ void CC3100_IfRegIntHdlr(P_EVENT_HANDLER interruptHdl, void *pValue)
     interrupt_handler_callback = interruptHdl;
     interrupt_handler_pValue   = pValue;
 
-    if(interruptHdl == NULL)
+    if (interruptHdl == NULL)
     {
         GPIO_ExtIntConfig(WIFI_INT_PORT, WIFI_INT_PIN, WIFI_INT_PIN, true, false, false);
         GPIO_PinModeSet(WIFI_INT_PORT, WIFI_INT_PIN, gpioModeDisabled, 0);
