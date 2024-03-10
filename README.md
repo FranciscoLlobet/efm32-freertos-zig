@@ -12,6 +12,11 @@
 
 `MISO` is not affiliated with LEGIC Identsystems Ltd, the LEGIC XDK Secure Sensor Evaluation Kit, the Rust Foundation or the Rust Project. Furthermore, it's important to note that this codebase should not be used in use cases which have strict safety and/or availability requirements.
 
+## Important documents
+
+- [LICENSE.md](./LICENSE.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+
 ## What's inside?
 
 The current version of `MISO` boasts a set of features, including:
