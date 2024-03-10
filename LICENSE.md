@@ -4,29 +4,29 @@
 
 `miso` code is licensed using two open source licenses depending on the programming language used in the file.
 
-- [MIT License](#mit-license) is used in `zig`-code
+- [MIT License](#mit-license) is used in `zig`-code and `python` code
 - [BSD 3-Clause License](#bsd-3-clause-license) is used in `C`-code and headers
 
 For contributions, please consult [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## SBOM and 3rd Party Software
 
-`miso` uses 3rd party software extensively. Some of the included submodules may include licenses not listed below or be dual-licensed. If a 3rd party component offer dual licensing, please use the most convenient or compatible with the MIT license or the BSD 3-Clause licenses used in the project.
+`miso` uses 3rd party software extensively. Some of the included submodules may include licenses not listed below. If a 3rd party component offer dual licensing, please use the most convenient or compatible with the MIT license or the BSD 3-Clause licenses used in the project.
 
-| Product                 | Version    | Year | SPDX Identifier             |
-|-------------------------|------------|------|-----------------------------|
-| FreeRTOS Kernel         | 202112.00  | 2021 | MIT                         |
-| Wakaama                 | 1.1        | 2021 | EPL-2.0, EDL-1.0            |
-| PicoHTTP Parser         | 2.9        | 2020 | MIT License, GPL-2.0-or-later |
-| Eclipse Paho MQTT C/C++ | 1.3.9      | 2021 | EPL-1.0, EDL-1.0            |
-| mbedTLS                 | 3.1.0      | 2021 | Apache-2.0                  |
-| McuBoot                 | 1.8.0      | 2021 | Apache-2.0                  |
-| FatFs                   | R0.14c     | 2020 | Custom (similar to MIT/BSD) |
-| CC3100 SDK              | 1.3.0      | 2015 | BSD-Style                   |
-| Gecko SDK               | 3.2.1      | 2021 | Zlib                        |
-| picolibc                | 1.7.4      | 2021 | MIT License                 |
-| Zig                     | 0.9.0      | 2021 | MIT License                 |
-| Jsmn                    | 2020.10.19 | 2020 | MIT License                 |
+| Product                 | Licensing info  |Version    | Year | SPDX Identifier             |
+|-------------------------|---------------------------------------------------------------------|-----------|------|-----------------------------|
+| FreeRTOS Kernel   | [LICENSE.md](./csrc/system/FreeRTOS-Kernel/LICENSE.md)              | V11.0.x | 2024 | MIT                         |
+| Wakaama                 | [NOTICE.md](./csrc/connectivity/wakaama/NOTICE.md)                  | dev branch        | 2024 | EPL-2.0, EDL-1.0            |
+| PicoHTTP Parser         | [README.md](./csrc/connectivity/picohttpparser/README.md)           | master branch        | 2024 | MIT License, GPL-2.0-or-later |
+| Eclipse Paho MQTT C/C++ | [notice.html](./csrc/connectivity/paho.mqtt.embedded-c/notice.html) | 1.3.9      | 2021 | EPL-1.0, EDL-1.0            |
+| mbedTLS                 | [LICENSE](./csrc/crypto/mbedtls/LICENSE)                            | 3.5.2      | 2024 | Apache-2.0                  |
+| McuBoot                 | [LICENSE](./csrc/mcuboot/LICENSE)                                   | 2.1.0-dev      | 2024 | Apache-2.0                  |
+| FatFs                   | [ff.h](./csrc/system/ff15/source/ff.h)                              | R0.15      | 2023 | Custom (similar to MIT/BSD) |
+| CC3100 SDK              | [readme.txt](./csrc/system/cc3100-sdk/readme.txt)                   | 1.3.0      | 2015 | BSD-Style                   |
+| Gecko SDK               | [License.txt](./csrc/system/gecko_sdk/License.txt)                  | 4.4.1      | 2024 | Zlib                        |
+| picolibc                | |1.8.6      | 2023 | MIT License                 |
+| Zig                     | |0.11.0     | 2023 | MIT License                 |
+| Jsmn                    | [LICENSE](./csrc/utils/jsmn/LICENSE) | master branch | 2021 | MIT License                 |
 
 ## MIT License
 
