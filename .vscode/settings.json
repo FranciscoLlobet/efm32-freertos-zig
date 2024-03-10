@@ -81,7 +81,15 @@
         "liblwm2m.h": "c",
         "__locale": "c",
         "string": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "diskio.h": "c",
+        "array": "c",
+        "span": "c",
+        "vector": "c",
+        "xstring": "c",
+        "xutility": "c",
+        "regex": "c",
+        "xiosbase": "c"
     },
     "cmake.configureOnOpen": false,
     "cortex-debug.variableUseNaturalFormat": true

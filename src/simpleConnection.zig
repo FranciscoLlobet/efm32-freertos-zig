@@ -1,5 +1,22 @@
-//! Simple Connection
-//!
+// Copyright (c) 2023-2024 Francisco Llobet-Blandino and the "Miso Project".
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
@@ -26,7 +43,7 @@ const SL_IPROTO_TCP: i16 = c.SL_IPPROTO_TCP;
 const SL_AF_INET: i16 = c.SL_AF_INET;
 
 const SL_SEC_SOCKET: i16 = c.SL_SEC_SOCKET;
-const SL_MAX_SOCKETS: i16 = @intCast(c.SL_MAX_SOCKETS);
+const SL_MAX_SOCKETS: i16 = c.SL_MAX_SOCKETS;
 
 const RET_VAL_OK: i32 = 0;
 /// Address Family

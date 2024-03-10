@@ -1,3 +1,21 @@
+// Copyright (c) 2023-2024 Francisco Llobet-Blandino and the "Miso Project".
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 const std = @import("std");
 const freertos = @import("freertos.zig");
 const config = @import("config.zig");
@@ -188,27 +206,34 @@ fn run(self: *@This()) noreturn {
         var read_set_ptr: ?*c.SlFdSet_t = null;
         var write_set_ptr: ?*c.SlFdSet_t = null;
         var nfsd: i16 = -1;
+        var maintenance: usize = 0;
 
         c.SL_FD_ZERO(&read_fd_set);
         c.SL_FD_ZERO(&write_fd_set);
 
         const current_time = freertos.xTaskGetTickCount();
 
-        // process the connection pool
+        // Go through the connection list
         for (&self.connections) |*conn| {
             if (conn.sd >= 0) {
                 if (conn.rx_queue.recieve(0)) |msg| {
-                    if (msg.deadline > conn.rx_wait_deadline_ms) {
+                    if ((msg.deadline > conn.rx_wait_deadline_ms) or (msg.deadline == 0)) {
                         conn.rx_wait_deadline_ms = msg.deadline;
                     }
                 }
                 if (conn.tx_queue.recieve(0)) |msg| {
-                    if (msg.deadline > conn.tx_wait_deadline_ms) {
+                    if ((msg.deadline > conn.tx_wait_deadline_ms) or (msg.deadline == 0)) {
                         conn.tx_wait_deadline_ms = msg.deadline;
                     }
                 }
 
-                if (conn.rx_wait_deadline_ms >= current_time) {
+                if ((conn.rx_wait_deadline_ms == 0)) {
+                    if (self.mutex.take(null) catch unreachable) {
+                        conn.sd = -1; // Invalidate the connection
+                        self.mutex.give() catch unreachable;
+                    }
+                    maintenance += 1; // Go for another loop if there are no more deadlines
+                } else if (conn.rx_wait_deadline_ms >= current_time) {
                     c.SL_FD_SET(conn.sd, &read_fd_set);
                     if (nfsd < conn.sd) {
                         nfsd = conn.sd;
@@ -216,71 +241,46 @@ fn run(self: *@This()) noreturn {
                     read_set_ptr = &read_fd_set;
                 } else {
                     conn.rx_wait_deadline_ms = 0; // reset deadline
-                    conn.rx_signal.give() catch {};
-                }
-
-                if (conn.tx_wait_deadline_ms >= current_time) {
-                    c.SL_FD_SET(conn.sd, &write_fd_set);
-                    if (nfsd < conn.sd) {
-                        nfsd = conn.sd;
-                    }
-                    write_set_ptr = &write_fd_set;
-                } else {
-                    conn.tx_wait_deadline_ms = 0; // reset deadline
-                    conn.tx_signal.give() catch {};
+                    const msg: timeout_resp = .{ .timeout = 0 };
+                    conn.rx_signal.send(&msg, null) catch {};
+                    maintenance += 1; // Go for another loop if there are no more deadlines
                 }
             }
         }
 
         if ((read_set_ptr != null) or (write_set_ptr != null)) {
-            var res: i16 = -1;
-            // Sem
-            if (self.mutex.take(null)) |_| {
-                const tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 0 };
+            var tv = c.SlTimeval_t{ .tv_sec = 0, .tv_usec = 0 };
 
-                res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, @constCast(&tv));
+            const res = c.sl_Select(nfsd + 1, read_set_ptr, write_set_ptr, null, &tv);
 
-                self.mutex.give() catch unreachable;
-            } else |_| {
-                //Ignore
-            }
-
-            var waiting_count: usize = 0;
             if (res > 0) {
                 if (read_set_ptr) |read_set| {
                     for (&self.connections) |*conn| {
                         if (conn.sd >= 0) {
                             if (1 == c.SL_FD_ISSET(conn.sd, read_set)) {
-                                conn.sd = -1;
-                                conn.rx_wait_deadline_ms = 0;
-                                conn.rx_signal.give() catch unreachable;
+                                conn.rx_wait_deadline_ms = 0; // reset deadline
+
+                                const msg: timeout_resp = .{ .timeout = 1 };
+
+                                conn.rx_signal.send(&msg, null) catch {};
                             } else {
-                                waiting_count += 1;
+                                // Do nothing
                             }
                         }
                     }
                 }
             } else if (res == 0) {
-                if (read_set_ptr) |_| {
-                    for (&self.connections) |*conn| {
-                        if (conn.sd >= 0) {
-                            waiting_count += 1;
-                        }
-                    }
-                }
-
-                // self.task.delayTask(10);
+                // Select returned without any events
+                self.task.delayTask(50);
             } else {
                 // Error
                 _ = c.printf("Select ERROR\n\r");
             }
-
-            if (waiting_count > 0) {
-                self.task.delayTask(50);
-            }
+        } else if (maintenance != 0) {
+            // do nothing
         } else {
             // no deadlines
-            if (self.task.waitForNotify(0, 0xFFFFFFFF, 2000)) |_| {
+            if (self.task.waitForNotify(0, 0xFFFFFFFF, null)) |_| {
                 // Do something
             } else |_| {
                 // Do nothing
@@ -294,11 +294,15 @@ const timeout_msg = struct {
     deadline: u32,
 };
 
+const timeout_resp = struct {
+    timeout: u32,
+};
+
 const connectionManagerElement = struct {
     sd: i16 = -1,
     rx_wait_deadline_ms: u32 = 0,
     tx_wait_deadline_ms: u32 = 0,
-    rx_signal: freertos.StaticBinarySemaphore(),
+    rx_signal: freertos.StaticQueue(timeout_resp, 1),
     tx_signal: freertos.StaticBinarySemaphore(),
     rx_queue: freertos.StaticQueue(timeout_msg, 1),
     tx_queue: freertos.StaticQueue(timeout_msg, 1),
@@ -332,7 +336,10 @@ fn findSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
 fn findFreeSocket(self: *@This(), sd: i16) ?*connectionManagerElement {
     for (&self.connections) |*conn| {
         if (conn.sd < 0) {
-            conn.sd = sd;
+            if (self.mutex.take(null) catch unreachable) {
+                conn.sd = sd;
+                self.mutex.give() catch unreachable;
+            }
             return conn;
         }
     }
@@ -353,31 +360,28 @@ pub fn init(self: *@This()) !void {
 }
 
 pub fn wait_rx(self: *@This(), sd: i16, timeout_s: u32) !bool {
-    const timeout_ms = timeout_s * 1000;
-    var current_time = freertos.xTaskGetTickCount();
-    const deadline_ms = current_time + timeout_ms + 1000;
-
+    const deadline_ms: u32 = @as(u32, freertos.xTaskGetTickCount()) + (timeout_s * 1024);
     const msg: timeout_msg = .{ .deadline = deadline_ms };
 
     // Find a connection in the pool.
     var conn: *connectionManagerElement = self.findSocket(sd) orelse (self.findFreeSocket(sd) orelse unreachable);
 
-    _ = conn.rx_signal.take(0) catch false; // Dummy take to block the signal
+    conn.rx_signal.reset();
 
-    try conn.rx_queue.send(&msg, timeout_ms);
+    try conn.rx_queue.send(&msg, null);
 
     self.task.notify(1, .eIncrement) catch {};
 
-    current_time = freertos.xTaskGetTickCount();
-    if (current_time <= deadline_ms) {
-        if (conn.rx_signal.take(deadline_ms - current_time)) |val| {
-            return val;
-        } else |err| {
-            return if (err == freertos.FreeRtosError.SemaphoreTakeTimeout) false else err;
+    if (conn.rx_signal.recieve(null)) |resp| {
+        if (1 == resp.timeout) {
+            return true;
+        } else {
+            // _ = c.printf("Deadline missed: %d\n\r", freertos.xTaskGetTickCount() - deadline_ms);
+            return false;
         }
+    } else {
+        return false;
     }
-
-    return false;
 }
 
 pub var connectionManager: @This() = undefined;

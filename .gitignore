@@ -14,3 +14,4 @@ zig-out
 *.pyc
 .doit.db.*
 venv
+miso-cppcheck-build-dir

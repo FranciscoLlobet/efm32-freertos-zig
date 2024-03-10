@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="1">
+    <builddir>miso-cppcheck-build-dir</builddir>
+    <platform>arm32-wchar_t2.xml</platform>
+    <analyze-all-vs-configs>false</analyze-all-vs-configs>
+    <check-headers>false</check-headers>
+    <check-unused-templates>true</check-unused-templates>
+    <max-ctu-depth>2</max-ctu-depth>
+    <max-template-recursion>100</max-template-recursion>
+    <includedir>
+        <dir name="csrc/inc/"/>
+        <dir name="csrc/config/"/>
+        <dir name="csrc/board/inc/"/>
+        <dir name="csrc/system/gecko_sdk/platform/CMSIS/Core/Include/"/>
+        <dir name="csrc/system/gecko_sdk/platform/Device/SiliconLabs/EFM32GG/Include/"/>
+        <dir name="csrc/system/gecko_sdk/platform/common/inc/"/>
+        <dir name="csrc/system/gecko_sdk/platform/emdrv/common/inc/"/>
+        <dir name="csrc/system/gecko_sdk/platform/emlib/inc/"/>
+        <dir name="csrc/system/FreeRTOS-Kernel/portable/GCC/ARM_CM3/"/>
+        <dir name="csrc/system/FreeRTOS-Kernel/include/"/>
+        <dir name="csrc/crypto/mbedtls/include/"/>
+        <dir name="csrc/crypto/mbedtls/include/mbedtls/"/>
+        <dir name="csrc/connectivity/wakaama/include/"/>
+        <dir name="csrc/system/cc3100-sdk/simplelink/include/"/>
+        <dir name="csrc/system/ff15/source/"/>
+    </includedir>
+    <defines>
+        <define name="MBEDTLS_CONFIG_FILE=&quot;miso_mbedtls_config.h&quot;"/>
+        <define name="EFM32GG390F1024"/>
+        <define name="SL_CATALOG_POWER_MANAGER_PRESENT=1"/>
+        <define name="MISO_APPLICATION"/>
+        <define name="__ARMCC_VERSION=6100100"/>
+    </defines>
+    <paths>
+        <dir name="csrc/board/src"/>
+        <dir name="csrc/src"/>
+    </paths>
+</project>

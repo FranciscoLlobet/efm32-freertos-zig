@@ -337,7 +337,7 @@ extern "C"
 #define sl_Memcpy(dest, src, len)      memcpy(dest, src, (size_t)len)
   
 #ifndef SL_TINY_EXT
-#define SL_MAX_SOCKETS      (_u8)(8)
+#define SL_MAX_SOCKETS      (8)
 #else
 #define SL_MAX_SOCKETS      (_u8)(2)
 #endif

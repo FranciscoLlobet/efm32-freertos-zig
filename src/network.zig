@@ -1,3 +1,22 @@
+// Copyright (c) 2023-2024 Francisco Llobet-Blandino and the "Miso Project".
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 const std = @import("std");
 const board = @import("microzig").board;
 const freertos = @import("freertos.zig");
@@ -15,7 +34,7 @@ const c = @cImport({
 
 /// SimpleLink Spawn Queue Executor
 const simpleLinkSpawn = struct {
-    task: freertos.StaticTask(@This(), 900, "SimpleLinkSpawnTask", run),
+    task: freertos.StaticTask(@This(), 900, "SimpleLinkSpawn", run),
     queue: freertos.StaticQueue(c.tSimpleLinkSpawnMsg, 4),
     stack: usize,
 
@@ -37,15 +56,12 @@ const simpleLinkSpawn = struct {
     /// Send a message to the SimpleLink Spawn task
     fn sendMsg(self: *@This(), pEntry: c.P_OSI_SPAWN_ENTRY, pValue: ?*anyopaque, flags: c_ulong) !void {
         const msg: c.tSimpleLinkSpawnMsg = .{ .pEntry = pEntry, .pValue = pValue };
-        var xHigherPriorityTaskWoken: freertos.BaseType_t = freertos.pdFALSE;
+        defer freertos.portYIELD();
 
         if (flags == 1) {
-            defer freertos.portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-
-            try self.queue.sendFromIsr(&msg, &xHigherPriorityTaskWoken);
+            try self.queue.send(&msg, 0);
         } else {
             try self.queue.send(&msg, null);
-            defer freertos.portYIELD();
         }
     }
 };
