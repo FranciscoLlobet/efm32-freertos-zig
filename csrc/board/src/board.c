@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Francisco Llobet-Blandino and the "Miso Project".
+ * Copyright (c) 2022-2024 Francisco Llobet-Blandino and the "Miso Project".
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
